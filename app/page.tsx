@@ -1,5 +1,5 @@
 import { getChatGPTUser, chatGPTSignInPath } from "./chatgpt-auth";
-import { Storyyard } from "./storyyard";
+import { Library } from "./library";
 
 export const dynamic = "force-dynamic";
 
@@ -17,5 +17,5 @@ export default async function Home() {
     );
   }
 
-  return <Storyyard userName={user.displayName} />;
+  return <Library userName={user.displayName} />;
 }

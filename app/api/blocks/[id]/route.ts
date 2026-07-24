@@ -14,5 +14,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const input = (await request.json()) as Partial<{ act: number; title: string; body: string; kind: string; sortOrder: number }>;
   const update = { ...input, updatedAt: new Date().toISOString() };
   await getDb().update(plotBlocks).set(update).where(eq(plotBlocks.id, id));
+  await getDb().update(projects).set({ updatedAt: update.updatedAt }).where(eq(projects.id, block.projectId));
   return Response.json({ ok: true });
 }

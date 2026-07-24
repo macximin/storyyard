@@ -1,0 +1,148 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+
+type Project = {
+  id: string;
+  title: string;
+  logline: string;
+  genre: string;
+  favorite: number;
+  updatedAt: string;
+};
+
+export function Library({ userName }: { userName: string }) {
+  const router = useRouter();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [filter, setFilter] = useState<"all" | "favorites">("all");
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/projects")
+      .then((response) => response.json())
+      .then((data) => setProjects(data.projects ?? []))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const visible = useMemo(
+    () => projects.filter((project) => filter === "all" || project.favorite),
+    [filter, projects],
+  );
+
+  async function createProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: form.get("title"),
+        logline: form.get("logline"),
+        genre: form.get("genre"),
+      }),
+    });
+    const data = await response.json();
+    if (data.project) router.push(`/project/${data.project.id}/plot`);
+  }
+
+  async function toggleFavorite(project: Project) {
+    const favorite = project.favorite ? 0 : 1;
+    setProjects((current) =>
+      current.map((item) => (item.id === project.id ? { ...item, favorite } : item)),
+    );
+    await fetch(`/api/projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ favorite }),
+    });
+  }
+
+  return (
+    <main className="library-shell">
+      <aside className="global-sidebar">
+        <a className="wordmark" href="/">STORYYARD</a>
+        <div className="user-chip"><span>{userName.slice(0, 1)}</span>{userName}</div>
+        <nav className="global-nav" aria-label="주 메뉴">
+          <a className="active" href="/">⌂ <span>내 작품</span></a>
+          <a href="#favorites" onClick={() => setFilter("favorites")}>☆ <span>즐겨찾기</span></a>
+        </nav>
+        <a className="signout" href="/signout-with-chatgpt?return_to=/">로그아웃</a>
+      </aside>
+
+      <section className="library-main">
+        <header className="library-header">
+          <div>
+            <p className="kicker">WRITING STUDIO</p>
+            <h1>내 작품</h1>
+            <p>작품을 고르면 등장인물, 플롯, 문서 작업실로 들어갑니다.</p>
+          </div>
+          <button className="black-button" onClick={() => setCreating(true)}>＋ 새 작품</button>
+        </header>
+
+        <div className="library-toolbar" id="favorites">
+          <div className="filter-tabs" role="tablist" aria-label="작품 필터">
+            <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>
+              모든 작품 <b>{projects.length}</b>
+            </button>
+            <button className={filter === "favorites" ? "active" : ""} onClick={() => setFilter("favorites")}>
+              즐겨찾기 <b>{projects.filter((project) => project.favorite).length}</b>
+            </button>
+          </div>
+          <span className="sort-label">최근 편집순 ↓</span>
+        </div>
+
+        {loading ? (
+          <div className="blank-state">작품 목록 불러오는 중…</div>
+        ) : visible.length ? (
+          <div className="work-grid">
+            {visible.map((project) => (
+              <article className="work-card" key={project.id}>
+                <button
+                  className={`favorite-button ${project.favorite ? "selected" : ""}`}
+                  aria-label={`${project.title} 즐겨찾기`}
+                  onClick={() => toggleFavorite(project)}
+                >
+                  {project.favorite ? "★" : "☆"}
+                </button>
+                <button className="work-card-body" onClick={() => router.push(`/project/${project.id}/plot`)}>
+                  <span className="work-type">{project.genre}</span>
+                  <h2>{project.title}</h2>
+                  <p>{project.logline}</p>
+                  <span className="edited-at">{formatDate(project.updatedAt)} 편집</span>
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="blank-state">
+            <strong>{filter === "favorites" ? "즐겨찾기한 작품이 없음." : "아직 작품이 없음."}</strong>
+            <span>{filter === "favorites" ? "별을 눌러 작업 우선순위를 박아 두면 됨." : "첫 작품부터 깔자."}</span>
+          </div>
+        )}
+      </section>
+
+      {creating && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setCreating(false)}>
+          <form className="modal-card" onSubmit={createProject} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-heading">
+              <div><p className="kicker">NEW WORK</p><h2>새 작품</h2></div>
+              <button type="button" className="icon-button" onClick={() => setCreating(false)}>×</button>
+            </div>
+            <label>작품 제목<input name="title" autoFocus required placeholder="제목을 입력" /></label>
+            <label>한 줄 소개<textarea name="logline" placeholder="주인공, 목표, 압박을 한 줄로" /></label>
+            <label>장르<input name="genre" defaultValue="웹소설" /></label>
+            <button className="black-button" type="submit">작품 만들기</button>
+          </form>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "최근";
+  return new Intl.DateTimeFormat("ko", { month: "short", day: "numeric" }).format(date);
+}

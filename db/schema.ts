@@ -6,6 +6,7 @@ export const projects = sqliteTable("projects", {
   title: text("title").notNull(),
   logline: text("logline").notNull().default(""),
   genre: text("genre").notNull().default("웹소설"),
+  favorite: integer("favorite").notNull().default(0),
   updatedAt: text("updated_at").notNull(),
   createdAt: text("created_at").notNull(),
 });

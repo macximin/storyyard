@@ -24,7 +24,8 @@ export async function POST(request: Request) {
   const project = {
     id: id(), ownerEmail: user.email, title,
     logline: payload.logline?.trim() || "이 작품의 한 줄 출발점을 적어 보세요.",
-    genre: payload.genre?.trim() || "웹소설", updatedAt: timestamp, createdAt: timestamp,
+    genre: payload.genre?.trim() || "웹소설", favorite: 0,
+    updatedAt: timestamp, createdAt: timestamp,
   };
   await getDb().insert(projects).values(project);
   return Response.json({ project }, { status: 201 });
