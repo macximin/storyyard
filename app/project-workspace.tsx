@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { startNavigationProgress } from "./navigation-progress";
 import { DotsThree, FileText, GlobeHemisphereWest, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkspaceSnapshot } from "./workspace-data";
@@ -128,15 +129,6 @@ export function ProjectWorkspace({
   useEffect(() => {
     if (project) workspaceCache.set(projectId, { project, blocks, items });
   }, [projectId, project, blocks, items]);
-
-  useEffect(() => {
-    router.prefetch(`/project/${projectId}`);
-    router.prefetch(`/project/${projectId}/characters`);
-    router.prefetch(`/project/${projectId}/plot`);
-    router.prefetch(`/project/${projectId}/documents`);
-    router.prefetch(`/project/${projectId}/manuscript`);
-    router.prefetch(`/project/${projectId}/publish`);
-  }, [projectId, router]);
 
   useEffect(() => {
     function preservePendingDraft() {
@@ -631,7 +623,10 @@ export function ProjectWorkspace({
       setTreeAddOpen(false);
       setTreeMenu(null);
       if (folderId && !openFolders.includes(folderId)) setOpenFolders((current) => [...current, folderId]);
-      if (view !== "documents") router.push(`/project/${projectId}/documents?document=${data.item.id}`);
+      if (view !== "documents") {
+        startNavigationProgress();
+        router.push(`/project/${projectId}/documents?document=${data.item.id}`);
+      }
     }
   }
 
@@ -710,7 +705,10 @@ export function ProjectWorkspace({
 
   function selectDocument(id: string) {
     setDocumentId(id);
-    if (view !== "documents") router.push(`/project/${projectId}/documents?document=${id}`);
+    if (view !== "documents") {
+      startNavigationProgress();
+      router.push(`/project/${projectId}/documents?document=${id}`);
+    }
   }
 
   if (loading) return <main className="loading-shell">작업실 불러오는 중…</main>;
@@ -923,13 +921,13 @@ function ProjectSidebar(props: {
   const unfiled = props.documents.filter((document) => !documentFolder(document));
   return (
     <aside className="project-sidebar">
-      <Link className="back-home" href="/studio">⌂ 개인 작업실</Link>
+      <Link className="back-home" href="/studio" prefetch={false}>⌂ 개인 작업실</Link>
       <div className="project-identity"><span>{props.project.genre}</span><strong>{props.project.title}</strong></div>
       <label className="sidebar-search">⌕<input placeholder="검색…" aria-label="작품 검색" /></label>
       <nav className="project-nav" aria-label="작품 메뉴">
-        <Link className={props.view === "overview" ? "active" : ""} href={`/project/${props.projectId}`}>◇ <span>작품 개요</span></Link>
-        <Link className={props.view === "characters" ? "active" : ""} href={`/project/${props.projectId}/characters`}>♙ <span>등장인물</span><b>{props.characters.length}</b></Link>
-        <Link className={props.view === "plot" ? "active" : ""} href={`/project/${props.projectId}/plot`}>▦ <span>플롯</span><b>{props.plots.length}</b></Link>
+        <Link className={props.view === "overview" ? "active" : ""} href={`/project/${props.projectId}`} prefetch={false}>◇ <span>작품 개요</span></Link>
+        <Link className={props.view === "characters" ? "active" : ""} href={`/project/${props.projectId}/characters`} prefetch={false}>♙ <span>등장인물</span><b>{props.characters.length}</b></Link>
+        <Link className={props.view === "plot" ? "active" : ""} href={`/project/${props.projectId}/plot`} prefetch={false}>▦ <span>플롯</span><b>{props.plots.length}</b></Link>
       </nav>
 
       <section
@@ -989,10 +987,10 @@ function ProjectSidebar(props: {
         </div>
       </section>
       <nav className="project-secondary-nav" aria-label="원고와 공개 관리">
-        <Link className={props.view === "manuscript" ? "active" : ""} href={`/project/${props.projectId}/manuscript`}>
+        <Link className={props.view === "manuscript" ? "active" : ""} href={`/project/${props.projectId}/manuscript`} prefetch={false}>
           <FileText size={17} /><span>원고</span>
         </Link>
-        <Link className={props.view === "publish" ? "active" : ""} href={`/project/${props.projectId}/publish`}>
+        <Link className={props.view === "publish" ? "active" : ""} href={`/project/${props.projectId}/publish`} prefetch={false}>
           <GlobeHemisphereWest size={17} /><span>공개 관리</span>
         </Link>
       </nav>

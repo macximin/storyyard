@@ -2,7 +2,6 @@
 
 import { BookmarkSimple, Star } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CommentThread } from "./comment-thread";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
@@ -32,7 +31,6 @@ export function PublicWork({
   setupRequired: boolean;
   initialSnapshot: PublicWorkSnapshot | null;
 }) {
-  const router = useRouter();
   const [work, setWork] = useState<Work | null>(initialSnapshot?.work ?? null);
   const episodes = initialSnapshot?.episodes ?? [];
   const comments = initialSnapshot?.comments ?? [];
@@ -106,8 +104,6 @@ export function PublicWork({
                         className="episode-heading"
                         href={href}
                         prefetch={false}
-                        onPointerEnter={() => router.prefetch(href)}
-                        onFocus={() => router.prefetch(href)}
                       >
                         <span>{episode.episode_no}화</span><strong>{episode.title}</strong><small>읽기 →</small>
                       </Link>

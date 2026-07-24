@@ -2,7 +2,6 @@
 
 import { ArrowLeft, ArrowRight, ChatCircle, List, X } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CommentThread } from "./comment-thread";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
@@ -17,7 +16,6 @@ export function PublicEpisodeReader({
   setupRequired: boolean;
   snapshot: PublicEpisodeSnapshot | null;
 }) {
-  const router = useRouter();
   const [tocOpen, setTocOpen] = useState(false);
 
   if (!snapshot) {
@@ -34,7 +32,6 @@ export function PublicEpisodeReader({
   const previous = index > 0 ? episodes[index - 1] : null;
   const next = index >= 0 && index < episodes.length - 1 ? episodes[index + 1] : null;
   const episodeHref = (episodeNo: number) => `/works/${work.slug}/episodes/${episodeNo}`;
-  const prime = (episodeNo: number) => router.prefetch(episodeHref(episodeNo));
 
   return (
     <main className="library-shell reader-page-shell">
@@ -60,8 +57,6 @@ export function PublicEpisodeReader({
                 className={item.id === episode.id ? "active" : ""}
                 href={episodeHref(item.episode_no)}
                 prefetch={false}
-                onPointerEnter={() => prime(item.episode_no)}
-                onFocus={() => prime(item.episode_no)}
                 onClick={() => setTocOpen(false)}
               >
                 <span>{item.episode_no}화</span>
@@ -89,8 +84,6 @@ export function PublicEpisodeReader({
               <Link
                 href={episodeHref(previous.episode_no)}
                 prefetch={false}
-                onPointerEnter={() => prime(previous.episode_no)}
-                onFocus={() => prime(previous.episode_no)}
               >
                 <ArrowLeft size={18} /><span><small>이전화</small>{previous.title}</span>
               </Link>
@@ -100,8 +93,6 @@ export function PublicEpisodeReader({
                 className="next"
                 href={episodeHref(next.episode_no)}
                 prefetch={false}
-                onPointerEnter={() => prime(next.episode_no)}
-                onFocus={() => prime(next.episode_no)}
               >
                 <span><small>다음화</small>{next.title}</span><ArrowRight size={18} />
               </Link>

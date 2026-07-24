@@ -14,6 +14,7 @@ import {
   UserCircle,
 } from "@phosphor-icons/react";
 import { FormEvent, useState } from "react";
+import { startNavigationProgress } from "./navigation-progress";
 
 export type SidebarUser = {
   id: string;
@@ -66,6 +67,7 @@ export function GlobalSidebar({
       }
       const returnTo = searchParams.get("return_to");
       if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
+        startNavigationProgress();
         router.push(returnTo);
       } else {
         router.refresh();
@@ -84,13 +86,14 @@ export function GlobalSidebar({
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
+    startNavigationProgress();
     router.push("/");
     router.refresh();
   }
 
   return (
     <aside className="global-sidebar">
-      <Link className="wordmark" href="/">STORYYARD</Link>
+      <Link className="wordmark" href="/" prefetch={false}>STORYYARD</Link>
       {user ? (
         <div className="signed-user">
           <div className="user-chip">
@@ -118,14 +121,15 @@ export function GlobalSidebar({
             <button type="button" className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>회원가입</button>
           </div>
           {mode === "register" && (
-            <input name="displayName" placeholder="표시 이름" maxLength={32} />
+            <input name="displayName" placeholder="표시 이름" aria-label="표시 이름" maxLength={32} />
           )}
-          <input name="username" placeholder="아이디" autoComplete="username" required />
+          <input name="username" placeholder="아이디" aria-label="아이디" autoComplete="username" required />
           <label className="password-input">
             <input
               name="password"
               type={passwordVisible ? "text" : "password"}
               placeholder="비밀번호"
+              aria-label="비밀번호"
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               minLength={8}
               required
@@ -135,7 +139,7 @@ export function GlobalSidebar({
             </button>
           </label>
           {setupRequired && mode === "register" && (
-            <input name="setupCode" placeholder="관리자 초기 설정 코드" required />
+            <input name="setupCode" placeholder="관리자 초기 설정 코드" aria-label="관리자 초기 설정 코드" required />
           )}
           <label className="remember-login">
             <input name="remember" type="checkbox" defaultChecked />
@@ -152,23 +156,23 @@ export function GlobalSidebar({
 
       <nav className="global-nav" aria-label="주 메뉴">
         <p>커뮤니티</p>
-        <Link className={active === "community" ? "active" : ""} href="/" aria-label="전체장르">
+        <Link className={active === "community" ? "active" : ""} href="/" prefetch={false} aria-label="전체장르">
           <BookOpen size={18} /><span>전체장르</span>
         </Link>
-        <Link className={active === "preferred" ? "active" : ""} href="/preferred" aria-label="선호작">
+        <Link className={active === "preferred" ? "active" : ""} href="/preferred" prefetch={false} aria-label="선호작">
           <BookmarkSimple size={18} /><span>선호작</span>
         </Link>
         <p>개인 작업실</p>
-        <Link className={active === "studio" ? "active" : ""} href="/studio" aria-label="내 작품">
+        <Link className={active === "studio" ? "active" : ""} href="/studio" prefetch={false} aria-label="내 작품">
           <House size={18} /><span>내 작품</span>
         </Link>
-        <Link className={active === "studio-favorites" ? "active" : ""} href="/studio?filter=favorites" aria-label="즐겨찾기">
+        <Link className={active === "studio-favorites" ? "active" : ""} href="/studio?filter=favorites" prefetch={false} aria-label="즐겨찾기">
           <Star size={18} /><span>즐겨찾기</span>
         </Link>
         {user?.role === "admin" && (
           <>
             <p>관리자</p>
-            <Link className={active === "admin" ? "active" : ""} href="/admin" aria-label="운영 관리">
+            <Link className={active === "admin" ? "active" : ""} href="/admin" prefetch={false} aria-label="운영 관리">
               <GearSix size={18} /><span>운영 관리</span>
             </Link>
           </>

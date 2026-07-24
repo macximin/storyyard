@@ -47,6 +47,25 @@ test("primes navigation data on the server and sorts community works locally", a
   assert.match(publicWorkData, /env\.DB\.batch/);
 });
 
+test("avoids duplicate route prefetches and shows navigation progress", async () => {
+  const [sidebar, work, reader, library, workspace, progress, layout] = await Promise.all([
+    read("app/global-sidebar.tsx"),
+    read("app/public-work.tsx"),
+    read("app/public-episode-reader.tsx"),
+    read("app/library.tsx"),
+    read("app/project-workspace.tsx"),
+    read("app/navigation-progress.tsx"),
+    read("app/layout.tsx"),
+  ]);
+  assert.doesNotMatch(`${work}\n${reader}\n${library}\n${workspace}`, /router\.prefetch/);
+  assert.match(sidebar, /prefetch=\{false\}/);
+  assert.match(work, /prefetch=\{false\}/);
+  assert.match(reader, /prefetch=\{false\}/);
+  assert.match(progress, /storyyard:navigation-start/);
+  assert.match(layout, /NavigationProgress/);
+  assert.doesNotMatch(layout, /Geist_Mono|Geist\(/);
+});
+
 test("keeps credentials out of browser storage and uses durable secure sessions", async () => {
   const [auth, sidebar, schema] = await Promise.all([
     read("app/chatgpt-auth.ts"),

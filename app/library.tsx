@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
+import { startNavigationProgress } from "./navigation-progress";
 
 type Project = {
   id: string;
@@ -51,7 +52,10 @@ export function Library({
       }),
     });
     const data = await response.json();
-    if (data.project) router.push(`/project/${data.project.id}/plot`);
+    if (data.project) {
+      startNavigationProgress();
+      router.push(`/project/${data.project.id}/plot`);
+    }
   }
 
   async function toggleFavorite(project: Project) {
@@ -113,10 +117,10 @@ export function Library({
 
         <div className="library-toolbar" id="favorites">
           <div className="filter-tabs" role="tablist" aria-label="작품 필터">
-            <button className={filter === "all" ? "active" : ""} onClick={() => router.replace("/studio")}>
+            <button className={filter === "all" ? "active" : ""} onClick={() => { startNavigationProgress(); router.replace("/studio"); }}>
               모든 작품 <b>{projects.length}</b>
             </button>
-            <button className={filter === "favorites" ? "active" : ""} onClick={() => router.replace("/studio?filter=favorites")}>
+            <button className={filter === "favorites" ? "active" : ""} onClick={() => { startNavigationProgress(); router.replace("/studio?filter=favorites"); }}>
               즐겨찾기 <b>{projects.filter((project) => project.favorite).length}</b>
             </button>
           </div>
@@ -151,9 +155,10 @@ export function Library({
                 )}
                 <button
                   className="work-card-body"
-                  onPointerEnter={() => router.prefetch(`/project/${project.id}/plot`)}
-                  onFocus={() => router.prefetch(`/project/${project.id}/plot`)}
-                  onClick={() => router.push(`/project/${project.id}/plot`)}
+                  onClick={() => {
+                    startNavigationProgress();
+                    router.push(`/project/${project.id}/plot`);
+                  }}
                 >
                   <span className="work-type">{project.genre}</span>
                   <h2>{project.title}</h2>
