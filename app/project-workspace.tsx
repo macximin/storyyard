@@ -26,11 +26,6 @@ type SaveStatus = "idle" | "saving" | "saved" | "error" | "recovered";
 type FolderDraft = { id?: string; title: string };
 type WorkspaceSnapshot = { project: Project; blocks: Block[]; items: Item[] };
 
-const actDefaults = [
-  { title: "1아크", body: "TBD" },
-  { title: "2아크", body: "TBD" },
-  { title: "3아크", body: "TBD" },
-];
 const workspaceCache = new Map<string, WorkspaceSnapshot>();
 
 export function ProjectWorkspace({
@@ -58,6 +53,7 @@ export function ProjectWorkspace({
   const [plotMenuOpen, setPlotMenuOpen] = useState(false);
   const [activePlotId, setActivePlotId] = useState<string | null>(null);
   const [actDraft, setActDraft] = useState<Draft | null>(null);
+  const [creatingAct, setCreatingAct] = useState(false);
   const [folderDraft, setFolderDraft] = useState<FolderDraft | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(
     () => cached?.items.find((item) => item.kind === "document")?.id ?? null,
@@ -150,29 +146,33 @@ export function ProjectWorkspace({
   const activePlot = plots.find((item) => item.id === activePlotId) ?? defaultPlot;
   const selectedDocument = documents.find((item) => item.id === documentId) ?? null;
   const columns = useMemo(
-    () =>
-      actDefaults.map((fallback, index) => {
+    () => {
+      if (!activePlot) return [];
+      const isDefaultPlot = readPlotMeta(activePlot).isDefault;
+      const plotActs = actItems.filter((item) =>
+        belongsToPlot(item.meta, activePlot.id, isDefaultPlot),
+      );
+      const plotBlocks = blocks.filter((block) =>
+        belongsToPlot(block.meta, activePlot.id, isDefaultPlot),
+      );
+      const maxAct = Math.max(
+        3,
+        ...plotActs.map((item) => readAct(item.meta)),
+        ...plotBlocks.map((block) => block.act),
+      );
+      return Array.from({ length: maxAct }, (_, index) => {
         const act = index + 1;
-        const saved = actItems.find(
-          (item) =>
-            readAct(item.meta) === act &&
-            activePlot &&
-            belongsToPlot(item.meta, activePlot.id, readPlotMeta(activePlot).isDefault),
-        );
+        const saved = plotActs.find((item) => readAct(item.meta) === act);
         return {
           act,
-          title: normalizeArcTitle(saved?.title, act) || fallback.title,
-          body: normalizeArcBody(saved?.body) || fallback.body,
-          blocks: blocks
-            .filter(
-              (block) =>
-                block.act === act &&
-                activePlot &&
-                belongsToPlot(block.meta, activePlot.id, readPlotMeta(activePlot).isDefault),
-            )
+          title: normalizeArcTitle(saved?.title, act),
+          body: normalizeArcBody(saved?.body),
+          blocks: plotBlocks
+            .filter((block) => block.act === act)
             .sort((left, right) => left.sortOrder - right.sortOrder),
         };
-      }),
+      });
+    },
     [actItems, activePlot, blocks],
   );
 
@@ -551,6 +551,29 @@ export function ProjectWorkspace({
     setActDraft(null);
   }
 
+  async function createAct() {
+    if (!activePlot || creatingAct) return;
+    const act = Math.max(0, ...columns.map((column) => column.act)) + 1;
+    const meta = JSON.stringify({ act, plotId: activePlot.id });
+    setCreatingAct(true);
+    try {
+      const response = await fetch(`/api/projects/${projectId}/items`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "act",
+          title: `${act}아크`,
+          body: "TBD",
+          meta,
+        }),
+      });
+      const data = await response.json();
+      if (data.item) setItems((current) => [...current, data.item]);
+    } finally {
+      setCreatingAct(false);
+    }
+  }
+
   async function saveFolder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!folderDraft?.title.trim()) return;
@@ -731,9 +754,11 @@ export function ProjectWorkspace({
         )}
         {view === "plot" && activePlot && (
           <Plot
+            key={activePlot.id}
             plots={plots}
             activePlot={activePlot}
             columns={columns}
+            creatingAct={creatingAct}
             menuOpen={plotMenuOpen}
             draggedPlot={draggedPlot}
             onSelectPlot={selectPlot}
@@ -767,6 +792,7 @@ export function ProjectWorkspace({
             })}
             onInspectBlock={inspectBlock}
             onEditAct={setActDraft}
+            onNewAct={() => void createAct()}
             onDrag={setDraggedBlock}
             onDrop={moveBlock}
           />
@@ -782,7 +808,7 @@ export function ProjectWorkspace({
       {blockDraft && (
         <BlockInspector
           draft={blockDraft}
-          actTitle={columns[blockDraft.act - 1]?.title ?? `${blockDraft.act}아크`}
+          actTitle={columns.find((column) => column.act === blockDraft.act)?.title ?? `${blockDraft.act}아크`}
           characters={characters}
           documents={documents}
           folders={folders}
@@ -1120,6 +1146,7 @@ function Plot(props: {
   plots: Item[];
   activePlot: Item;
   columns: Array<{ act: number; title: string; body: string; blocks: Block[] }>;
+  creatingAct: boolean;
   menuOpen: boolean;
   draggedPlot: string | null;
   onSelectPlot: (id: string) => void;
@@ -1132,9 +1159,28 @@ function Plot(props: {
   onNewBlock: (act: number) => void;
   onInspectBlock: (block: Block) => void;
   onEditAct: (draft: Draft) => void;
+  onNewAct: () => void;
   onDrag: (id: string) => void;
   onDrop: (act: number) => void;
 }) {
+  const [collapsedActs, setCollapsedActs] = useState<number[]>([]);
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const previousColumnCountRef = useRef(props.columns.length);
+
+  useEffect(() => {
+    if (props.columns.length > previousColumnCountRef.current) {
+      const board = boardScrollRef.current;
+      if (board) board.scrollTo({ left: board.scrollWidth, behavior: "smooth" });
+    }
+    previousColumnCountRef.current = props.columns.length;
+  }, [props.columns.length]);
+
+  function toggleAct(act: number) {
+    setCollapsedActs((current) =>
+      current.includes(act) ? current.filter((value) => value !== act) : [...current, act],
+    );
+  }
+
   return (
     <div className="plot-page">
       <div className="plot-tabs-bar" role="tablist" aria-label="플롯 탭">
@@ -1205,29 +1251,66 @@ function Plot(props: {
           </div>
         </header>
 
-        <div className="plot-board">
-          {props.columns.map((column) => (
-            <article className="act-column" key={column.act} onDragOver={(event) => event.preventDefault()} onDrop={() => props.onDrop(column.act)}>
-              <button className="act-heading" onClick={() => props.onEditAct({ act: column.act, title: column.title, body: column.body })}>
-                <div><strong>{column.title}</strong><p>{column.body}</p></div><span>{column.blocks.length}</span>
-              </button>
-              <div className="block-stack">
-                {column.blocks.map((block) => {
-                  const links = readBlockLinks(block.meta);
-                  return (
-                    <button className="plot-card" key={block.id} draggable onDragStart={() => props.onDrag(block.id)} onClick={() => props.onInspectBlock(block)}>
-                      <strong>{block.title}</strong>
-                      <p>{block.body || "이 블록에서 벌어지는 사건을 적어."}</p>
-                      {(links.characterIds.length > 0 || links.documentIds.length > 0) && (
-                        <span className="plot-card-links">인물 {links.characterIds.length} · 문서 {links.documentIds.length}</span>
-                      )}
+        <div className="plot-board-scroll" ref={boardScrollRef} aria-label="아크 보드">
+          <div className="plot-board">
+            {props.columns.map((column) => {
+              const collapsed = collapsedActs.includes(column.act);
+              return (
+                <article
+                  className={`act-column ${collapsed ? "collapsed" : ""}`}
+                  key={column.act}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => props.onDrop(column.act)}
+                >
+                  <div className="act-heading">
+                    <button
+                      className="act-title-button"
+                      onClick={() => props.onEditAct({ act: column.act, title: column.title, body: column.body })}
+                    >
+                      <strong>{column.title}</strong>
+                      {!collapsed && <p>{column.body}</p>}
                     </button>
-                  );
-                })}
-              </div>
-              <button className="add-block" onClick={() => props.onNewBlock(column.act)}>＋ 새 블록</button>
-            </article>
-          ))}
+                    <div className="act-heading-actions">
+                      <span className="act-count" aria-label={`${column.blocks.length}개 블록`}>{column.blocks.length}</span>
+                      <button
+                        className="act-collapse"
+                        type="button"
+                        aria-expanded={!collapsed}
+                        aria-label={`${column.title} ${collapsed ? "펼치기" : "접기"}`}
+                        onClick={() => toggleAct(column.act)}
+                      >
+                        {collapsed ? "펼치기" : "접기"}
+                      </button>
+                    </div>
+                  </div>
+                  {!collapsed && (
+                    <>
+                      <div className="block-stack">
+                        {column.blocks.map((block) => {
+                          const links = readBlockLinks(block.meta);
+                          return (
+                            <button className="plot-card" key={block.id} draggable onDragStart={() => props.onDrag(block.id)} onClick={() => props.onInspectBlock(block)}>
+                              <strong>{block.title}</strong>
+                              <p>{block.body || "이 블록에서 벌어지는 사건을 적어."}</p>
+                              {(links.characterIds.length > 0 || links.documentIds.length > 0) && (
+                                <span className="plot-card-links">인물 {links.characterIds.length} · 문서 {links.documentIds.length}</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button className="add-block" onClick={() => props.onNewBlock(column.act)}>＋ 새 블록</button>
+                    </>
+                  )}
+                </article>
+              );
+            })}
+            <button className="add-act-column" type="button" onClick={props.onNewAct} disabled={props.creatingAct}>
+              <Plus size={22} weight="bold" aria-hidden="true" />
+              <strong>{props.columns.length + 1}아크 추가</strong>
+              <span>{props.creatingAct ? "추가 중…" : "보드를 계속 이어서 만들기"}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1982,7 +2065,7 @@ function belongsToPlot(meta: string, plotId: string, isDefaultPlot: boolean) {
 function normalizeArcTitle(title: string | undefined, act: number) {
   const value = title?.trim();
   if (!value || value === "TBD") return `${act}아크`;
-  if (/^[123]\s*막\s*·\s*(각성|진실과 갈등|결전과 선택)$/.test(value)) return `${act}아크`;
+  if (/^\d+\s*막\s*·\s*(각성|진실과 갈등|결전과 선택)$/.test(value)) return `${act}아크`;
   return value.replace(/^(\d+)\s*막\b/, "$1아크").replace(/^(\d+)막/, "$1아크");
 }
 
