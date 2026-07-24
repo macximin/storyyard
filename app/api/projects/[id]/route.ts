@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb } from "@/db";
 import { projects } from "@/db/schema";
@@ -36,4 +37,23 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (typeof input.favorite === "number") update.favorite = input.favorite ? 1 : 0;
   await getDb().update(projects).set(update).where(eq(projects.id, id));
   return Response.json({ project: { ...project, ...update } });
+}
+
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await getChatGPTUser();
+  const { id } = await context.params;
+  if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
+
+  const [project] = await getDb().select().from(projects).where(eq(projects.id, id));
+  if (!project || project.ownerEmail !== user.email) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM plot_blocks WHERE project_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM project_items WHERE project_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM projects WHERE id = ? AND owner_email = ?").bind(id, user.email),
+  ]);
+
+  return Response.json({ ok: true });
 }

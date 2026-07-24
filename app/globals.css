@@ -107,8 +107,15 @@ a { color: inherit; text-decoration: none; }
 .work-card h2 { margin: 25px 30px 11px 0; font-size: 1.45rem; letter-spacing: -.04em; }
 .work-card p { display: -webkit-box; overflow: hidden; margin: 0; color: #595959; line-height: 1.6; font-size: .88rem; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
 .edited-at { margin-top: auto; padding-top: 24px; color: #999; font-size: .72rem; }
-.favorite-button { position: absolute; z-index: 2; top: 18px; right: 18px; border: 0; background: transparent; color: #888; font-size: 1.35rem; cursor: pointer; }
+.work-card-actions { position: absolute; z-index: 3; top: 14px; right: 14px; display: flex; align-items: center; gap: 2px; }
+.favorite-button, .work-menu-button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; background: transparent; color: #888; cursor: pointer; }
+.favorite-button { font-size: 1.35rem; }
 .favorite-button.selected { color: #d6a900; }
+.work-menu-button { border-radius: 4px; font-size: 1rem; letter-spacing: .08em; }
+.work-menu-button:hover, .work-menu-button[aria-expanded="true"] { background: var(--yellow); color: var(--ink); }
+.work-card-menu { position: absolute; z-index: 4; top: 50px; right: 14px; width: 132px; padding: 5px; border: 1px solid var(--ink); background: #fff; box-shadow: 4px 4px 0 var(--yellow); }
+.work-card-menu button { width: 100%; padding: 9px 10px; border: 0; background: transparent; color: #a33424; font-size: .76rem; font-weight: 800; text-align: left; cursor: pointer; }
+.work-card-menu button:hover { background: #fff2ed; }
 .blank-state { max-width: 1180px; min-height: 280px; display: grid; place-content: center; gap: 8px; border: 1px dashed #bbb; color: var(--muted); text-align: center; }
 .blank-state strong { color: var(--ink); font-size: 1.1rem; }
 
@@ -585,6 +592,11 @@ a { color: inherit; text-decoration: none; }
 .outline-cancel, .confirm-delete { padding: 10px 14px; border-radius: 4px; font-weight: 800; cursor: pointer; }
 .outline-cancel { border: 1px solid #bbb; background: #fff; }
 .confirm-delete { border: 1px solid #8d2416; background: #a33424; color: #fff; }
+.confirm-delete:disabled { border-color: #d8c5c0; background: #d8c5c0; cursor: not-allowed; }
+.project-delete-modal { gap: 18px; }
+.project-delete-modal .danger-summary { padding: 14px; border-left: 3px solid #a33424; background: #fff5f1; color: #5e2a21; }
+.delete-confirm-field input { margin-top: 2px; }
+.delete-error { margin: -6px 0 0; color: #a33424; font-size: .76rem; font-weight: 750; }
 
 @media (max-width: 900px) {
   .library-shell, .project-shell { grid-template-columns: 72px minmax(0, 1fr); }

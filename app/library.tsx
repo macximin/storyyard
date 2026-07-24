@@ -18,6 +18,11 @@ export function Library({ userName }: { userName: string }) {
   const [filter, setFilter] = useState<"all" | "favorites">("all");
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     fetch("/api/projects")
@@ -57,6 +62,37 @@ export function Library({ userName }: { userName: string }) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ favorite }),
     });
+  }
+
+  function openDelete(project: Project) {
+    setMenuProjectId(null);
+    setDeletingProject(project);
+    setDeleteConfirmation("");
+    setDeleteError("");
+  }
+
+  function closeDelete() {
+    if (deletePending) return;
+    setDeletingProject(null);
+    setDeleteConfirmation("");
+    setDeleteError("");
+  }
+
+  async function deleteProject() {
+    if (!deletingProject || deleteConfirmation !== deletingProject.title || deletePending) return;
+    setDeletePending(true);
+    setDeleteError("");
+    try {
+      const response = await fetch(`/api/projects/${deletingProject.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("delete failed");
+      setProjects((current) => current.filter((project) => project.id !== deletingProject.id));
+      setDeletingProject(null);
+      setDeleteConfirmation("");
+    } catch {
+      setDeleteError("삭제하지 못했음. 잠시 뒤 다시 시도해 줘.");
+    } finally {
+      setDeletePending(false);
+    }
   }
 
   return (
@@ -99,13 +135,28 @@ export function Library({ userName }: { userName: string }) {
           <div className="work-grid">
             {visible.map((project) => (
               <article className="work-card" key={project.id}>
-                <button
-                  className={`favorite-button ${project.favorite ? "selected" : ""}`}
-                  aria-label={`${project.title} 즐겨찾기`}
-                  onClick={() => toggleFavorite(project)}
-                >
-                  {project.favorite ? "★" : "☆"}
-                </button>
+                <div className="work-card-actions">
+                  <button
+                    className={`favorite-button ${project.favorite ? "selected" : ""}`}
+                    aria-label={`${project.title} 즐겨찾기`}
+                    onClick={() => toggleFavorite(project)}
+                  >
+                    {project.favorite ? "★" : "☆"}
+                  </button>
+                  <button
+                    className="work-menu-button"
+                    aria-label={`${project.title} 작품 관리`}
+                    aria-expanded={menuProjectId === project.id}
+                    onClick={() => setMenuProjectId((current) => current === project.id ? null : project.id)}
+                  >
+                    ···
+                  </button>
+                </div>
+                {menuProjectId === project.id && (
+                  <div className="work-card-menu">
+                    <button type="button" onClick={() => openDelete(project)}>작품 삭제</button>
+                  </div>
+                )}
                 <button className="work-card-body" onClick={() => router.push(`/project/${project.id}/plot`)}>
                   <span className="work-type">{project.genre}</span>
                   <h2>{project.title}</h2>
@@ -135,6 +186,52 @@ export function Library({ userName }: { userName: string }) {
             <label>장르<input name="genre" defaultValue="웹소설" /></label>
             <button className="black-button" type="submit">작품 만들기</button>
           </form>
+        </div>
+      )}
+
+      {deletingProject && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeDelete}>
+          <section
+            className="modal-card confirm-modal project-delete-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="project-delete-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div>
+                <p className="kicker">DELETE WORK</p>
+                <h2 id="project-delete-title">작품 삭제</h2>
+              </div>
+              <button type="button" className="icon-button" onClick={closeDelete} aria-label="삭제 취소">×</button>
+            </div>
+            <p className="danger-summary">
+              <strong>{deletingProject.title}</strong>과 연결된 등장인물, 플롯, 아크, 블록, 문서가 전부 삭제됨.
+              이 작업은 되돌릴 수 없음.
+            </p>
+            <label className="delete-confirm-field">
+              확인을 위해 작품 제목 입력
+              <input
+                autoFocus
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+                placeholder={deletingProject.title}
+                aria-describedby={deleteError ? "project-delete-error" : undefined}
+              />
+            </label>
+            {deleteError && <p className="delete-error" id="project-delete-error" role="alert">{deleteError}</p>}
+            <div className="modal-actions">
+              <button className="outline-cancel" type="button" onClick={closeDelete} disabled={deletePending}>취소</button>
+              <button
+                className="confirm-delete"
+                type="button"
+                onClick={deleteProject}
+                disabled={deleteConfirmation !== deletingProject.title || deletePending}
+              >
+                {deletePending ? "삭제 중…" : "영구 삭제"}
+              </button>
+            </div>
+          </section>
         </div>
       )}
     </main>
