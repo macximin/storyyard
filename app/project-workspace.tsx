@@ -39,6 +39,7 @@ export function ProjectWorkspace({
   const [openFolders, setOpenFolders] = useState<string[]>([]);
   const [treeMenu, setTreeMenu] = useState<string | null>(null);
   const [treeAddOpen, setTreeAddOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Item | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -265,7 +266,6 @@ export function ProjectWorkspace({
   }
 
   async function deleteItem(item: Item) {
-    if (!window.confirm(`${item.title}을(를) 삭제할까?`)) return;
     if (item.kind === "folder") {
       const children = documents.filter((document) => documentFolder(document) === item.id);
       await Promise.all(children.map((document) => moveDocument(document, null)));
@@ -311,7 +311,7 @@ export function ProjectWorkspace({
         onCreateDocument={createDocument}
         onSelectDocument={selectDocument}
         onMoveDocument={moveDocument}
-        onDeleteItem={deleteItem}
+        onDeleteItem={setPendingDelete}
         onDragDocument={setDraggedDocument}
         onDropDocument={dropDocument}
       />
@@ -363,7 +363,7 @@ export function ProjectWorkspace({
           onClose={() => setCharacterDraft(null)}
           onDelete={characterDraft.id ? () => {
             const character = characters.find((item) => item.id === characterDraft.id);
-            if (character) void deleteItem(character);
+            if (character) setPendingDelete(character);
             setCharacterDraft(null);
           } : undefined}
         />
@@ -373,6 +373,16 @@ export function ProjectWorkspace({
       )}
       {folderDraft && (
         <NameModal draft={folderDraft} setDraft={setFolderDraft} onSubmit={saveFolder} onClose={() => setFolderDraft(null)} />
+      )}
+      {pendingDelete && (
+        <ConfirmDeleteModal
+          item={pendingDelete}
+          onClose={() => setPendingDelete(null)}
+          onConfirm={() => {
+            void deleteItem(pendingDelete);
+            setPendingDelete(null);
+          }}
+        />
       )}
     </main>
   );
@@ -688,6 +698,21 @@ function NameModal(props: {
         <label>폴더 이름<input autoFocus value={props.draft.title} onChange={(event) => props.setDraft({ ...props.draft, title: event.target.value })} /></label>
         <button className="black-button" type="submit">저장</button>
       </form>
+    </div>
+  );
+}
+
+function ConfirmDeleteModal({ item, onClose, onConfirm }: { item: Item; onClose: () => void; onConfirm: () => void }) {
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="modal-card confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-heading"><h2 id="delete-title">{item.kind === "folder" ? "폴더 삭제" : item.kind === "character" ? "인물 삭제" : "문서 삭제"}</h2><button type="button" className="icon-button" onClick={onClose}>×</button></div>
+        <p><strong>{item.title}</strong>을(를) 삭제할까? {item.kind === "folder" ? "안의 문서는 최상위로 이동됨." : "이 작업은 되돌릴 수 없음."}</p>
+        <div className="modal-actions">
+          <button className="outline-cancel" type="button" onClick={onClose}>취소</button>
+          <button className="confirm-delete" type="button" onClick={onConfirm}>삭제하기</button>
+        </div>
+      </section>
     </div>
   );
 }
