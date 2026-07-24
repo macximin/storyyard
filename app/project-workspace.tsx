@@ -104,7 +104,7 @@ export function ProjectWorkspace({
         return {
           act,
           title: normalizeArcTitle(saved?.title, act) || fallback.title,
-          body: saved?.body.trim() || fallback.body,
+          body: normalizeArcBody(saved?.body) || fallback.body,
           blocks: blocks
             .filter((block) => block.act === act)
             .sort((left, right) => left.sortOrder - right.sortOrder),
@@ -750,7 +750,19 @@ function readAct(meta: string) {
 function normalizeArcTitle(title: string | undefined, act: number) {
   const value = title?.trim();
   if (!value || value === "TBD") return `${act}아크`;
+  if (/^[123]\s*막\s*·\s*(각성|진실과 갈등|결전과 선택)$/.test(value)) return `${act}아크`;
   return value.replace(/^(\d+)\s*막\b/, "$1아크").replace(/^(\d+)막/, "$1아크");
+}
+
+function normalizeArcBody(body: string | undefined) {
+  const value = body?.trim();
+  if (!value) return "TBD";
+  if ([
+    "세계가 흔들리고, 주인공이 이전으로 돌아갈 수 없게 된다.",
+    "목표를 향할수록 대가와 적의 정체가 선명해진다.",
+    "가장 큰 대가 앞에서 주인공이 마지막 선택을 내린다.",
+  ].includes(value)) return "TBD";
+  return value;
 }
 
 function documentFolder(item: Item) {
