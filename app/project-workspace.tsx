@@ -1,12 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
 export type WorkspaceView = "overview" | "characters" | "plot" | "documents";
 type Project = { id: string; title: string; logline: string; genre: string; favorite: number; updatedAt: string };
-type Block = { id: string; act: number; kind: string; title: string; body: string; sortOrder: number };
+type Block = { id: string; act: number; kind: string; title: string; body: string; meta: string; sortOrder: number };
 type Item = { id: string; kind: string; title: string; body: string; meta: string };
 type Draft = { id?: string; title: string; body: string; act?: number };
+type BlockDraft = Draft & { act: number; characterIds: string[]; documentIds: string[] };
+type FolderDraft = { id?: string; title: string };
 
 const actDefaults = [
   { title: "1막 · 각성", body: "세계가 흔들리고, 주인공이 이전으로 돌아갈 수 없게 된다." },
@@ -27,11 +29,16 @@ export function ProjectWorkspace({
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dragged, setDragged] = useState<string | null>(null);
-  const [blockDraft, setBlockDraft] = useState<Draft | null>(null);
+  const [draggedBlock, setDraggedBlock] = useState<string | null>(null);
+  const [draggedDocument, setDraggedDocument] = useState<string | null>(null);
+  const [blockDraft, setBlockDraft] = useState<BlockDraft | null>(null);
   const [characterDraft, setCharacterDraft] = useState<Draft | null>(null);
   const [actDraft, setActDraft] = useState<Draft | null>(null);
+  const [folderDraft, setFolderDraft] = useState<FolderDraft | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
+  const [openFolders, setOpenFolders] = useState<string[]>([]);
+  const [treeMenu, setTreeMenu] = useState<string | null>(null);
+  const [treeAddOpen, setTreeAddOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -40,17 +47,26 @@ export function ProjectWorkspace({
       fetch(`/api/projects/${projectId}/items`).then((response) => response.json()),
     ])
       .then(([projectData, blockData, itemData]) => {
+        const loadedItems: Item[] = itemData.items ?? [];
+        const loadedDocuments = loadedItems.filter((item) => item.kind === "document");
         setProject(projectData.project ?? null);
         setBlocks(blockData.blocks ?? []);
-        setItems(itemData.items ?? []);
-        const firstDocument = (itemData.items ?? []).find((item: Item) => item.kind === "document");
-        setDocumentId(firstDocument?.id ?? null);
+        setItems(loadedItems);
+        setOpenFolders(loadedItems.filter((item) => item.kind === "folder").map((item) => item.id));
+        const requestedDocument =
+          typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("document") : null;
+        setDocumentId(
+          loadedDocuments.some((item) => item.id === requestedDocument)
+            ? requestedDocument
+            : loadedDocuments[0]?.id ?? null,
+        );
       })
       .finally(() => setLoading(false));
   }, [projectId]);
 
   const characters = items.filter((item) => item.kind === "character");
   const documents = items.filter((item) => item.kind === "document");
+  const folders = items.filter((item) => item.kind === "folder");
   const actItems = items.filter((item) => item.kind === "act");
   const selectedDocument = documents.find((item) => item.id === documentId) ?? null;
   const columns = useMemo(
@@ -62,7 +78,6 @@ export function ProjectWorkspace({
           act,
           title: saved?.title ?? fallback.title,
           body: saved?.body ?? fallback.body,
-          item: saved,
           blocks: blocks
             .filter((block) => block.act === act)
             .sort((left, right) => left.sortOrder - right.sortOrder),
@@ -78,34 +93,37 @@ export function ProjectWorkspace({
     const response = await fetch(`/api/projects/${projectId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        title: form.get("title"),
-        logline: form.get("logline"),
-        genre: form.get("genre"),
-      }),
+      body: JSON.stringify({ title: form.get("title"), logline: form.get("logline"), genre: form.get("genre") }),
     });
     const data = await response.json();
     if (data.project) setProject(data.project);
   }
 
+  function inspectBlock(block: Block) {
+    const links = readBlockLinks(block.meta);
+    setBlockDraft({ id: block.id, act: block.act, title: block.title, body: block.body, ...links });
+  }
+
   async function saveBlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!blockDraft?.act) return;
-    const endpoint = blockDraft.id
-      ? `/api/blocks/${blockDraft.id}`
-      : `/api/projects/${projectId}/blocks`;
+    if (!blockDraft) return;
+    const endpoint = blockDraft.id ? `/api/blocks/${blockDraft.id}` : `/api/projects/${projectId}/blocks`;
+    const meta = JSON.stringify({
+      characterIds: blockDraft.characterIds,
+      documentIds: blockDraft.documentIds,
+    });
     const response = await fetch(endpoint, {
       method: blockDraft.id ? "PATCH" : "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        act: blockDraft.act,
-        title: blockDraft.title,
-        body: blockDraft.body,
-      }),
+      body: JSON.stringify({ act: blockDraft.act, title: blockDraft.title, body: blockDraft.body, meta }),
     });
     if (blockDraft.id) {
       setBlocks((current) =>
-        current.map((block) => (block.id === blockDraft.id ? { ...block, ...blockDraft } : block)),
+        current.map((block) =>
+          block.id === blockDraft.id
+            ? { ...block, title: blockDraft.title, body: blockDraft.body, act: blockDraft.act, meta }
+            : block,
+        ),
       );
     } else {
       const data = await response.json();
@@ -115,13 +133,11 @@ export function ProjectWorkspace({
   }
 
   async function moveBlock(act: number) {
-    const block = blocks.find((item) => item.id === dragged);
-    setDragged(null);
+    const block = blocks.find((item) => item.id === draggedBlock);
+    setDraggedBlock(null);
     if (!block || block.act === act) return;
     const sortOrder = Date.now();
-    setBlocks((current) =>
-      current.map((item) => (item.id === block.id ? { ...item, act, sortOrder } : item)),
-    );
+    setBlocks((current) => current.map((item) => (item.id === block.id ? { ...item, act, sortOrder } : item)));
     await fetch(`/api/blocks/${block.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
@@ -132,17 +148,11 @@ export function ProjectWorkspace({
   async function saveCharacter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!characterDraft) return;
-    const endpoint = characterDraft.id
-      ? `/api/items/${characterDraft.id}`
-      : `/api/projects/${projectId}/items`;
+    const endpoint = characterDraft.id ? `/api/items/${characterDraft.id}` : `/api/projects/${projectId}/items`;
     const response = await fetch(endpoint, {
       method: characterDraft.id ? "PATCH" : "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        kind: "character",
-        title: characterDraft.title,
-        body: characterDraft.body,
-      }),
+      body: JSON.stringify({ kind: "character", title: characterDraft.title, body: characterDraft.body }),
     });
     if (characterDraft.id) {
       setItems((current) =>
@@ -183,16 +193,48 @@ export function ProjectWorkspace({
     setActDraft(null);
   }
 
-  async function createDocument() {
+  async function saveFolder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!folderDraft?.title.trim()) return;
+    const endpoint = folderDraft.id ? `/api/items/${folderDraft.id}` : `/api/projects/${projectId}/items`;
+    const response = await fetch(endpoint, {
+      method: folderDraft.id ? "PATCH" : "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "folder", title: folderDraft.title, body: "", meta: "{}" }),
+    });
+    if (folderDraft.id) {
+      setItems((current) =>
+        current.map((item) => (item.id === folderDraft.id ? { ...item, title: folderDraft.title } : item)),
+      );
+    } else {
+      const data = await response.json();
+      if (data.item) {
+        setItems((current) => [...current, data.item]);
+        setOpenFolders((current) => [...current, data.item.id]);
+      }
+    }
+    setFolderDraft(null);
+  }
+
+  async function createDocument(folderId: string | null = null) {
     const response = await fetch(`/api/projects/${projectId}/items`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "document", title: "새 문서", body: "" }),
+      body: JSON.stringify({
+        kind: "document",
+        title: "새 문서",
+        body: "",
+        meta: JSON.stringify({ folderId, sortOrder: Date.now() }),
+      }),
     });
     const data = await response.json();
     if (data.item) {
       setItems((current) => [...current, data.item]);
       setDocumentId(data.item.id);
+      setTreeAddOpen(false);
+      setTreeMenu(null);
+      if (folderId && !openFolders.includes(folderId)) setOpenFolders((current) => [...current, folderId]);
+      if (view !== "documents") window.location.href = `/project/${projectId}/documents?document=${data.item.id}`;
     }
   }
 
@@ -201,8 +243,42 @@ export function ProjectWorkspace({
     await fetch(`/api/items/${item.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: item.title, body: item.body }),
+      body: JSON.stringify({ title: item.title, body: item.body, meta: item.meta }),
     });
+  }
+
+  async function moveDocument(item: Item, folderId: string | null) {
+    const meta = JSON.stringify({ ...readObject(item.meta), folderId, sortOrder: Date.now() });
+    setItems((current) => current.map((value) => (value.id === item.id ? { ...value, meta } : value)));
+    setTreeMenu(null);
+    await fetch(`/api/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ meta }),
+    });
+  }
+
+  async function dropDocument(folderId: string | null) {
+    const document = documents.find((item) => item.id === draggedDocument);
+    setDraggedDocument(null);
+    if (document) await moveDocument(document, folderId);
+  }
+
+  async function deleteItem(item: Item) {
+    if (!window.confirm(`${item.title}을(를) 삭제할까?`)) return;
+    if (item.kind === "folder") {
+      const children = documents.filter((document) => documentFolder(document) === item.id);
+      await Promise.all(children.map((document) => moveDocument(document, null)));
+    }
+    await fetch(`/api/items/${item.id}`, { method: "DELETE" });
+    setItems((current) => current.filter((value) => value.id !== item.id));
+    if (documentId === item.id) setDocumentId(documents.find((value) => value.id !== item.id)?.id ?? null);
+    setTreeMenu(null);
+  }
+
+  function selectDocument(id: string) {
+    setDocumentId(id);
+    if (view !== "documents") window.location.href = `/project/${projectId}/documents?document=${id}`;
   }
 
   if (loading) return <main className="loading-shell">작업실 불러오는 중…</main>;
@@ -210,30 +286,38 @@ export function ProjectWorkspace({
 
   return (
     <main className="project-shell">
-      <aside className="project-sidebar">
-        <a className="back-home" href="/">← 내 작품</a>
-        <div className="project-identity">
-          <span>{project.genre}</span>
-          <strong>{project.title}</strong>
-        </div>
-        <nav className="project-nav" aria-label="작품 메뉴">
-          <a className={view === "overview" ? "active" : ""} href={`/project/${projectId}`}>◇ <span>작품 개요</span></a>
-          <a className={view === "characters" ? "active" : ""} href={`/project/${projectId}/characters`}>♙ <span>등장인물</span><b>{characters.length}</b></a>
-          <a className={view === "plot" ? "active" : ""} href={`/project/${projectId}/plot`}>▦ <span>플롯</span><b>{blocks.length}</b></a>
-          <a className={view === "documents" ? "active" : ""} href={`/project/${projectId}/documents`}>□ <span>문서</span><b>{documents.length}</b></a>
-        </nav>
-        <div className="document-tree">
-          {documents.slice(0, 7).map((document) => (
-            <a href={`/project/${projectId}/documents`} key={document.id}>└ {document.title}</a>
-          ))}
-        </div>
-        <div className="sidebar-user"><span>{userName.slice(0, 1)}</span>{userName}</div>
-      </aside>
+      <ProjectSidebar
+        project={project}
+        projectId={projectId}
+        view={view}
+        userName={userName}
+        blocks={blocks}
+        characters={characters}
+        documents={documents}
+        folders={folders}
+        documentId={documentId}
+        openFolders={openFolders}
+        treeMenu={treeMenu}
+        treeAddOpen={treeAddOpen}
+        onToggleFolder={(id) =>
+          setOpenFolders((current) =>
+            current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
+          )
+        }
+        onToggleTreeMenu={(id) => setTreeMenu((current) => (current === id ? null : id))}
+        onToggleTreeAdd={() => setTreeAddOpen((current) => !current)}
+        onCreateFolder={() => { setFolderDraft({ title: "새 폴더" }); setTreeAddOpen(false); }}
+        onRenameFolder={(folder) => setFolderDraft({ id: folder.id, title: folder.title })}
+        onCreateDocument={createDocument}
+        onSelectDocument={selectDocument}
+        onMoveDocument={moveDocument}
+        onDeleteItem={deleteItem}
+        onDragDocument={setDraggedDocument}
+        onDropDocument={dropDocument}
+      />
 
       <section className="project-main">
-        {view === "overview" && (
-          <Overview project={project} onSave={saveProject} />
-        )}
+        {view === "overview" && <Overview project={project} onSave={saveProject} />}
         {view === "characters" && (
           <Characters
             characters={characters}
@@ -245,26 +329,30 @@ export function ProjectWorkspace({
           <Plot
             project={project}
             columns={columns}
-            onNewBlock={(act) => setBlockDraft({ act, title: "", body: "" })}
-            onEditBlock={(block) => setBlockDraft({ id: block.id, act: block.act, title: block.title, body: block.body })}
-            onEditAct={(draft) => setActDraft(draft)}
-            onDrag={setDragged}
+            onNewBlock={(act) =>
+              setBlockDraft({ act, title: "", body: "", characterIds: [], documentIds: [] })
+            }
+            onInspectBlock={inspectBlock}
+            onEditAct={setActDraft}
+            onDrag={setDraggedBlock}
             onDrop={moveBlock}
           />
         )}
         {view === "documents" && (
-          <Documents
-            documents={documents}
-            selected={selectedDocument}
-            onSelect={setDocumentId}
-            onNew={createDocument}
-            onSave={saveDocument}
-          />
+          <Documents selected={selectedDocument} onSave={saveDocument} onNew={() => createDocument(null)} />
         )}
       </section>
 
       {blockDraft && (
-        <EditorModal title={blockDraft.id ? "블록 편집" : "새 블록"} draft={blockDraft} setDraft={setBlockDraft} onSubmit={saveBlock} onClose={() => setBlockDraft(null)} />
+        <BlockInspector
+          draft={blockDraft}
+          actTitle={columns[blockDraft.act - 1]?.title ?? `${blockDraft.act}막`}
+          characters={characters}
+          documents={documents}
+          setDraft={setBlockDraft}
+          onSubmit={saveBlock}
+          onClose={() => setBlockDraft(null)}
+        />
       )}
       {characterDraft && (
         <EditorModal title={characterDraft.id ? "인물 편집" : "새 인물"} draft={characterDraft} setDraft={setCharacterDraft} onSubmit={saveCharacter} onClose={() => setCharacterDraft(null)} />
@@ -272,7 +360,138 @@ export function ProjectWorkspace({
       {actDraft && (
         <EditorModal title={`${actDraft.act}막 설정`} draft={actDraft} setDraft={setActDraft} onSubmit={saveAct} onClose={() => setActDraft(null)} />
       )}
+      {folderDraft && (
+        <NameModal draft={folderDraft} setDraft={setFolderDraft} onSubmit={saveFolder} onClose={() => setFolderDraft(null)} />
+      )}
     </main>
+  );
+}
+
+function ProjectSidebar(props: {
+  project: Project;
+  projectId: string;
+  view: WorkspaceView;
+  userName: string;
+  blocks: Block[];
+  characters: Item[];
+  documents: Item[];
+  folders: Item[];
+  documentId: string | null;
+  openFolders: string[];
+  treeMenu: string | null;
+  treeAddOpen: boolean;
+  onToggleFolder: (id: string) => void;
+  onToggleTreeMenu: (id: string) => void;
+  onToggleTreeAdd: () => void;
+  onCreateFolder: () => void;
+  onRenameFolder: (item: Item) => void;
+  onCreateDocument: (folderId: string | null) => void;
+  onSelectDocument: (id: string) => void;
+  onMoveDocument: (item: Item, folderId: string | null) => void;
+  onDeleteItem: (item: Item) => void;
+  onDragDocument: (id: string) => void;
+  onDropDocument: (folderId: string | null) => void;
+}) {
+  const unfiled = props.documents.filter((document) => !documentFolder(document));
+  return (
+    <aside className="project-sidebar">
+      <a className="back-home" href="/">⌂ 홈으로</a>
+      <div className="project-identity"><span>{props.project.genre}</span><strong>{props.project.title}</strong></div>
+      <label className="sidebar-search">⌕<input placeholder="검색…" aria-label="작품 검색" /></label>
+      <nav className="project-nav" aria-label="작품 메뉴">
+        <a className={props.view === "overview" ? "active" : ""} href={`/project/${props.projectId}`}>◇ <span>작품 개요</span></a>
+        <a className={props.view === "characters" ? "active" : ""} href={`/project/${props.projectId}/characters`}>♙ <span>등장인물</span><b>{props.characters.length}</b></a>
+        <a className={props.view === "plot" ? "active" : ""} href={`/project/${props.projectId}/plot`}>▦ <span>플롯</span><b>{props.blocks.length}</b></a>
+      </nav>
+
+      <section
+        className="sidebar-documents"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={() => props.onDropDocument(null)}
+      >
+        <div className="tree-heading">
+          <strong>문서</strong>
+          <button aria-label="문서 또는 폴더 추가" onClick={props.onToggleTreeAdd}>＋</button>
+          {props.treeAddOpen && (
+            <div className="tree-popover add-menu">
+              <button onClick={() => props.onCreateDocument(null)}>□ 새 문서</button>
+              <button onClick={props.onCreateFolder}>▱ 새 폴더</button>
+            </div>
+          )}
+        </div>
+        <div className="file-tree" role="tree">
+          {props.folders.map((folder) => {
+            const isOpen = props.openFolders.includes(folder.id);
+            const folderDocuments = props.documents.filter((document) => documentFolder(document) === folder.id);
+            const menuId = `folder:${folder.id}`;
+            return (
+              <div className="tree-folder" key={folder.id} role="treeitem" aria-expanded={isOpen}>
+                <div
+                  className="tree-row folder-row"
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => { event.stopPropagation(); props.onDropDocument(folder.id); }}
+                >
+                  <button className="tree-main" onClick={() => props.onToggleFolder(folder.id)}>
+                    <span>{isOpen ? "⌄" : "›"}</span><span>▱</span><strong>{folder.title}</strong>
+                  </button>
+                  <button className="tree-more" aria-label={`${folder.title} 관리`} onClick={() => props.onToggleTreeMenu(menuId)}>···</button>
+                  {props.treeMenu === menuId && (
+                    <div className="tree-popover">
+                      <button onClick={() => props.onCreateDocument(folder.id)}>＋ 문서 추가</button>
+                      <button onClick={() => props.onRenameFolder(folder)}>이름 변경</button>
+                      <button className="danger" onClick={() => props.onDeleteItem(folder)}>폴더 삭제</button>
+                    </div>
+                  )}
+                </div>
+                {isOpen && (
+                  <div className="tree-children" role="group">
+                    {folderDocuments.map((document) => (
+                      <TreeDocument key={document.id} document={document} folders={props.folders} active={document.id === props.documentId} menuOpen={props.treeMenu === `document:${document.id}`} onSelect={props.onSelectDocument} onMenu={props.onToggleTreeMenu} onMove={props.onMoveDocument} onDelete={props.onDeleteItem} onDrag={props.onDragDocument} />
+                    ))}
+                    {!folderDocuments.length && <span className="tree-empty">비어 있음</span>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {unfiled.map((document) => (
+            <TreeDocument key={document.id} document={document} folders={props.folders} active={document.id === props.documentId} menuOpen={props.treeMenu === `document:${document.id}`} onSelect={props.onSelectDocument} onMenu={props.onToggleTreeMenu} onMove={props.onMoveDocument} onDelete={props.onDeleteItem} onDrag={props.onDragDocument} />
+          ))}
+          {!props.folders.length && !props.documents.length && <span className="tree-empty root">＋ 버튼으로 문서나 폴더를 추가</span>}
+        </div>
+      </section>
+      <div className="sidebar-user"><span>{props.userName.slice(0, 1)}</span>{props.userName}</div>
+    </aside>
+  );
+}
+
+function TreeDocument(props: {
+  document: Item;
+  folders: Item[];
+  active: boolean;
+  menuOpen: boolean;
+  onSelect: (id: string) => void;
+  onMenu: (id: string) => void;
+  onMove: (item: Item, folderId: string | null) => void;
+  onDelete: (item: Item) => void;
+  onDrag: (id: string) => void;
+}) {
+  return (
+    <div className={`tree-row document-row ${props.active ? "active" : ""}`} role="treeitem" draggable onDragStart={() => props.onDrag(props.document.id)}>
+      <button className="tree-main" onClick={() => props.onSelect(props.document.id)}><span>□</span><span>{props.document.title}</span></button>
+      <button className="tree-more" aria-label={`${props.document.title} 관리`} onClick={() => props.onMenu(`document:${props.document.id}`)}>···</button>
+      {props.menuOpen && (
+        <div className="tree-popover">
+          <label>이동
+            <select value={documentFolder(props.document) ?? ""} onChange={(event) => props.onMove(props.document, event.target.value || null)}>
+              <option value="">최상위</option>
+              {props.folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.title}</option>)}
+            </select>
+          </label>
+          <button className="danger" onClick={() => props.onDelete(props.document)}>문서 삭제</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -298,9 +517,7 @@ function Characters({ characters, onNew, onEdit }: { characters: Item[]; onNew: 
       <div className="character-list">
         {characters.map((character) => (
           <button className="character-row" key={character.id} onClick={() => onEdit(character)}>
-            <strong>{character.title}</strong>
-            <p>{character.body || "이 인물이 원하는 것과 방해받는 이유를 적어."}</p>
-            <span>편집 →</span>
+            <strong>{character.title}</strong><p>{character.body || "이 인물이 원하는 것과 방해받는 이유를 적어."}</p><span>편집 →</span>
           </button>
         ))}
         {!characters.length && <div className="inline-empty">인물이 아직 없음. 주인공부터 박자.</div>}
@@ -309,48 +526,39 @@ function Characters({ characters, onNew, onEdit }: { characters: Item[]; onNew: 
   );
 }
 
-function Plot({
-  project,
-  columns,
-  onNewBlock,
-  onEditBlock,
-  onEditAct,
-  onDrag,
-  onDrop,
-}: {
+function Plot(props: {
   project: Project;
-  columns: Array<{ act: number; title: string; body: string; item?: Item; blocks: Block[] }>;
+  columns: Array<{ act: number; title: string; body: string; blocks: Block[] }>;
   onNewBlock: (act: number) => void;
-  onEditBlock: (block: Block) => void;
+  onInspectBlock: (block: Block) => void;
   onEditAct: (draft: Draft) => void;
   onDrag: (id: string) => void;
   onDrop: (act: number) => void;
 }) {
   return (
     <div className="plot-page">
-      <PageHeader kicker="PLOT BOARD" title={project.title} description={project.logline} />
+      <PageHeader kicker="PLOT BOARD" title={props.project.title} description={props.project.logline} />
       <div className="plot-board">
-        {columns.map((column) => (
-          <article className="act-column" key={column.act} onDragOver={(event) => event.preventDefault()} onDrop={() => onDrop(column.act)}>
-            <button className="act-heading" onClick={() => onEditAct({ act: column.act, title: column.title, body: column.body })}>
-              <div><strong>{column.title}</strong><p>{column.body}</p></div>
-              <span>{column.blocks.length}</span>
+        {props.columns.map((column) => (
+          <article className="act-column" key={column.act} onDragOver={(event) => event.preventDefault()} onDrop={() => props.onDrop(column.act)}>
+            <button className="act-heading" onClick={() => props.onEditAct({ act: column.act, title: column.title, body: column.body })}>
+              <div><strong>{column.title}</strong><p>{column.body}</p></div><span>{column.blocks.length}</span>
             </button>
             <div className="block-stack">
-              {column.blocks.map((block) => (
-                <button
-                  className="plot-card"
-                  key={block.id}
-                  draggable
-                  onDragStart={() => onDrag(block.id)}
-                  onClick={() => onEditBlock(block)}
-                >
-                  <strong>{block.title}</strong>
-                  <p>{block.body || "이 블록에서 벌어지는 사건을 적어."}</p>
-                </button>
-              ))}
+              {column.blocks.map((block) => {
+                const links = readBlockLinks(block.meta);
+                return (
+                  <button className="plot-card" key={block.id} draggable onDragStart={() => props.onDrag(block.id)} onClick={() => props.onInspectBlock(block)}>
+                    <strong>{block.title}</strong>
+                    <p>{block.body || "이 블록에서 벌어지는 사건을 적어."}</p>
+                    {(links.characterIds.length > 0 || links.documentIds.length > 0) && (
+                      <span className="plot-card-links">인물 {links.characterIds.length} · 문서 {links.documentIds.length}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            <button className="add-block" onClick={() => onNewBlock(column.act)}>＋ 새 블록</button>
+            <button className="add-block" onClick={() => props.onNewBlock(column.act)}>＋ 새 블록</button>
           </article>
         ))}
       </div>
@@ -358,33 +566,12 @@ function Plot({
   );
 }
 
-function Documents({
-  documents,
-  selected,
-  onSelect,
-  onNew,
-  onSave,
-}: {
-  documents: Item[];
-  selected: Item | null;
-  onSelect: (id: string) => void;
-  onNew: () => void;
-  onSave: (item: Item) => void;
-}) {
+function Documents({ selected, onSave, onNew }: { selected: Item | null; onSave: (item: Item) => void; onNew: () => void }) {
   return (
     <div className="documents-page">
-      <aside className="documents-list">
-        <div><p className="kicker">DOCUMENTS</p><h1>문서</h1></div>
-        <button className="outline-button" onClick={onNew}>＋ 새 문서</button>
-        <div className="doc-links">
-          {documents.map((document) => (
-            <button className={document.id === selected?.id ? "active" : ""} key={document.id} onClick={() => onSelect(document.id)}>
-              <span>□</span>{document.title}
-            </button>
-          ))}
-        </div>
-      </aside>
-      {selected ? <DocumentEditor key={selected.id} item={selected} onSave={onSave} /> : <div className="document-blank">왼쪽에서 문서를 만들면 바로 쓸 수 있음.</div>}
+      {selected ? <DocumentEditor key={selected.id} item={selected} onSave={onSave} /> : (
+        <div className="document-blank"><strong>문서가 아직 없음.</strong><button className="black-button" onClick={onNew}>＋ 새 문서</button></div>
+      )}
     </div>
   );
 }
@@ -400,22 +587,61 @@ function DocumentEditor({ item, onSave }: { item: Item; onSave: (item: Item) => 
   );
 }
 
-function PageHeader({ kicker, title, description, action }: { kicker: string; title: string; description: string; action?: React.ReactNode }) {
+function BlockInspector(props: {
+  draft: BlockDraft;
+  actTitle: string;
+  characters: Item[];
+  documents: Item[];
+  setDraft: (draft: BlockDraft | null) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onClose: () => void;
+}) {
+  function toggle(key: "characterIds" | "documentIds", id: string) {
+    const values = props.draft[key];
+    props.setDraft({ ...props.draft, [key]: values.includes(id) ? values.filter((value) => value !== id) : [...values, id] });
+  }
   return (
-    <header className="page-header">
-      <div><p className="kicker">{kicker}</p><h1>{title}</h1><p>{description}</p></div>
-      {action}
-    </header>
+    <div className="inspector-backdrop" role="presentation" onMouseDown={props.onClose}>
+      <aside className="block-inspector" onMouseDown={(event) => event.stopPropagation()}>
+        <form onSubmit={props.onSubmit}>
+          <div className="inspector-top"><button type="button" onClick={props.onClose}>»</button><span>블록 상세</span><button type="button">···</button></div>
+          <p className="inspector-breadcrumb">↳ {props.actTitle}</p>
+          <input className="inspector-title" aria-label="블록 제목" autoFocus value={props.draft.title} onChange={(event) => props.setDraft({ ...props.draft, title: event.target.value })} placeholder="새 블록" />
+          <InspectorSection title="내용">
+            <textarea value={props.draft.body} onChange={(event) => props.setDraft({ ...props.draft, body: event.target.value })} placeholder="내용을 입력하세요…" />
+          </InspectorSection>
+          <InspectorSection title="등장인물">
+            <div className="link-picker">
+              {props.characters.map((character) => (
+                <label key={character.id}><input type="checkbox" checked={props.draft.characterIds.includes(character.id)} onChange={() => toggle("characterIds", character.id)} /><span>{character.title}</span></label>
+              ))}
+              {!props.characters.length && <span className="picker-empty">등장인물이 비어 있음</span>}
+            </div>
+          </InspectorSection>
+          <InspectorSection title="문서">
+            <div className="link-picker">
+              {props.documents.map((document) => (
+                <label key={document.id}><input type="checkbox" checked={props.draft.documentIds.includes(document.id)} onChange={() => toggle("documentIds", document.id)} /><span>{document.title}</span></label>
+              ))}
+              {!props.documents.length && <span className="picker-empty">문서가 비어 있음</span>}
+            </div>
+          </InspectorSection>
+          <div className="inspector-save"><button className="black-button" type="submit">블록 저장</button></div>
+        </form>
+      </aside>
+    </div>
   );
 }
 
-function EditorModal({
-  title,
-  draft,
-  setDraft,
-  onSubmit,
-  onClose,
-}: {
+function InspectorSection({ title, children }: { title: string; children: ReactNode }) {
+  return <section className="inspector-section"><strong>{title}</strong>{children}</section>;
+}
+
+function PageHeader({ kicker, title, description, action }: { kicker: string; title: string; description: string; action?: ReactNode }) {
+  return <header className="page-header"><div><p className="kicker">{kicker}</p><h1>{title}</h1><p>{description}</p></div>{action}</header>;
+}
+
+function EditorModal(props: {
   title: string;
   draft: Draft;
   setDraft: (draft: Draft | null) => void;
@@ -423,11 +649,28 @@ function EditorModal({
   onClose: () => void;
 }) {
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <form className="modal-card" onSubmit={onSubmit} onMouseDown={(event) => event.stopPropagation()}>
-        <div className="modal-heading"><h2>{title}</h2><button type="button" className="icon-button" onClick={onClose}>×</button></div>
-        <label>제목<input autoFocus value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
-        <label>설명<textarea value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label>
+    <div className="modal-backdrop" role="presentation" onMouseDown={props.onClose}>
+      <form className="modal-card" onSubmit={props.onSubmit} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-heading"><h2>{props.title}</h2><button type="button" className="icon-button" onClick={props.onClose}>×</button></div>
+        <label>제목<input autoFocus value={props.draft.title} onChange={(event) => props.setDraft({ ...props.draft, title: event.target.value })} /></label>
+        <label>설명<textarea value={props.draft.body} onChange={(event) => props.setDraft({ ...props.draft, body: event.target.value })} /></label>
+        <button className="black-button" type="submit">저장</button>
+      </form>
+    </div>
+  );
+}
+
+function NameModal(props: {
+  draft: FolderDraft;
+  setDraft: (draft: FolderDraft | null) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={props.onClose}>
+      <form className="modal-card name-modal" onSubmit={props.onSubmit} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-heading"><h2>{props.draft.id ? "폴더 이름 변경" : "새 폴더"}</h2><button type="button" className="icon-button" onClick={props.onClose}>×</button></div>
+        <label>폴더 이름<input autoFocus value={props.draft.title} onChange={(event) => props.setDraft({ ...props.draft, title: event.target.value })} /></label>
         <button className="black-button" type="submit">저장</button>
       </form>
     </div>
@@ -435,9 +678,27 @@ function EditorModal({
 }
 
 function readAct(meta: string) {
+  return Number(readObject(meta).act ?? 0);
+}
+
+function documentFolder(item: Item) {
+  const value = readObject(item.meta).folderId;
+  return typeof value === "string" && value ? value : null;
+}
+
+function readBlockLinks(meta: string) {
+  const value = readObject(meta);
+  return {
+    characterIds: Array.isArray(value.characterIds) ? value.characterIds.filter((id): id is string => typeof id === "string") : [],
+    documentIds: Array.isArray(value.documentIds) ? value.documentIds.filter((id): id is string => typeof id === "string") : [],
+  };
+}
+
+function readObject(value: string): Record<string, unknown> {
   try {
-    return Number(JSON.parse(meta).act);
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
-    return 0;
+    return {};
   }
 }

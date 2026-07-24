@@ -11,7 +11,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!block) return Response.json({ error: "Not found" }, { status: 404 });
   const [project] = await getDb().select().from(projects).where(eq(projects.id, block.projectId));
   if (!project || project.ownerEmail !== user.email) return Response.json({ error: "Not found" }, { status: 404 });
-  const input = (await request.json()) as Partial<{ act: number; title: string; body: string; kind: string; sortOrder: number }>;
+  const input = (await request.json()) as Partial<{ act: number; title: string; body: string; kind: string; meta: string; sortOrder: number }>;
   const update = { ...input, updatedAt: new Date().toISOString() };
   await getDb().update(plotBlocks).set(update).where(eq(plotBlocks.id, id));
   await getDb().update(projects).set({ updatedAt: update.updatedAt }).where(eq(projects.id, block.projectId));

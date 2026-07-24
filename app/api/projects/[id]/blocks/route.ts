@@ -23,8 +23,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
   const { id } = await context.params;
   if (!(await owns(id, user.email))) return Response.json({ error: "Not found" }, { status: 404 });
-  const payload = (await request.json()) as { act?: number; title?: string; body?: string; kind?: string; sortOrder?: number };
-  const block = { id: crypto.randomUUID(), projectId: id, act: payload.act ?? 1, kind: payload.kind ?? "scene", title: payload.title?.trim() || "새 블록", body: payload.body?.trim() || "", sortOrder: payload.sortOrder ?? Date.now(), updatedAt: new Date().toISOString() };
+  const payload = (await request.json()) as { act?: number; title?: string; body?: string; kind?: string; meta?: string; sortOrder?: number };
+  const block = { id: crypto.randomUUID(), projectId: id, act: payload.act ?? 1, kind: payload.kind ?? "scene", title: payload.title?.trim() || "새 블록", body: payload.body?.trim() || "", meta: payload.meta ?? "{}", sortOrder: payload.sortOrder ?? Date.now(), updatedAt: new Date().toISOString() };
   await getDb().insert(plotBlocks).values(block);
   await getDb().update(projects).set({ updatedAt: block.updatedAt }).where(eq(projects.id, id));
   return Response.json({ block }, { status: 201 });

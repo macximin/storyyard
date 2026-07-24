@@ -1,0 +1,1 @@
+ALTER TABLE `plot_blocks` ADD `meta` text DEFAULT '{}' NOT NULL;

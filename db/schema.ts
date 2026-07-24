@@ -18,6 +18,7 @@ export const plotBlocks = sqliteTable("plot_blocks", {
   kind: text("kind").notNull().default("scene"),
   title: text("title").notNull(),
   body: text("body").notNull().default(""),
+  meta: text("meta").notNull().default("{}"),
   sortOrder: integer("sort_order").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
