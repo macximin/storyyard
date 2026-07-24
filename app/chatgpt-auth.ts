@@ -16,7 +16,7 @@ export type ChatGPTUser = {
 
 const SESSION_COOKIE = "storyyard_session";
 const SESSION_DAYS = 30;
-const PASSWORD_ITERATIONS = 210_000;
+const PASSWORD_ITERATIONS = 100_000;
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;

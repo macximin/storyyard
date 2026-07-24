@@ -44,28 +44,41 @@ export function GlobalSidebar({
     setPending(true);
     setError("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch(`/api/auth/${mode}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        username: form.get("username"),
-        password: form.get("password"),
-        displayName: form.get("displayName"),
-        setupCode: form.get("setupCode"),
-        remember: form.get("remember") === "on",
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      setError(data.error || "처리하지 못했음.");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await fetch(`/api/auth/${mode}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          username: form.get("username"),
+          password: form.get("password"),
+          displayName: form.get("displayName"),
+          setupCode: form.get("setupCode"),
+          remember: form.get("remember") === "on",
+        }),
+        signal: controller.signal,
+      });
+      const data = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) {
+        setError(data.error || "처리하지 못했음. 잠시 뒤 다시 시도해 줘.");
+        return;
+      }
+      const returnTo = searchParams.get("return_to");
+      if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
+        router.push(returnTo);
+      } else {
+        router.refresh();
+      }
+    } catch (requestError) {
+      setError(
+        requestError instanceof DOMException && requestError.name === "AbortError"
+          ? "서버 응답이 늦어서 중단했음. 잠시 뒤 다시 눌러 줘."
+          : "연결이 끊겼음. 잠시 뒤 다시 눌러 줘.",
+      );
+    } finally {
+      window.clearTimeout(timeout);
       setPending(false);
-      return;
-    }
-    const returnTo = searchParams.get("return_to");
-    if (returnTo?.startsWith("/") && !returnTo.startsWith("//")) {
-      router.push(returnTo);
-    } else {
-      router.refresh();
     }
   }
 
