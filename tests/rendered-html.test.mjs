@@ -81,18 +81,30 @@ test("keeps credentials out of browser storage and uses durable secure sessions"
   assert.match(schema, /passwordHash/);
 });
 
-test("publishes manuscript snapshots without exposing private planning data", async () => {
-  const [schema, publicationRoute, workspace] = await Promise.all([
+test("publishes only selected manuscript and planning snapshots", async () => {
+  const [schema, publicationRoute, contentRoute, projectRoute, workspace, publicWork] = await Promise.all([
     read("db/schema.ts"),
     read("app/api/projects/[id]/publication/route.ts"),
+    read("app/api/community/[id]/content/route.ts"),
+    read("app/api/projects/[id]/route.ts"),
     read("app/project-workspace.tsx"),
+    read("app/public-work.tsx"),
   ]);
   assert.match(schema, /publicationEpisodes/);
+  assert.match(schema, /publicationContent/);
   assert.match(publicationRoute, /INSERT INTO publication_episodes/);
-  assert.doesNotMatch(publicationRoute, /plot_blocks|project_items/);
-  assert.match(workspace, /원고/);
-  assert.match(workspace, /공개 관리/);
-  assert.match(workspace, /자동저장/);
+  assert.match(publicationRoute, /INSERT INTO publication_content/);
+  assert.match(publicationRoute, /characterFieldIds/);
+  assert.match(publicationRoute, /validItemKinds/);
+  assert.match(contentRoute, /p\.status = 'published'/);
+  assert.match(projectRoute, /UPDATE publications SET title = \?, logline = \?, genre = \?/);
+  for (const label of ["공개할 원고", "공개할 등장인물", "공개할 자료", "공개할 플롯"]) {
+    assert.match(workspace, new RegExp(label));
+  }
+  for (const tab of ["원고", "등장인물", "자료실", "플롯"]) {
+    assert.match(publicWork, new RegExp(`>${tab}<`));
+  }
+  assert.match(publicWork, /fetch\(`\/api\/community\/\$\{work\.id\}\/content\?type=\$\{nextTab\}`\)/);
 });
 
 test("cascades project deletion through public and private records", async () => {
@@ -102,6 +114,7 @@ test("cascades project deletion through public and private records", async () =>
     "ratings",
     "publication_favorites",
     "publication_episodes",
+    "publication_content",
     "publications",
     "manuscripts",
     "plot_blocks",

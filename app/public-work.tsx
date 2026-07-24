@@ -2,7 +2,7 @@
 
 import { BookmarkSimple, Star } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CommentThread } from "./comment-thread";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
 import type { PublicWorkSnapshot } from "./public-work-data";
@@ -26,23 +26,22 @@ export function PublicWork({
   const [message, setMessage] = useState(initialSnapshot ? "" : "작품을 찾지 못했음.");
   const [activeTab, setActiveTab] = useState<PublicTab>("manuscript");
   const [content, setContent] = useState<Partial<Record<Exclude<PublicTab, "manuscript">, PublicContent[]>>>({});
-  const [contentLoading, setContentLoading] = useState(false);
+  const [loadingTab, setLoadingTab] = useState<Exclude<PublicTab, "manuscript"> | null>(null);
 
-  useEffect(() => {
-    if (!work || activeTab === "manuscript" || content[activeTab]) return;
-    let active = true;
-    setContentLoading(true);
-    fetch(`/api/community/${work.id}/content?type=${activeTab}`)
-      .then((response) => response.ok ? response.json() : { content: [] })
-      .then((data) => {
-        if (active) setContent((current) => ({ ...current, [activeTab]: data.content ?? [] }));
-      })
-      .catch(() => {
-        if (active) setContent((current) => ({ ...current, [activeTab]: [] }));
-      })
-      .finally(() => { if (active) setContentLoading(false); });
-    return () => { active = false; };
-  }, [activeTab, content, work]);
+  async function selectTab(nextTab: PublicTab) {
+    setActiveTab(nextTab);
+    if (!work || nextTab === "manuscript" || content[nextTab]) return;
+    setLoadingTab(nextTab);
+    try {
+      const response = await fetch(`/api/community/${work.id}/content?type=${nextTab}`);
+      const data = response.ok ? await response.json() : { content: [] };
+      setContent((current) => ({ ...current, [nextTab]: data.content ?? [] }));
+    } catch {
+      setContent((current) => ({ ...current, [nextTab]: [] }));
+    } finally {
+      setLoadingTab((current) => current === nextTab ? null : current);
+    }
+  }
 
   async function toggleFavorite() {
     if (!user || !work) return setMessage("선호작은 로그인 후 사용할 수 있음.");
@@ -80,15 +79,15 @@ export function PublicWork({
           </header>
 
           <nav className="public-content-tabs" aria-label="작품 공개 정보">
-            <TabButton tab="manuscript" active={activeTab} onClick={setActiveTab}>원고</TabButton>
-            <TabButton tab="characters" active={activeTab} onClick={setActiveTab}>등장인물</TabButton>
-            <TabButton tab="documents" active={activeTab} onClick={setActiveTab}>자료실</TabButton>
-            <TabButton tab="plots" active={activeTab} onClick={setActiveTab}>플롯</TabButton>
+            <TabButton tab="manuscript" active={activeTab} onClick={selectTab}>원고</TabButton>
+            <TabButton tab="characters" active={activeTab} onClick={selectTab}>등장인물</TabButton>
+            <TabButton tab="documents" active={activeTab} onClick={selectTab}>자료실</TabButton>
+            <TabButton tab="plots" active={activeTab} onClick={selectTab}>플롯</TabButton>
           </nav>
           {activeTab === "manuscript" && <Manuscripts episodes={episodes} slug={work.slug} />}
-          {activeTab === "characters" && <PublicCharacters content={content.characters ?? []} loading={contentLoading} />}
-          {activeTab === "documents" && <PublicDocuments content={content.documents ?? []} loading={contentLoading} />}
-          {activeTab === "plots" && <PublicPlots content={content.plots ?? []} loading={contentLoading} />}
+          {activeTab === "characters" && <PublicCharacters content={content.characters ?? []} loading={loadingTab === "characters"} />}
+          {activeTab === "documents" && <PublicDocuments content={content.documents ?? []} loading={loadingTab === "documents"} />}
+          {activeTab === "plots" && <PublicPlots content={content.plots ?? []} loading={loadingTab === "plots"} />}
 
           <CommentThread publicationId={work.id} initialComments={comments} user={user} title="작품 댓글" />
         </>}

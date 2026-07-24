@@ -134,12 +134,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       ),
     ),
     ...buildContentSnapshots({
-      publicationId,
       allItems,
       allBlocks,
       requested,
       characterFieldIds: input.characterFieldIds ?? {},
-      timestamp,
     }).map((item) =>
       env.DB.prepare(
         `INSERT INTO publication_content
@@ -225,19 +223,15 @@ function readMeta(value: string): { plotId: string; act: number; tags: string[];
 }
 
 function buildContentSnapshots({
-  publicationId: _publicationId,
   allItems,
   allBlocks,
   requested,
   characterFieldIds,
-  timestamp: _timestamp,
 }: {
-  publicationId: string;
   allItems: Array<{ id: string; kind: string; title: string; body: string; meta: string }>;
   allBlocks: Array<{ id: string; act: number; title: string; body: string; meta: string; sortOrder: number }>;
   requested: { characterIds: string[]; documentIds: string[]; plotIds: string[]; actIds: string[]; blockIds: string[] };
   characterFieldIds: Record<string, string[]>;
-  timestamp: string;
 }): ContentRow[] {
   const result: ContentRow[] = [];
   const itemById = new Map(allItems.map((item) => [item.id, item]));

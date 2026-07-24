@@ -66,6 +66,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     env.DB.prepare("DELETE FROM ratings WHERE publication_id = ?").bind(publicationId),
     env.DB.prepare("DELETE FROM publication_favorites WHERE publication_id = ?").bind(publicationId),
     env.DB.prepare("DELETE FROM publication_episodes WHERE publication_id = ?").bind(publicationId),
+    env.DB.prepare("DELETE FROM publication_content WHERE publication_id = ?").bind(publicationId),
     env.DB.prepare("DELETE FROM publications WHERE project_id = ?").bind(id),
     env.DB.prepare("DELETE FROM manuscripts WHERE project_id = ?").bind(id),
     env.DB.prepare("DELETE FROM plot_blocks WHERE project_id = ?").bind(id),
