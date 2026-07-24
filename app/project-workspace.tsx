@@ -818,7 +818,7 @@ export function ProjectWorkspace({
           <Documents selected={selectedDocument} onSave={saveDocument} onNew={() => createDocument(null)} />
         )}
         {view === "manuscript" && <ManuscriptView projectId={projectId} />}
-        {view === "publish" && <PublishView project={project} />}
+        {view === "publish" && <PublishView project={project} items={items} blocks={blocks} />}
       </section>
 
       {blockDraft && (
@@ -1163,12 +1163,22 @@ function ManuscriptView({ projectId }: { projectId: string }) {
   );
 }
 
-function PublishView({ project }: { project: Project }) {
+function PublishView({ project, items, blocks }: { project: Project; items: Item[]; blocks: Block[] }) {
   const [manuscripts, setManuscripts] = useState<Manuscript[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [publication, setPublication] = useState<Record<string, string> | null>(null);
+  const [selectedCharacters, setSelectedCharacters] = useState<string[]>([]);
+  const [selectedCharacterFields, setSelectedCharacterFields] = useState<Record<string, string[]>>({});
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
+  const [selectedPlots, setSelectedPlots] = useState<string[]>([]);
+  const [selectedActs, setSelectedActs] = useState<string[]>([]);
+  const [selectedBlocks, setSelectedBlocks] = useState<string[]>([]);
+  const [publication, setPublication] = useState<{ status?: string; slug?: string; authorName?: string; coverUrl?: string } | null>(null);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const characters = items.filter((item) => item.kind === "character");
+  const documents = items.filter((item) => item.kind === "document");
+  const plots = items.filter((item) => item.kind === "plot").sort((left, right) => readPlotMeta(left).sortOrder - readPlotMeta(right).sortOrder);
+  const acts = items.filter((item) => item.kind === "act");
 
   useEffect(() => {
     Promise.all([
@@ -1180,6 +1190,13 @@ function PublishView({ project }: { project: Project }) {
       setPublication(publicationData.publication ?? null);
       const publicSources = new Set<string>((publicationData.episodes ?? []).map((item: { sourceManuscriptId?: string; source_manuscript_id?: string }) => item.sourceManuscriptId ?? item.source_manuscript_id ?? ""));
       setSelected(rows.filter((item) => item.status === "published" || publicSources.has(item.id)).map((item) => item.id));
+      const content = publicationData.content ?? {};
+      setSelectedCharacters(Array.isArray(content.characterIds) ? content.characterIds : []);
+      setSelectedCharacterFields(content.characterFieldIds && typeof content.characterFieldIds === "object" ? content.characterFieldIds : {});
+      setSelectedDocuments(Array.isArray(content.documentIds) ? content.documentIds : []);
+      setSelectedPlots(Array.isArray(content.plotIds) ? content.plotIds : []);
+      setSelectedActs(Array.isArray(content.actIds) ? content.actIds : []);
+      setSelectedBlocks(Array.isArray(content.blockIds) ? content.blockIds : []);
     });
   }, [project.id]);
 
@@ -1192,12 +1209,15 @@ function PublishView({ project }: { project: Project }) {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        title: form.get("title"),
-        logline: form.get("logline"),
-        genre: form.get("genre"),
         authorName: form.get("authorName"),
         coverUrl: form.get("coverUrl"),
         episodeIds: selected,
+        characterIds: selectedCharacters,
+        characterFieldIds: selectedCharacterFields,
+        documentIds: selectedDocuments,
+        plotIds: selectedPlots,
+        actIds: selectedActs,
+        blockIds: selectedBlocks,
       }),
     });
     const data = await response.json();
@@ -1213,6 +1233,37 @@ function PublishView({ project }: { project: Project }) {
     setMessage("커뮤니티에서 내렸음. 개인 작업 데이터는 그대로임.");
   }
 
+  function toggleCharacter(id: string) {
+    const current = selectedCharacters.includes(id);
+    setSelectedCharacters((values) => current ? values.filter((value) => value !== id) : [...values, id]);
+    if (!current) {
+      const character = characters.find((item) => item.id === id);
+      if (character) setSelectedCharacterFields((values) => ({ ...values, [id]: readCharacterMeta(character).fields.map((field) => field.id) }));
+    }
+  }
+
+  function toggleCharacterField(characterId: string, fieldId: string) {
+    setSelectedCharacterFields((current) => {
+      const values = current[characterId] ?? [];
+      return { ...current, [characterId]: values.includes(fieldId) ? values.filter((id) => id !== fieldId) : [...values, fieldId] };
+    });
+  }
+
+  function togglePlot(plotId: string) {
+    const checked = !selectedPlots.includes(plotId);
+    const linkedActs = acts.filter((item) => readObject(item.meta).plotId === plotId).map((item) => item.id);
+    const linkedBlocks = blocks.filter((item) => readObject(item.meta).plotId === plotId).map((item) => item.id);
+    setSelectedPlots((values) => checked ? [...values, plotId] : values.filter((id) => id !== plotId));
+    setSelectedActs((values) => checked ? [...new Set([...values, ...linkedActs])] : values.filter((id) => !linkedActs.includes(id)));
+    setSelectedBlocks((values) => checked ? [...new Set([...values, ...linkedBlocks])] : values.filter((id) => !linkedBlocks.includes(id)));
+  }
+
+  function toggleNested(plotId: string, id: string, type: "act" | "block") {
+    setSelectedPlots((values) => values.includes(plotId) ? values : [...values, plotId]);
+    const setter = type === "act" ? setSelectedActs : setSelectedBlocks;
+    setter((values) => values.includes(id) ? values.filter((value) => value !== id) : [...values, id]);
+  }
+
   return (
     <div className="page-narrow publish-page">
       <PageHeader kicker="PUBLISH" title="공개 관리" description="개인 작업실에서 선택한 정보와 원고만 커뮤니티로 복사합니다." />
@@ -1221,10 +1272,9 @@ function PublishView({ project }: { project: Project }) {
           <strong>{publication?.status === "published" ? "현재 공개 중" : "현재 비공개"}</strong>
           {publication?.slug && <Link href={`/works/${publication.slug}`}>공개 페이지 보기 →</Link>}
         </div>
-        <label>공개 제목<input name="title" defaultValue={publication?.title || project.title} /></label>
+        <div className="publication-sync-note"><strong>작품 기본 정보 자동 동기화</strong><span>제목·소개·장르는 작업실의 작품 개요를 저장하면 공개 페이지에도 바로 반영됨.</span></div>
+        <dl className="publication-project-info"><div><dt>제목</dt><dd>{project.title}</dd></div><div><dt>장르</dt><dd>{project.genre}</dd></div><div><dt>소개</dt><dd>{project.logline}</dd></div></dl>
         <label>필명<input name="authorName" defaultValue={publication?.authorName || ""} placeholder="커뮤니티에 표시할 이름" /></label>
-        <label>장르<input name="genre" defaultValue={publication?.genre || project.genre} /></label>
-        <label>작품 소개<textarea name="logline" defaultValue={publication?.logline || project.logline} /></label>
         <label>표지 이미지 URL<input name="coverUrl" defaultValue={publication?.coverUrl || "/default-cover.png"} placeholder="https://…" /></label>
         <div className="cover-preview">
           <img src={publication?.coverUrl || "/default-cover.png"} alt="기본 표지 미리보기" />
@@ -1243,6 +1293,35 @@ function PublishView({ project }: { project: Project }) {
             </label>
           ))}
           {!manuscripts.length && <p className="tree-empty root">원고 메뉴에서 먼저 회차를 작성해 주세요.</p>}
+        </fieldset>
+        <fieldset>
+          <legend>공개할 등장인물</legend>
+          {characters.map((item) => {
+            const meta = readCharacterMeta(item);
+            const checked = selectedCharacters.includes(item.id);
+            return <div className="publish-content-row" key={item.id}>
+              <label className="publish-episode"><input type="checkbox" checked={checked} onChange={() => toggleCharacter(item.id)} /><strong>{item.title}</strong><small>{meta.tags.join(" · ") || "태그 없음"}</small></label>
+              {checked && meta.fields.length > 0 && <div className="publish-field-picker"><span>공개 정보 블록</span>{meta.fields.map((field) => <label key={field.id}><input type="checkbox" checked={(selectedCharacterFields[item.id] ?? []).includes(field.id)} onChange={() => toggleCharacterField(item.id, field.id)} />{field.label || "이름 없는 항목"}</label>)}</div>}
+            </div>;
+          })}
+          {!characters.length && <p className="tree-empty root">등장인물 메뉴에서 먼저 인물을 작성해 주세요.</p>}
+        </fieldset>
+        <fieldset>
+          <legend>공개할 자료</legend>
+          {documents.map((item) => <label key={item.id} className="publish-episode"><input type="checkbox" checked={selectedDocuments.includes(item.id)} onChange={() => setSelectedDocuments((values) => values.includes(item.id) ? values.filter((id) => id !== item.id) : [...values, item.id])} /><strong>{item.title}</strong><small>읽기 전용으로 공개</small></label>)}
+          {!documents.length && <p className="tree-empty root">공개할 자료가 아직 없음.</p>}
+        </fieldset>
+        <fieldset>
+          <legend>공개할 플롯</legend>
+          {plots.map((plot) => {
+            const plotActs = acts.filter((item) => readObject(item.meta).plotId === plot.id).sort((left, right) => readAct(left.meta) - readAct(right.meta));
+            const plotBlocks = blocks.filter((item) => readObject(item.meta).plotId === plot.id);
+            return <div className="publish-plot-picker" key={plot.id}>
+              <label className="publish-episode"><input type="checkbox" checked={selectedPlots.includes(plot.id)} onChange={() => togglePlot(plot.id)} /><strong>{plot.title}</strong><small>전체 선택 / 해제</small></label>
+              {selectedPlots.includes(plot.id) && <div className="publish-plot-nested">{plotActs.map((act) => <label key={act.id}><input type="checkbox" checked={selectedActs.includes(act.id)} onChange={() => toggleNested(plot.id, act.id, "act")} />{act.title}</label>)}{plotBlocks.map((block) => <label key={block.id}><input type="checkbox" checked={selectedBlocks.includes(block.id)} onChange={() => toggleNested(plot.id, block.id, "block")} />{block.act}아크 · {block.title}</label>)}</div>}
+            </div>;
+          })}
+          {!plots.length && <p className="tree-empty root">공개할 플롯이 아직 없음.</p>}
         </fieldset>
         {message && <p className="inline-message">{message}</p>}
         <div className="publish-actions">

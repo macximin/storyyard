@@ -101,6 +101,24 @@ export const publicationEpisodes = sqliteTable("publication_episodes", {
   uniqueIndex("publication_episodes_publication_episode_unique").on(table.publicationId, table.episodeNo),
 ]);
 
+// 공개 페이지는 작업실 원본을 직접 읽지 않고, 작가가 고른 정보만 이 스냅샷에 복사한다.
+export const publicationContent = sqliteTable("publication_content", {
+  id: text("id").primaryKey(),
+  publicationId: text("publication_id").notNull(),
+  sourceId: text("source_id").notNull(),
+  kind: text("kind").notNull(),
+  parentSourceId: text("parent_source_id").notNull().default(""),
+  sortOrder: integer("sort_order").notNull().default(0),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  meta: text("meta").notNull().default("{}"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+}, (table) => [
+  uniqueIndex("publication_content_source_unique").on(table.publicationId, table.kind, table.sourceId),
+  index("publication_content_lookup_idx").on(table.publicationId, table.kind, table.sortOrder),
+]);
+
 export const publicationFavorites = sqliteTable("publication_favorites", {
   id: text("id").primaryKey(),
   publicationId: text("publication_id").notNull(),

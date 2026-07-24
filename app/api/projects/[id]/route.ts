@@ -36,6 +36,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (typeof input.favorite === "boolean") update.favorite = input.favorite ? 1 : 0;
   if (typeof input.favorite === "number") update.favorite = input.favorite ? 1 : 0;
   await getDb().update(projects).set(update).where(eq(projects.id, id));
+  // 공개본의 기본 정보는 별도 갱신 버튼 없이 작업실 원본을 즉시 따라간다.
+  await env.DB.prepare(
+    "UPDATE publications SET title = ?, logline = ?, genre = ?, updated_at = ? WHERE project_id = ?",
+  ).bind(
+    update.title ?? project.title,
+    update.logline ?? project.logline,
+    update.genre ?? project.genre,
+    update.updatedAt,
+    id,
+  ).run();
   return Response.json({ project: { ...project, ...update } });
 }
 

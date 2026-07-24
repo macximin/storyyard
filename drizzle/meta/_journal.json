@@ -43,6 +43,13 @@
       "when": 1784872953561,
       "tag": "0005_amused_midnight",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1784878728601,
+      "tag": "0006_massive_arclight",
+      "breakpoints": true
     }
   ]
 }
