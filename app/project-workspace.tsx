@@ -2,10 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DotsThree } from "@phosphor-icons/react/DotsThree";
-import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
-import { Plus } from "@phosphor-icons/react/Plus";
-import { Trash } from "@phosphor-icons/react/Trash";
+import { DotsThree, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 export type WorkspaceView = "overview" | "characters" | "plot" | "documents";
