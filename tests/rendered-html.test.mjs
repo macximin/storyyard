@@ -86,3 +86,23 @@ test("cascades project deletion through public and private records", async () =>
     assert.match(route, new RegExp(`DELETE FROM ${table}`));
   }
 });
+
+test("opens manuscripts as dedicated episode pages with episode comments and deletion", async () => {
+  const [work, reader, episodeData, episodeComments, commentDelete, schema] = await Promise.all([
+    read("app/public-work.tsx"),
+    read("app/public-episode-reader.tsx"),
+    read("app/public-episode-data.ts"),
+    read("app/api/community/[id]/episodes/[episodeId]/comments/route.ts"),
+    read("app/api/comments/[id]/route.ts"),
+    read("db/schema.ts"),
+  ]);
+  assert.match(work, /\/episodes\/\$\{episode\.episode_no\}/);
+  assert.doesNotMatch(work, /openEpisode|episode-body/);
+  assert.match(reader, /회차 목차/);
+  assert.match(reader, /화 댓글/);
+  assert.match(episodeData, /episode_id/);
+  assert.match(episodeComments, /INSERT INTO comments/);
+  assert.match(commentDelete, /user\.role !== "admin"/);
+  assert.match(commentDelete, /DELETE FROM comments/);
+  assert.match(schema, /episodeId/);
+});

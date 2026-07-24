@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -124,9 +124,12 @@ export const ratings = sqliteTable("ratings", {
 export const comments = sqliteTable("comments", {
   id: text("id").primaryKey(),
   publicationId: text("publication_id").notNull(),
+  episodeId: text("episode_id"),
   userId: text("user_id").notNull(),
   body: text("body").notNull(),
   status: text("status").notNull().default("visible"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
-});
+}, (table) => [
+  index("comments_publication_episode_idx").on(table.publicationId, table.episodeId),
+]);

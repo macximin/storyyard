@@ -71,7 +71,12 @@ export function CommunityHome({
               <article className="cover-card" key={work.id}>
                 <Link className="cover-link" href={`/works/${work.slug}`} prefetch>
                   <div className="cover-frame">
-                    <img src={work.coverUrl || "/default-cover.png"} alt={`${work.title} 표지`} />
+                    <img
+                      src={work.coverUrl || "/default-cover.png"}
+                      alt={`${work.title} 표지`}
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <strong className="rank-badge">{sort === "rating" ? index + 1 : "NEW"}</strong>
                     <span className="episode-badge">{work.episodeCount}화</span>
                   </div>

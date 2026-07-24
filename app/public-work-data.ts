@@ -19,12 +19,12 @@ export type PublicWorkSnapshot = {
     id: string;
     episode_no: number;
     title: string;
-    body: string;
     published_at: string;
     updated_at: string;
   }>;
   comments: Array<{
     id: string;
+    user_id: string;
     body: string;
     created_at: string;
     display_name: string;
@@ -53,13 +53,13 @@ export async function getPublicWork(
   const publicationId = String(publication.id);
   const [episodes, comments] = await Promise.all([
     env.DB.prepare(
-      `SELECT id, episode_no, title, body, published_at, updated_at
+      `SELECT id, episode_no, title, published_at, updated_at
          FROM publication_episodes WHERE publication_id = ? ORDER BY episode_no ASC`,
     ).bind(publicationId).all<PublicWorkSnapshot["episodes"][number]>(),
     env.DB.prepare(
-      `SELECT c.id, c.body, c.created_at, u.display_name, u.username
+      `SELECT c.id, c.user_id, c.body, c.created_at, u.display_name, u.username
          FROM comments c JOIN users u ON u.id = c.user_id
-        WHERE c.publication_id = ? AND c.status = 'visible'
+        WHERE c.publication_id = ? AND c.episode_id IS NULL AND c.status = 'visible'
         ORDER BY c.created_at DESC`,
     ).bind(publicationId).all<PublicWorkSnapshot["comments"][number]>(),
   ]);

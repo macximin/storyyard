@@ -33,6 +33,17 @@ export function AdminClient({ user }: { user: Exclude<SidebarUser, null> }) {
     setMessage(response.ok ? "운영 상태를 반영했음." : "반영하지 못했음.");
     await load();
   }
+  async function removeComment(id: string) {
+    if (!window.confirm("이 댓글을 완전히 삭제할까?")) return;
+    const response = await fetch(`/api/comments/${id}`, { method: "DELETE" });
+    setMessage(response.ok ? "댓글을 삭제했음." : "댓글을 삭제하지 못했음.");
+    if (response.ok) {
+      setData((current) => ({
+        ...current,
+        comments: current.comments.filter((comment) => comment.id !== id),
+      }));
+    }
+  }
   return (
     <main className="library-shell">
       <GlobalSidebar user={user} active="admin" />
@@ -61,7 +72,10 @@ export function AdminClient({ user }: { user: Exclude<SidebarUser, null> }) {
             {data.comments.map((comment) => (
               <article key={comment.id}>
                 <div><strong>{comment.work_title} · {comment.display_name}</strong><span>{comment.body}</span></div>
-                <button onClick={() => update("comment", comment.id, comment.status === "visible" ? "hidden" : "visible")}>{comment.status === "visible" ? "숨기기" : "복구"}</button>
+                <div className="admin-row-actions">
+                  <button onClick={() => update("comment", comment.id, comment.status === "visible" ? "hidden" : "visible")}>{comment.status === "visible" ? "숨기기" : "복구"}</button>
+                  <button className="danger" onClick={() => removeComment(comment.id)}>삭제</button>
+                </div>
               </article>
             ))}
           </div>

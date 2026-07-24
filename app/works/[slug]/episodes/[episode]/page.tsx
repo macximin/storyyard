@@ -1,23 +1,27 @@
 import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { PublicWork } from "@/app/public-work";
+import { PublicEpisodeReader } from "@/app/public-episode-reader";
+import { getPublicEpisode } from "@/app/public-episode-data";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
-import { getPublicWork } from "@/app/public-work-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function WorkPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function EpisodePage({
+  params,
+}: {
+  params: Promise<{ slug: string; episode: string }>;
+}) {
+  const { slug, episode } = await params;
   const user = await getChatGPTUser();
-  const [existing, initialSnapshot] = await Promise.all([
+  const [existing, snapshot] = await Promise.all([
     getDb().select({ id: users.id }).from(users).limit(1),
-    getPublicWork(slug, user?.id ?? ""),
+    getPublicEpisode(slug, Number(episode)),
   ]);
   return (
-    <PublicWork
+    <PublicEpisodeReader
       user={user ? { id: user.id, username: user.username, displayName: user.displayName, role: user.role } : null}
       setupRequired={!existing.length}
-      initialSnapshot={initialSnapshot}
+      snapshot={snapshot}
     />
   );
 }

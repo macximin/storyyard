@@ -1,7 +1,10 @@
 "use client";
 
-import { BookmarkSimple, ChatCircle, Star } from "@phosphor-icons/react";
-import { FormEvent, useState } from "react";
+import { BookmarkSimple, Star } from "@phosphor-icons/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { CommentThread } from "./comment-thread";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
 import type { PublicWorkSnapshot } from "./public-work-data";
 
@@ -19,37 +22,21 @@ type Work = {
   isFavorite: boolean;
   myRating: number;
 };
-type Episode = { id: string; episode_no: number; title: string; body: string; published_at: string; updated_at: string };
-type Comment = { id: string; body: string; created_at: string; display_name: string; username: string };
 
 export function PublicWork({
-  slug,
   user,
   setupRequired,
   initialSnapshot,
 }: {
-  slug: string;
   user: SidebarUser;
   setupRequired: boolean;
   initialSnapshot: PublicWorkSnapshot | null;
 }) {
+  const router = useRouter();
   const [work, setWork] = useState<Work | null>(initialSnapshot?.work ?? null);
-  const [episodes, setEpisodes] = useState<Episode[]>(initialSnapshot?.episodes ?? []);
-  const [comments, setComments] = useState<Comment[]>(initialSnapshot?.comments ?? []);
-  const [openEpisode, setOpenEpisode] = useState<string | null>(null);
+  const episodes = initialSnapshot?.episodes ?? [];
+  const comments = initialSnapshot?.comments ?? [];
   const [message, setMessage] = useState(initialSnapshot ? "" : "작품을 찾지 못했음.");
-
-  async function load() {
-    const response = await fetch(`/api/community/${slug}`);
-    const data = await response.json();
-    if (!response.ok) {
-      setMessage("작품을 찾지 못했음.");
-      return;
-    }
-    setWork(data.work);
-    setEpisodes(data.episodes ?? []);
-    setComments(data.comments ?? []);
-  }
 
   async function toggleFavorite() {
     if (!user || !work) return setMessage("선호작은 로그인 후 사용할 수 있음.");
@@ -66,26 +53,15 @@ export function PublicWork({
       body: JSON.stringify({ value }),
     });
     if (response.ok) {
+      const data = await response.json() as { value: number; ratingAverage: number; ratingCount: number };
+      setWork({
+        ...work,
+        myRating: data.value,
+        ratingAverage: data.ratingAverage,
+        ratingCount: data.ratingCount,
+      });
       setMessage(`${value}점으로 반영됨.`);
-      await load();
     }
-  }
-
-  async function comment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!user || !work) return setMessage("댓글은 로그인 후 남길 수 있음.");
-    const form = new FormData(event.currentTarget);
-    const body = String(form.get("body") ?? "");
-    const response = await fetch(`/api/community/${work.id}/comments`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ body }),
-    });
-    const data = await response.json();
-    if (!response.ok) return setMessage(data.error || "댓글을 남기지 못했음.");
-    event.currentTarget.reset();
-    setMessage("댓글을 남겼음.");
-    await load();
   }
 
   return (
@@ -123,44 +99,30 @@ export function PublicWork({
               <div className="section-title"><div><p className="kicker">MANUSCRIPT</p><h2>공개 원고</h2></div><span>{episodes.length}편</span></div>
               <div className="episode-list">
                 {episodes.map((episode) => {
-                  const open = openEpisode === episode.id;
+                  const href = `/works/${work.slug}/episodes/${episode.episode_no}`;
                   return (
-                    <article className={`episode-card ${open ? "open" : ""}`} key={episode.id}>
-                      <button className="episode-heading" onClick={() => setOpenEpisode(open ? null : episode.id)}>
-                        <span>{episode.episode_no}화</span><strong>{episode.title}</strong><small>{open ? "접기" : "읽기"}</small>
-                      </button>
-                      {open && (
-                        <div className="episode-body">
-                          {episode.body.split(/\n+/).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
-                          <div className="episode-rating">
-                            <strong>이 작품은 어땠나요?</strong>
-                            <RatingPicker value={work.myRating} onRate={rate} compact />
-                          </div>
-                        </div>
-                      )}
+                    <article className="episode-card" key={episode.id}>
+                      <Link
+                        className="episode-heading"
+                        href={href}
+                        prefetch={false}
+                        onPointerEnter={() => router.prefetch(href)}
+                        onFocus={() => router.prefetch(href)}
+                      >
+                        <span>{episode.episode_no}화</span><strong>{episode.title}</strong><small>읽기 →</small>
+                      </Link>
                     </article>
                   );
                 })}
               </div>
             </section>
 
-            <section className="comment-section">
-              <div className="section-title"><div><p className="kicker">COMMENTS</p><h2>댓글</h2></div><span>{comments.length}개</span></div>
-              <form className="comment-form" onSubmit={comment}>
-                <ChatCircle size={22} />
-                <textarea name="body" placeholder={user ? "작품에 대한 의견을 남겨 주세요." : "로그인 후 댓글을 남길 수 있음."} disabled={!user} maxLength={1000} />
-                <button className="black-button" disabled={!user}>등록</button>
-              </form>
-              <div className="comments">
-                {comments.map((item) => (
-                  <article key={item.id}>
-                    <div><strong>{item.display_name}</strong><span>@{item.username}</span><time>{formatDate(item.created_at)}</time></div>
-                    <p>{item.body}</p>
-                  </article>
-                ))}
-                {!comments.length && <div className="blank-state small">첫 댓글을 남겨 보세요.</div>}
-              </div>
-            </section>
+            <CommentThread
+              publicationId={work.id}
+              initialComments={comments}
+              user={user}
+              title="작품 댓글"
+            />
           </>
         )}
       </section>
@@ -181,9 +143,4 @@ function RatingPicker({ value, onRate, compact = false }: { value: number; onRat
       </div>
     </div>
   );
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("ko", { year: "numeric", month: "short", day: "numeric" }).format(date);
 }

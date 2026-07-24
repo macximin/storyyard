@@ -17,5 +17,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
      ON CONFLICT(user_id, publication_id)
      DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
   ).bind(crypto.randomUUID(), id, user.id, value, timestamp, timestamp).run();
-  return Response.json({ value });
+  const summary = await env.DB.prepare(
+    "SELECT AVG(value) AS average, COUNT(*) AS count FROM ratings WHERE publication_id = ?",
+  ).bind(id).first<{ average: number; count: number }>();
+  return Response.json({
+    value,
+    ratingAverage: Number(summary?.average ?? value),
+    ratingCount: Number(summary?.count ?? 1),
+  });
 }
