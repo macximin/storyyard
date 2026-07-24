@@ -48,4 +48,36 @@
 4. Compared the supplied multi-plot header and the rendered two-tab plot workspace in one focused image. Tab placement, selected state, add action, page title, overflow menu, and one-line description are all present. No P0/P1/P2 mismatch remained.
 5. Captured the revised character list and verified that linked block names are readable in the third column without collapsing the name or description columns.
 
+## Public community expansion QA
+
+### Visual truth
+
+- Ranking/card references: `C:\Users\wjjo\AppData\Local\Temp\codex-clipboard-2a4e6483-d714-4fa2-b441-16d9fd6cea68.png` and `C:\Users\wjjo\AppData\Local\Temp\codex-clipboard-de2d8979-1383-4d7d-9932-fb09645fa554.png`
+- Embedded account form reference: `C:\Users\wjjo\AppData\Local\Temp\codex-clipboard-31ac690c-5a2f-41bf-8738-cd04a20ccd65.png`
+- Production captures: `work/design-qa-public/community-viewport.png`, `work/design-qa-public/community-mobile.png`, and `work/design-qa-public/community-mobile-auth.png`
+- Shared comparison canvas: `work/design-qa-public/community-comparison.png`
+
+### Production state and viewport
+
+- Production URL verified at 1366×768 and 390×844.
+- Anonymous state with the first-admin setup form visible inside the desktop sidebar.
+- Mobile account panel opened from the fixed header and remained fully usable without a separate login route.
+- Public database intentionally has no publication until the first administrator selects and publishes at least one manuscript.
+
+### Fidelity review
+
+- The production page retains Storyyard's white, black, gray, and pale-yellow system while adopting the reference ranking-grid hierarchy.
+- The embedded account form is compact, visually subordinate to the community content, and matches the supplied pale-blue input treatment.
+- Desktop uses a fixed 220 px navigation rail and a wide left-aligned content canvas; mobile reduces navigation to icon actions without squeezing the main content.
+- The empty publication state preserves the future grid footprint rather than collapsing the page.
+- Cover cards use a 2:3 slot, ranking number, title, pen name, rating, episode count, and favorite action. The first live grid remains data-gated, but its backing list/detail APIs were exercised with realistic local publication data.
+
+### Interaction and release audit
+
+- Local end-to-end API flow passed: first administrator setup, second user registration, project creation, manuscript autosave, publication snapshot, rating, comment, favorite, community listing, admin overview, and cascading project deletion.
+- Production `/`, `/api/auth/status`, and `/api/community` returned 200 after deployment and database migration.
+- Desktop and mobile account controls opened correctly; the mobile form includes display name, ID, password visibility, setup code, and persistent-login option.
+- The release keeps raw passwords out of storage. PBKDF2-SHA256 password hashes and a 30-day HttpOnly, Secure, SameSite=Lax session cookie are used.
+- No separate login landing page is required; anonymous reading remains available.
+
 final result: passed

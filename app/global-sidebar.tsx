@@ -90,7 +90,13 @@ export function GlobalSidebar({
         </div>
       ) : (
         <>
-        <button className="mobile-auth-button" type="button" onClick={() => setAuthOpen((value) => !value)}>
+        <button
+          className="mobile-auth-button"
+          type="button"
+          aria-label={authOpen ? "계정 창 닫기" : "로그인 및 회원가입"}
+          aria-expanded={authOpen}
+          onClick={() => setAuthOpen((value) => !value)}
+        >
           <UserCircle size={19} /><span>로그인</span>
         </button>
         <form className={`embedded-auth ${authOpen ? "mobile-open" : ""}`} onSubmit={submit}>
@@ -133,23 +139,23 @@ export function GlobalSidebar({
 
       <nav className="global-nav" aria-label="주 메뉴">
         <p>커뮤니티</p>
-        <Link className={active === "community" ? "active" : ""} href="/">
+        <Link className={active === "community" ? "active" : ""} href="/" aria-label="전체장르">
           <BookOpen size={18} /><span>전체장르</span>
         </Link>
-        <Link className={active === "preferred" ? "active" : ""} href="/preferred">
+        <Link className={active === "preferred" ? "active" : ""} href="/preferred" aria-label="선호작">
           <BookmarkSimple size={18} /><span>선호작</span>
         </Link>
         <p>개인 작업실</p>
-        <Link className={active === "studio" ? "active" : ""} href="/studio">
+        <Link className={active === "studio" ? "active" : ""} href="/studio" aria-label="내 작품">
           <House size={18} /><span>내 작품</span>
         </Link>
-        <Link className={active === "studio-favorites" ? "active" : ""} href="/studio?filter=favorites">
+        <Link className={active === "studio-favorites" ? "active" : ""} href="/studio?filter=favorites" aria-label="즐겨찾기">
           <Star size={18} /><span>즐겨찾기</span>
         </Link>
         {user?.role === "admin" && (
           <>
             <p>관리자</p>
-            <Link className={active === "admin" ? "active" : ""} href="/admin">
+            <Link className={active === "admin" ? "active" : ""} href="/admin" aria-label="운영 관리">
               <GearSix size={18} /><span>운영 관리</span>
             </Link>
           </>
