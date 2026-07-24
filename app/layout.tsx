@@ -18,8 +18,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("host") ?? "storyyard-wjjo.macximin11123.chatgpt.site";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? "https";
   const origin = `${protocol}://${host}`;
-  const title = "Storyyard — 개인 창작 스튜디오";
-  const description = "작품별 등장인물, 플롯, 문서를 한곳에서 관리하는 개인용 웹소설 작업실.";
+  const title = "Storyyard — 웹소설 창작과 독자 평가";
+  const description = "작품을 쓰고 공개하고, 별점과 댓글로 다음 이야기를 고르는 웹소설 커뮤니티.";
   return {
     title,
     description,

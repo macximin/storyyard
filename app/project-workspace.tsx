@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DotsThree, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
+import { DotsThree, FileText, GlobeHemisphereWest, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-export type WorkspaceView = "overview" | "characters" | "plot" | "documents";
+export type WorkspaceView = "overview" | "characters" | "plot" | "documents" | "manuscript" | "publish";
 type Project = { id: string; title: string; logline: string; genre: string; favorite: number; updatedAt: string };
 type Block = { id: string; act: number; kind: string; title: string; body: string; meta: string; sortOrder: number };
 type Item = { id: string; kind: string; title: string; body: string; meta: string; updatedAt?: string };
@@ -120,6 +120,8 @@ export function ProjectWorkspace({
     router.prefetch(`/project/${projectId}/characters`);
     router.prefetch(`/project/${projectId}/plot`);
     router.prefetch(`/project/${projectId}/documents`);
+    router.prefetch(`/project/${projectId}/manuscript`);
+    router.prefetch(`/project/${projectId}/publish`);
   }, [projectId, router]);
 
   useEffect(() => {
@@ -803,6 +805,8 @@ export function ProjectWorkspace({
         {view === "documents" && (
           <Documents selected={selectedDocument} onSave={saveDocument} onNew={() => createDocument(null)} />
         )}
+        {view === "manuscript" && <ManuscriptView projectId={projectId} />}
+        {view === "publish" && <PublishView project={project} />}
       </section>
 
       {blockDraft && (
@@ -905,7 +909,7 @@ function ProjectSidebar(props: {
   const unfiled = props.documents.filter((document) => !documentFolder(document));
   return (
     <aside className="project-sidebar">
-      <Link className="back-home" href="/">⌂ 홈으로</Link>
+      <Link className="back-home" href="/studio">⌂ 개인 작업실</Link>
       <div className="project-identity"><span>{props.project.genre}</span><strong>{props.project.title}</strong></div>
       <label className="sidebar-search">⌕<input placeholder="검색…" aria-label="작품 검색" /></label>
       <nav className="project-nav" aria-label="작품 메뉴">
@@ -970,6 +974,14 @@ function ProjectSidebar(props: {
           {!props.folders.length && !props.documents.length && <span className="tree-empty root">＋ 버튼으로 문서나 폴더를 추가</span>}
         </div>
       </section>
+      <nav className="project-secondary-nav" aria-label="원고와 공개 관리">
+        <Link className={props.view === "manuscript" ? "active" : ""} href={`/project/${props.projectId}/manuscript`}>
+          <FileText size={17} /><span>원고</span>
+        </Link>
+        <Link className={props.view === "publish" ? "active" : ""} href={`/project/${props.projectId}/publish`}>
+          <GlobeHemisphereWest size={17} /><span>공개 관리</span>
+        </Link>
+      </nav>
       <div className="sidebar-user"><span>{props.userName.slice(0, 1)}</span>{props.userName}</div>
     </aside>
   );
@@ -1014,6 +1026,217 @@ function Overview({ project, onSave }: { project: Project; onSave: (event: FormE
         <label>한 줄 소개<textarea name="logline" defaultValue={project.logline} /></label>
         <label>장르<input name="genre" defaultValue={project.genre} /></label>
         <button className="black-button" type="submit">변경사항 저장</button>
+      </form>
+    </div>
+  );
+}
+
+type Manuscript = {
+  id: string;
+  projectId: string;
+  episodeNo: number;
+  title: string;
+  body: string;
+  status: string;
+  updatedAt: string;
+};
+
+function ManuscriptView({ projectId }: { projectId: string }) {
+  const [manuscripts, setManuscripts] = useState<Manuscript[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Manuscript | null>(null);
+  const [status, setStatus] = useState<SaveStatus>("idle");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/projects/${projectId}/manuscripts`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (!active) return;
+        const rows: Manuscript[] = data.manuscripts ?? [];
+        setManuscripts(rows);
+        const chosen = rows[0] ?? null;
+        setSelectedId(chosen?.id ?? null);
+        setDraft(chosen);
+      });
+    return () => { active = false; };
+  }, [projectId]);
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
+  async function create() {
+    const response = await fetch(`/api/projects/${projectId}/manuscripts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+    if (!data.manuscript) return;
+    setManuscripts((current) => [...current, data.manuscript]);
+    setSelectedId(data.manuscript.id);
+    setDraft(data.manuscript);
+  }
+
+  function select(item: Manuscript) {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSelectedId(item.id);
+    setDraft(item);
+    setStatus("idle");
+  }
+
+  function change(update: Partial<Manuscript>) {
+    if (!draft) return;
+    const next = { ...draft, ...update };
+    setDraft(next);
+    setManuscripts((current) => current.map((item) => item.id === next.id ? next : item));
+    setStatus("saving");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/manuscripts/${next.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: next.title, body: next.body }),
+        });
+        if (!response.ok) throw new Error("save failed");
+        setStatus("saved");
+      } catch {
+        setStatus("error");
+      }
+    }, 600);
+  }
+
+  async function remove() {
+    if (!draft || !window.confirm(`${draft.episodeNo}화 원고를 삭제할까?`)) return;
+    await fetch(`/api/manuscripts/${draft.id}`, { method: "DELETE" });
+    const remaining = manuscripts.filter((item) => item.id !== draft.id);
+    setManuscripts(remaining);
+    setDraft(remaining[0] ?? null);
+    setSelectedId(remaining[0]?.id ?? null);
+  }
+
+  return (
+    <div className="page-wide manuscript-page">
+      <PageHeader
+        kicker="MANUSCRIPT"
+        title={`원고 ${manuscripts.length}`}
+        description="실제 공개할 회차를 쓰고 자동 저장합니다."
+        action={<button className="black-button" onClick={create}>＋ 새 원고</button>}
+      />
+      <div className="manuscript-layout">
+        <aside className="manuscript-list">
+          {manuscripts.map((item) => (
+            <button key={item.id} className={item.id === selectedId ? "active" : ""} onClick={() => select(item)}>
+              <span>{item.episodeNo}화</span><strong>{item.title}</strong><small>{item.status === "published" ? "공개 중" : "비공개"}</small>
+            </button>
+          ))}
+          {!manuscripts.length && <div className="tree-empty root">첫 원고를 추가해 보세요.</div>}
+        </aside>
+        {draft ? (
+          <section className="manuscript-editor">
+            <div className="manuscript-editor-head">
+              <span>{draft.episodeNo}화</span>
+              <div className={`save-indicator ${status}`}>{status === "saving" ? "저장 중…" : status === "saved" ? "저장됨" : status === "error" ? "저장 실패" : "자동저장"}</div>
+              <button type="button" onClick={remove}>삭제</button>
+            </div>
+            <input className="manuscript-title" value={draft.title} onChange={(event) => change({ title: event.target.value })} aria-label="원고 제목" />
+            <textarea className="manuscript-body" value={draft.body} onChange={(event) => change({ body: event.target.value })} placeholder="이 회차의 원고를 입력하세요." />
+            <footer><span>공백 포함 {draft.body.length.toLocaleString("ko")}자</span><span>{draft.status === "published" ? "현재 커뮤니티에 공개된 사본이 있음." : "공개 관리에서 공개할 수 있음."}</span></footer>
+          </section>
+        ) : (
+          <div className="blank-state">원고를 선택하거나 새로 추가해 주세요.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PublishView({ project }: { project: Project }) {
+  const [manuscripts, setManuscripts] = useState<Manuscript[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [publication, setPublication] = useState<Record<string, string> | null>(null);
+  const [message, setMessage] = useState("");
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`/api/projects/${project.id}/manuscripts`).then((response) => response.json()),
+      fetch(`/api/projects/${project.id}/publication`).then((response) => response.json()),
+    ]).then(([manuscriptData, publicationData]) => {
+      const rows: Manuscript[] = manuscriptData.manuscripts ?? [];
+      setManuscripts(rows);
+      setPublication(publicationData.publication ?? null);
+      const publicSources = new Set<string>((publicationData.episodes ?? []).map((item: { sourceManuscriptId?: string; source_manuscript_id?: string }) => item.sourceManuscriptId ?? item.source_manuscript_id ?? ""));
+      setSelected(rows.filter((item) => item.status === "published" || publicSources.has(item.id)).map((item) => item.id));
+    });
+  }, [project.id]);
+
+  async function publish(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setMessage("");
+    const form = new FormData(event.currentTarget);
+    const response = await fetch(`/api/projects/${project.id}/publication`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        title: form.get("title"),
+        logline: form.get("logline"),
+        genre: form.get("genre"),
+        authorName: form.get("authorName"),
+        coverUrl: form.get("coverUrl"),
+        episodeIds: selected,
+      }),
+    });
+    const data = await response.json();
+    setPending(false);
+    if (!response.ok) return setMessage(data.error || "공개하지 못했음.");
+    setPublication(data.publication);
+    setMessage("커뮤니티 공개본을 갱신했음.");
+  }
+
+  async function unpublish() {
+    await fetch(`/api/projects/${project.id}/publication`, { method: "DELETE" });
+    setPublication((current) => current ? { ...current, status: "draft" } : null);
+    setMessage("커뮤니티에서 내렸음. 개인 작업 데이터는 그대로임.");
+  }
+
+  return (
+    <div className="page-narrow publish-page">
+      <PageHeader kicker="PUBLISH" title="공개 관리" description="개인 작업실에서 선택한 정보와 원고만 커뮤니티로 복사합니다." />
+      <form className="publish-form" onSubmit={publish}>
+        <div className="publication-status">
+          <strong>{publication?.status === "published" ? "현재 공개 중" : "현재 비공개"}</strong>
+          {publication?.slug && <Link href={`/works/${publication.slug}`}>공개 페이지 보기 →</Link>}
+        </div>
+        <label>공개 제목<input name="title" defaultValue={publication?.title || project.title} /></label>
+        <label>필명<input name="authorName" defaultValue={publication?.authorName || ""} placeholder="커뮤니티에 표시할 이름" /></label>
+        <label>장르<input name="genre" defaultValue={publication?.genre || project.genre} /></label>
+        <label>작품 소개<textarea name="logline" defaultValue={publication?.logline || project.logline} /></label>
+        <label>표지 이미지 URL<input name="coverUrl" defaultValue={publication?.coverUrl || "/default-cover.png"} placeholder="https://…" /></label>
+        <div className="cover-preview">
+          <img src={publication?.coverUrl || "/default-cover.png"} alt="기본 표지 미리보기" />
+          <p>지금은 HTTPS 이미지 주소를 사용함. 주소가 없으면 Storyyard 기본 표지가 적용됨.</p>
+        </div>
+        <fieldset>
+          <legend>공개할 원고</legend>
+          {manuscripts.map((item) => (
+            <label key={item.id} className="publish-episode">
+              <input
+                type="checkbox"
+                checked={selected.includes(item.id)}
+                onChange={() => setSelected((current) => current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id])}
+              />
+              <span>{item.episodeNo}화</span><strong>{item.title}</strong><small>{item.body.length.toLocaleString("ko")}자</small>
+            </label>
+          ))}
+          {!manuscripts.length && <p className="tree-empty root">원고 메뉴에서 먼저 회차를 작성해 주세요.</p>}
+        </fieldset>
+        {message && <p className="inline-message">{message}</p>}
+        <div className="publish-actions">
+          <button className="black-button" disabled={pending}>{pending ? "공개 중…" : publication?.status === "published" ? "공개본 갱신" : "커뮤니티에 공개"}</button>
+          {publication?.status === "published" && <button type="button" className="outline-cancel" onClick={unpublish}>공개 중지</button>}
+        </div>
       </form>
     </div>
   );

@@ -49,7 +49,15 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     return Response.json({ error: "Not found" }, { status: 404 });
   }
 
+  const publication = await env.DB.prepare("SELECT id FROM publications WHERE project_id = ?").bind(id).first<{ id: string }>();
+  const publicationId = publication?.id ?? "";
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM comments WHERE publication_id = ?").bind(publicationId),
+    env.DB.prepare("DELETE FROM ratings WHERE publication_id = ?").bind(publicationId),
+    env.DB.prepare("DELETE FROM publication_favorites WHERE publication_id = ?").bind(publicationId),
+    env.DB.prepare("DELETE FROM publication_episodes WHERE publication_id = ?").bind(publicationId),
+    env.DB.prepare("DELETE FROM publications WHERE project_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM manuscripts WHERE project_id = ?").bind(id),
     env.DB.prepare("DELETE FROM plot_blocks WHERE project_id = ?").bind(id),
     env.DB.prepare("DELETE FROM project_items WHERE project_id = ?").bind(id),
     env.DB.prepare("DELETE FROM projects WHERE id = ? AND owner_email = ?").bind(id, user.email),

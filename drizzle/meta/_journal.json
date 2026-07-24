@@ -29,6 +29,13 @@
       "when": 1784859680350,
       "tag": "0003_slippery_medusa",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784869999254,
+      "tag": "0004_strange_meteorite",
+      "breakpoints": true
     }
   ]
 }

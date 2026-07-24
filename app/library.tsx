@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { GlobalSidebar, SidebarUser } from "./global-sidebar";
 
 type Project = {
   id: string;
@@ -12,10 +14,12 @@ type Project = {
   updatedAt: string;
 };
 
-export function Library({ userName }: { userName: string }) {
+export function Library({ user }: { user: Exclude<SidebarUser, null> }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [filter, setFilter] = useState<"all" | "favorites">("all");
+  const filter: "all" | "favorites" =
+    searchParams.get("filter") === "favorites" ? "favorites" : "all";
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
@@ -97,15 +101,7 @@ export function Library({ userName }: { userName: string }) {
 
   return (
     <main className="library-shell">
-      <aside className="global-sidebar">
-        <a className="wordmark" href="/">STORYYARD</a>
-        <div className="user-chip"><span>{userName.slice(0, 1)}</span>{userName}</div>
-        <nav className="global-nav" aria-label="주 메뉴">
-          <a className="active" href="/">⌂ <span>내 작품</span></a>
-          <a href="#favorites" onClick={() => setFilter("favorites")}>☆ <span>즐겨찾기</span></a>
-        </nav>
-        <a className="signout" href="/signout-with-chatgpt?return_to=/">로그아웃</a>
-      </aside>
+      <GlobalSidebar user={user} active={filter === "favorites" ? "studio-favorites" : "studio"} />
 
       <section className="library-main">
         <header className="library-header">
@@ -119,10 +115,10 @@ export function Library({ userName }: { userName: string }) {
 
         <div className="library-toolbar" id="favorites">
           <div className="filter-tabs" role="tablist" aria-label="작품 필터">
-            <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>
+            <button className={filter === "all" ? "active" : ""} onClick={() => router.replace("/studio")}>
               모든 작품 <b>{projects.length}</b>
             </button>
-            <button className={filter === "favorites" ? "active" : ""} onClick={() => setFilter("favorites")}>
+            <button className={filter === "favorites" ? "active" : ""} onClick={() => router.replace("/studio?filter=favorites")}>
               즐겨찾기 <b>{projects.filter((project) => project.favorite).length}</b>
             </button>
           </div>
