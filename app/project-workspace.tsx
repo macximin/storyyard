@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
 export type WorkspaceView = "overview" | "characters" | "plot" | "documents";
@@ -9,12 +11,14 @@ type Item = { id: string; kind: string; title: string; body: string; meta: strin
 type Draft = { id?: string; title: string; body: string; act?: number };
 type BlockDraft = Draft & { act: number; characterIds: string[]; documentIds: string[] };
 type FolderDraft = { id?: string; title: string };
+type WorkspaceSnapshot = { project: Project; blocks: Block[]; items: Item[] };
 
 const actDefaults = [
-  { title: "1막 · 각성", body: "세계가 흔들리고, 주인공이 이전으로 돌아갈 수 없게 된다." },
-  { title: "2막 · 진실과 갈등", body: "목표를 향할수록 대가와 적의 정체가 선명해진다." },
-  { title: "3막 · 결전과 선택", body: "가장 큰 대가 앞에서 주인공이 마지막 선택을 내린다." },
+  { title: "1아크", body: "TBD" },
+  { title: "2아크", body: "TBD" },
+  { title: "3아크", body: "TBD" },
 ];
+const workspaceCache = new Map<string, WorkspaceSnapshot>();
 
 export function ProjectWorkspace({
   projectId,
@@ -25,34 +29,40 @@ export function ProjectWorkspace({
   view: WorkspaceView;
   userName: string;
 }) {
-  const [project, setProject] = useState<Project | null>(null);
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [items, setItems] = useState<Item[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const cached = workspaceCache.get(projectId);
+  const [project, setProject] = useState<Project | null>(() => cached?.project ?? null);
+  const [blocks, setBlocks] = useState<Block[]>(() => cached?.blocks ?? []);
+  const [items, setItems] = useState<Item[]>(() => cached?.items ?? []);
+  const [loading, setLoading] = useState(() => !cached);
   const [draggedBlock, setDraggedBlock] = useState<string | null>(null);
   const [draggedDocument, setDraggedDocument] = useState<string | null>(null);
   const [blockDraft, setBlockDraft] = useState<BlockDraft | null>(null);
   const [characterDraft, setCharacterDraft] = useState<Draft | null>(null);
   const [actDraft, setActDraft] = useState<Draft | null>(null);
   const [folderDraft, setFolderDraft] = useState<FolderDraft | null>(null);
-  const [documentId, setDocumentId] = useState<string | null>(null);
+  const [documentId, setDocumentId] = useState<string | null>(
+    () => cached?.items.find((item) => item.kind === "document")?.id ?? null,
+  );
   const [openFolders, setOpenFolders] = useState<string[]>([]);
   const [treeMenu, setTreeMenu] = useState<string | null>(null);
   const [treeAddOpen, setTreeAddOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Item | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/projects/${projectId}`).then((response) => response.json()),
-      fetch(`/api/projects/${projectId}/blocks`).then((response) => response.json()),
-      fetch(`/api/projects/${projectId}/items`).then((response) => response.json()),
-    ])
-      .then(([projectData, blockData, itemData]) => {
-        const loadedItems: Item[] = itemData.items ?? [];
+    let active = true;
+    fetch(`/api/projects/${projectId}/workspace`)
+      .then((response) => response.json())
+      .then((data) => {
+        if (!active) return;
+        const loadedItems: Item[] = data.items ?? [];
         const loadedDocuments = loadedItems.filter((item) => item.kind === "document");
-        setProject(projectData.project ?? null);
-        setBlocks(blockData.blocks ?? []);
+        const loadedProject: Project | null = data.project ?? null;
+        const loadedBlocks: Block[] = data.blocks ?? [];
+        setProject(loadedProject);
+        setBlocks(loadedBlocks);
         setItems(loadedItems);
+        if (loadedProject) workspaceCache.set(projectId, { project: loadedProject, blocks: loadedBlocks, items: loadedItems });
         setOpenFolders(loadedItems.filter((item) => item.kind === "folder").map((item) => item.id));
         const requestedDocument =
           typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("document") : null;
@@ -62,8 +72,24 @@ export function ProjectWorkspace({
             : loadedDocuments[0]?.id ?? null,
         );
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [projectId]);
+
+  useEffect(() => {
+    if (project) workspaceCache.set(projectId, { project, blocks, items });
+  }, [projectId, project, blocks, items]);
+
+  useEffect(() => {
+    router.prefetch(`/project/${projectId}`);
+    router.prefetch(`/project/${projectId}/characters`);
+    router.prefetch(`/project/${projectId}/plot`);
+    router.prefetch(`/project/${projectId}/documents`);
+  }, [projectId, router]);
 
   const characters = items.filter((item) => item.kind === "character");
   const documents = items.filter((item) => item.kind === "document");
@@ -77,8 +103,8 @@ export function ProjectWorkspace({
         const saved = actItems.find((item) => readAct(item.meta) === act);
         return {
           act,
-          title: saved?.title ?? fallback.title,
-          body: saved?.body ?? fallback.body,
+          title: normalizeArcTitle(saved?.title, act) || fallback.title,
+          body: saved?.body.trim() || fallback.body,
           blocks: blocks
             .filter((block) => block.act === act)
             .sort((left, right) => left.sortOrder - right.sortOrder),
@@ -235,7 +261,7 @@ export function ProjectWorkspace({
       setTreeAddOpen(false);
       setTreeMenu(null);
       if (folderId && !openFolders.includes(folderId)) setOpenFolders((current) => [...current, folderId]);
-      if (view !== "documents") window.location.href = `/project/${projectId}/documents?document=${data.item.id}`;
+      if (view !== "documents") router.push(`/project/${projectId}/documents?document=${data.item.id}`);
     }
   }
 
@@ -278,7 +304,7 @@ export function ProjectWorkspace({
 
   function selectDocument(id: string) {
     setDocumentId(id);
-    if (view !== "documents") window.location.href = `/project/${projectId}/documents?document=${id}`;
+    if (view !== "documents") router.push(`/project/${projectId}/documents?document=${id}`);
   }
 
   if (loading) return <main className="loading-shell">작업실 불러오는 중…</main>;
@@ -346,7 +372,7 @@ export function ProjectWorkspace({
       {blockDraft && (
         <BlockInspector
           draft={blockDraft}
-          actTitle={columns[blockDraft.act - 1]?.title ?? `${blockDraft.act}막`}
+          actTitle={columns[blockDraft.act - 1]?.title ?? `${blockDraft.act}아크`}
           characters={characters}
           documents={documents}
           setDraft={setBlockDraft}
@@ -369,7 +395,7 @@ export function ProjectWorkspace({
         />
       )}
       {actDraft && (
-        <EditorModal title={`${actDraft.act}막 설정`} draft={actDraft} setDraft={setActDraft} onSubmit={saveAct} onClose={() => setActDraft(null)} />
+        <EditorModal title={`${actDraft.act}아크 설정`} draft={actDraft} setDraft={setActDraft} onSubmit={saveAct} onClose={() => setActDraft(null)} />
       )}
       {folderDraft && (
         <NameModal draft={folderDraft} setDraft={setFolderDraft} onSubmit={saveFolder} onClose={() => setFolderDraft(null)} />
@@ -416,13 +442,13 @@ function ProjectSidebar(props: {
   const unfiled = props.documents.filter((document) => !documentFolder(document));
   return (
     <aside className="project-sidebar">
-      <a className="back-home" href="/">⌂ 홈으로</a>
+      <Link className="back-home" href="/">⌂ 홈으로</Link>
       <div className="project-identity"><span>{props.project.genre}</span><strong>{props.project.title}</strong></div>
       <label className="sidebar-search">⌕<input placeholder="검색…" aria-label="작품 검색" /></label>
       <nav className="project-nav" aria-label="작품 메뉴">
-        <a className={props.view === "overview" ? "active" : ""} href={`/project/${props.projectId}`}>◇ <span>작품 개요</span></a>
-        <a className={props.view === "characters" ? "active" : ""} href={`/project/${props.projectId}/characters`}>♙ <span>등장인물</span><b>{props.characters.length}</b></a>
-        <a className={props.view === "plot" ? "active" : ""} href={`/project/${props.projectId}/plot`}>▦ <span>플롯</span><b>{props.blocks.length}</b></a>
+        <Link className={props.view === "overview" ? "active" : ""} href={`/project/${props.projectId}`}>◇ <span>작품 개요</span></Link>
+        <Link className={props.view === "characters" ? "active" : ""} href={`/project/${props.projectId}/characters`}>♙ <span>등장인물</span><b>{props.characters.length}</b></Link>
+        <Link className={props.view === "plot" ? "active" : ""} href={`/project/${props.projectId}/plot`}>▦ <span>플롯</span><b>{props.blocks.length}</b></Link>
       </nav>
 
       <section
@@ -446,7 +472,7 @@ function ProjectSidebar(props: {
             const folderDocuments = props.documents.filter((document) => documentFolder(document) === folder.id);
             const menuId = `folder:${folder.id}`;
             return (
-              <div className="tree-folder" key={folder.id} role="treeitem" aria-expanded={isOpen}>
+              <div className="tree-folder" key={folder.id} role="treeitem" aria-expanded={isOpen} aria-selected="false">
                 <div
                   className="tree-row folder-row"
                   onDragOver={(event) => event.preventDefault()}
@@ -498,7 +524,7 @@ function TreeDocument(props: {
   onDrag: (id: string) => void;
 }) {
   return (
-    <div className={`tree-row document-row ${props.active ? "active" : ""}`} role="treeitem" draggable onDragStart={() => props.onDrag(props.document.id)}>
+    <div className={`tree-row document-row ${props.active ? "active" : ""}`} role="treeitem" aria-selected={props.active} draggable onDragStart={() => props.onDrag(props.document.id)}>
       <button className="tree-main" onClick={() => props.onSelect(props.document.id)}><span>□</span><span>{props.document.title}</span></button>
       <button className="tree-more" aria-label={`${props.document.title} 관리`} onClick={() => props.onMenu(`document:${props.document.id}`)}>···</button>
       {props.menuOpen && (
@@ -719,6 +745,12 @@ function ConfirmDeleteModal({ item, onClose, onConfirm }: { item: Item; onClose:
 
 function readAct(meta: string) {
   return Number(readObject(meta).act ?? 0);
+}
+
+function normalizeArcTitle(title: string | undefined, act: number) {
+  const value = title?.trim();
+  if (!value || value === "TBD") return `${act}아크`;
+  return value.replace(/^(\d+)\s*막\b/, "$1아크").replace(/^(\d+)막/, "$1아크");
 }
 
 function documentFolder(item: Item) {
