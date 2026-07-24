@@ -2,59 +2,30 @@
 
 import Link from "next/link";
 import { BookmarkSimple, Star } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
-
-type CommunityWork = {
-  id: string;
-  slug: string;
-  title: string;
-  logline: string;
-  genre: string;
-  coverUrl: string;
-  authorName: string;
-  publishedAt: string;
-  ratingAverage: number;
-  ratingCount: number;
-  episodeCount: number;
-  isFavorite: boolean;
-  rank: number | null;
-  ranked: boolean;
-};
+import type { CommunityWork } from "./community-data";
 
 export function CommunityHome({
   user,
   setupRequired,
+  initialWorks,
   preferred = false,
 }: {
   user: SidebarUser;
   setupRequired: boolean;
+  initialWorks: CommunityWork[];
   preferred?: boolean;
 }) {
   const [sort, setSort] = useState<"rating" | "new">("rating");
-  const [works, setWorks] = useState<CommunityWork[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [works, setWorks] = useState<CommunityWork[]>(initialWorks);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/community?sort=${sort}${preferred ? "&favorites=1" : ""}`)
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "목록을 불러오지 못했음.");
-        if (active) setWorks(data.works ?? []);
-      })
-      .catch((reason) => {
-        if (active) setError(reason instanceof Error ? reason.message : "목록을 불러오지 못했음.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => { active = false; };
-  }, [preferred, sort, user?.id]);
+  const visibleWorks = useMemo(
+    () => sortWorks(works, sort),
+    [sort, works],
+  );
 
   function changeSort(next: "rating" | "new") {
-    setLoading(true);
     setError("");
     setSort(next);
   }
@@ -91,16 +62,14 @@ export function CommunityHome({
             <button className={sort === "rating" ? "active" : ""} onClick={() => changeSort("rating")}>랭킹순</button>
             <button className={sort === "new" ? "active" : ""} onClick={() => changeSort("new")}>신작순</button>
           </div>
-          <span>{works.length}작품</span>
+          <span>{visibleWorks.length}작품</span>
         </div>
         {error && <div className="community-alert">{error}</div>}
-        {loading ? (
-          <div className="blank-state">공개 작품을 불러오는 중…</div>
-        ) : works.length ? (
+        {visibleWorks.length ? (
           <div className="cover-grid">
-            {works.map((work, index) => (
+            {visibleWorks.map((work, index) => (
               <article className="cover-card" key={work.id}>
-                <Link className="cover-link" href={`/works/${work.slug}`}>
+                <Link className="cover-link" href={`/works/${work.slug}`} prefetch>
                   <div className="cover-frame">
                     <img src={work.coverUrl || "/default-cover.png"} alt={`${work.title} 표지`} />
                     <strong className="rank-badge">{sort === "rating" ? index + 1 : "NEW"}</strong>
@@ -133,4 +102,19 @@ export function CommunityHome({
       </section>
     </main>
   );
+}
+
+function sortWorks(works: CommunityWork[], sort: "rating" | "new") {
+  return [...works].sort((left, right) => {
+    const publishedDifference =
+      new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime();
+    if (sort === "new") return publishedDifference;
+    const qualificationDifference = Number(right.ranked) - Number(left.ranked);
+    if (qualificationDifference) return qualificationDifference;
+    if (left.ranked && right.ranked && right.ratingAverage !== left.ratingAverage) {
+      return right.ratingAverage - left.ratingAverage;
+    }
+    if (right.ratingCount !== left.ratingCount) return right.ratingCount - left.ratingCount;
+    return publishedDifference;
+  });
 }

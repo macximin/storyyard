@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DotsThree, FileText, GlobeHemisphereWest, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import type { WorkspaceSnapshot } from "./workspace-data";
 
 export type WorkspaceView = "overview" | "characters" | "plot" | "documents" | "manuscript" | "publish";
 type Project = { id: string; title: string; logline: string; genre: string; favorite: number; updatedAt: string };
@@ -24,25 +25,27 @@ type CharacterMeta = {
 };
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "recovered";
 type FolderDraft = { id?: string; title: string };
-type WorkspaceSnapshot = { project: Project; blocks: Block[]; items: Item[] };
-
 const workspaceCache = new Map<string, WorkspaceSnapshot>();
 
 export function ProjectWorkspace({
   projectId,
   view,
   userName,
+  initialSnapshot,
 }: {
   projectId: string;
   view: WorkspaceView;
   userName: string;
+  initialSnapshot?: WorkspaceSnapshot | null;
 }) {
   const router = useRouter();
-  const cached = workspaceCache.get(projectId);
+  const cached = workspaceCache.get(projectId) ?? initialSnapshot ?? undefined;
   const [project, setProject] = useState<Project | null>(() => cached?.project ?? null);
   const [blocks, setBlocks] = useState<Block[]>(() => cached?.blocks ?? []);
   const [items, setItems] = useState<Item[]>(() => cached?.items ?? []);
-  const [loading, setLoading] = useState(() => !cached);
+  const [loading, setLoading] = useState(
+    () => !cached && initialSnapshot === undefined,
+  );
   const [draggedBlock, setDraggedBlock] = useState<string | null>(null);
   const [draggedPlot, setDraggedPlot] = useState<string | null>(null);
   const [draggedDocument, setDraggedDocument] = useState<string | null>(null);
@@ -72,21 +75,26 @@ export function ProjectWorkspace({
 
   useEffect(() => {
     let active = true;
-    fetch(`/api/projects/${projectId}/workspace`)
-      .then((response) => response.json())
-      .then((data) => {
-        if (!active) return;
-        const loadedItems: Item[] = data.items ?? [];
+    function applySnapshot(data: WorkspaceSnapshot | null) {
+      if (!active) return;
+      if (!data) {
+        setProject(null);
+        setBlocks([]);
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+        const loadedItems: Item[] = data.items;
         const loadedDocuments = loadedItems.filter((item) => item.kind === "document");
         const loadedPlots = loadedItems
           .filter((item) => item.kind === "plot")
           .sort((left, right) => readPlotMeta(left).sortOrder - readPlotMeta(right).sortOrder);
-        const loadedProject: Project | null = data.project ?? null;
-        const loadedBlocks: Block[] = data.blocks ?? [];
+        const loadedProject: Project = data.project;
+        const loadedBlocks: Block[] = data.blocks;
         setProject(loadedProject);
         setBlocks(loadedBlocks);
         setItems(loadedItems);
-        if (loadedProject) workspaceCache.set(projectId, { project: loadedProject, blocks: loadedBlocks, items: loadedItems });
+        workspaceCache.set(projectId, data);
         setOpenFolders(loadedItems.filter((item) => item.kind === "folder").map((item) => item.id));
         const requestedDocument =
           typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("document") : null;
@@ -102,14 +110,20 @@ export function ProjectWorkspace({
             ? requestedPlot
             : loadedPlots.find((item) => readPlotMeta(item).isDefault)?.id ?? loadedPlots[0]?.id ?? null,
         );
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+        setLoading(false);
+    }
+    if (initialSnapshot !== undefined) {
+      applySnapshot(initialSnapshot);
+      return () => { active = false; };
+    }
+    fetch(`/api/projects/${projectId}/workspace`)
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((data) => applySnapshot(data as WorkspaceSnapshot | null))
+      .catch(() => applySnapshot(null));
     return () => {
       active = false;
     };
-  }, [projectId]);
+  }, [initialSnapshot, projectId]);
 
   useEffect(() => {
     if (project) workspaceCache.set(projectId, { project, blocks, items });

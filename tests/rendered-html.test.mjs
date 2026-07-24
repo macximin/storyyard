@@ -22,6 +22,25 @@ test("ships the public community and private studio navigation", async () => {
   await access(new URL("public/default-cover.png", root));
 });
 
+test("primes navigation data on the server and sorts community works locally", async () => {
+  const [community, home, studio, library, publicWork, plotPage] = await Promise.all([
+    read("app/community-home.tsx"),
+    read("app/page.tsx"),
+    read("app/studio/page.tsx"),
+    read("app/library.tsx"),
+    read("app/public-work.tsx"),
+    read("app/project/[id]/plot/page.tsx"),
+  ]);
+  assert.match(home, /getCommunityWorks/);
+  assert.match(home, /initialWorks/);
+  assert.doesNotMatch(community, /fetch\(`\/api\/community\?sort=/);
+  assert.doesNotMatch(community, /공개 작품을 불러오는 중/);
+  assert.match(studio, /initialProjects/);
+  assert.doesNotMatch(library, /작품 목록 불러오는 중/);
+  assert.doesNotMatch(publicWork, /작품을 불러오는 중/);
+  assert.match(plotPage, /initialSnapshot/);
+});
+
 test("keeps credentials out of browser storage and uses durable secure sessions", async () => {
   const [auth, sidebar, schema] = await Promise.all([
     read("app/chatgpt-auth.ts"),

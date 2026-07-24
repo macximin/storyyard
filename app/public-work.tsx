@@ -1,8 +1,9 @@
 "use client";
 
 import { BookmarkSimple, ChatCircle, Star } from "@phosphor-icons/react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
+import type { PublicWorkSnapshot } from "./public-work-data";
 
 type Work = {
   id: string;
@@ -25,16 +26,18 @@ export function PublicWork({
   slug,
   user,
   setupRequired,
+  initialSnapshot,
 }: {
   slug: string;
   user: SidebarUser;
   setupRequired: boolean;
+  initialSnapshot: PublicWorkSnapshot | null;
 }) {
-  const [work, setWork] = useState<Work | null>(null);
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [work, setWork] = useState<Work | null>(initialSnapshot?.work ?? null);
+  const [episodes, setEpisodes] = useState<Episode[]>(initialSnapshot?.episodes ?? []);
+  const [comments, setComments] = useState<Comment[]>(initialSnapshot?.comments ?? []);
   const [openEpisode, setOpenEpisode] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialSnapshot ? "" : "작품을 찾지 못했음.");
 
   async function load() {
     const response = await fetch(`/api/community/${slug}`);
@@ -47,23 +50,6 @@ export function PublicWork({
     setEpisodes(data.episodes ?? []);
     setComments(data.comments ?? []);
   }
-
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/community/${slug}`)
-      .then(async (response) => {
-        const data = await response.json();
-        if (!active) return;
-        if (!response.ok) {
-          setMessage("작품을 찾지 못했음.");
-          return;
-        }
-        setWork(data.work);
-        setEpisodes(data.episodes ?? []);
-        setComments(data.comments ?? []);
-      });
-    return () => { active = false; };
-  }, [slug, user?.id]);
 
   async function toggleFavorite() {
     if (!user || !work) return setMessage("선호작은 로그인 후 사용할 수 있음.");
@@ -107,7 +93,7 @@ export function PublicWork({
       <GlobalSidebar user={user} active="community" setupRequired={setupRequired} />
       <section className="public-work-main">
         {!work ? (
-          <div className="blank-state">{message || "작품을 불러오는 중…"}</div>
+          <div className="blank-state">{message}</div>
         ) : (
           <>
             <header className="work-hero">

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
@@ -14,26 +14,24 @@ type Project = {
   updatedAt: string;
 };
 
-export function Library({ user }: { user: Exclude<SidebarUser, null> }) {
+export function Library({
+  user,
+  initialProjects,
+}: {
+  user: Exclude<SidebarUser, null>;
+  initialProjects: Project[];
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
   const filter: "all" | "favorites" =
     searchParams.get("filter") === "favorites" ? "favorites" : "all";
-  const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-
-  useEffect(() => {
-    fetch("/api/projects")
-      .then((response) => response.json())
-      .then((data) => setProjects(data.projects ?? []))
-      .finally(() => setLoading(false));
-  }, []);
 
   const visible = useMemo(
     () => projects.filter((project) => filter === "all" || project.favorite),
@@ -125,9 +123,7 @@ export function Library({ user }: { user: Exclude<SidebarUser, null> }) {
           <span className="sort-label">최근 편집순 ↓</span>
         </div>
 
-        {loading ? (
-          <div className="blank-state">작품 목록 불러오는 중…</div>
-        ) : visible.length ? (
+        {visible.length ? (
           <div className="work-grid">
             {visible.map((project) => (
               <article className="work-card" key={project.id}>
@@ -153,7 +149,12 @@ export function Library({ user }: { user: Exclude<SidebarUser, null> }) {
                     <button type="button" onClick={() => openDelete(project)}>작품 삭제</button>
                   </div>
                 )}
-                <button className="work-card-body" onClick={() => router.push(`/project/${project.id}/plot`)}>
+                <button
+                  className="work-card-body"
+                  onPointerEnter={() => router.prefetch(`/project/${project.id}/plot`)}
+                  onFocus={() => router.prefetch(`/project/${project.id}/plot`)}
+                  onClick={() => router.push(`/project/${project.id}/plot`)}
+                >
                   <span className="work-type">{project.genre}</span>
                   <h2>{project.title}</h2>
                   <p>{project.logline}</p>
