@@ -36,8 +36,9 @@ export async function getPublicWork(
   idOrSlug: string,
   userId = "",
 ): Promise<PublicWorkSnapshot | null> {
-  const publication = await env.DB.prepare(
-    `SELECT p.*,
+  const [publicationResult, episodesResult, commentsResult] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT p.*,
             COALESCE((SELECT AVG(r.value) FROM ratings r WHERE r.publication_id = p.id), 0) AS rating_average,
             (SELECT COUNT(*) FROM ratings r WHERE r.publication_id = p.id) AS rating_count,
             CASE WHEN EXISTS (
@@ -47,22 +48,32 @@ export async function getPublicWork(
             (SELECT value FROM ratings mr WHERE mr.publication_id = p.id AND mr.user_id = ?) AS my_rating
        FROM publications p
       WHERE (p.id = ? OR p.slug = ?) AND p.status = 'published'`,
-  ).bind(userId, userId, idOrSlug, idOrSlug).first<Record<string, unknown>>();
-  if (!publication) return null;
-
-  const publicationId = String(publication.id);
-  const [episodes, comments] = await Promise.all([
+    ).bind(userId, userId, idOrSlug, idOrSlug),
     env.DB.prepare(
       `SELECT id, episode_no, title, published_at, updated_at
-         FROM publication_episodes WHERE publication_id = ? ORDER BY episode_no ASC`,
-    ).bind(publicationId).all<PublicWorkSnapshot["episodes"][number]>(),
+         FROM publication_episodes
+        WHERE publication_id = (
+          SELECT id FROM publications
+           WHERE (id = ? OR slug = ?) AND status = 'published'
+        )
+        ORDER BY episode_no ASC`,
+    ).bind(idOrSlug, idOrSlug),
     env.DB.prepare(
       `SELECT c.id, c.user_id, c.body, c.created_at, u.display_name, u.username
          FROM comments c JOIN users u ON u.id = c.user_id
-        WHERE c.publication_id = ? AND c.episode_id IS NULL AND c.status = 'visible'
+        WHERE c.publication_id = (
+          SELECT id FROM publications
+           WHERE (id = ? OR slug = ?) AND status = 'published'
+        )
+          AND c.episode_id IS NULL
+          AND c.status = 'visible'
         ORDER BY c.created_at DESC`,
-    ).bind(publicationId).all<PublicWorkSnapshot["comments"][number]>(),
+    ).bind(idOrSlug, idOrSlug),
   ]);
+  const publication = publicationResult.results?.[0] as Record<string, unknown> | undefined;
+  if (!publication) return null;
+
+  const publicationId = String(publication.id);
 
   return {
     work: {
@@ -79,7 +90,7 @@ export async function getPublicWork(
       isFavorite: Boolean(publication.is_favorite),
       myRating: Number(publication.my_rating ?? 0),
     },
-    episodes: (episodes.results ?? []) as PublicWorkSnapshot["episodes"],
-    comments: (comments.results ?? []) as PublicWorkSnapshot["comments"],
+    episodes: (episodesResult.results ?? []) as PublicWorkSnapshot["episodes"],
+    comments: (commentsResult.results ?? []) as PublicWorkSnapshot["comments"],
   };
 }

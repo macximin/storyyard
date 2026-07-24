@@ -23,15 +23,18 @@ test("ships the public community and private studio navigation", async () => {
 });
 
 test("primes navigation data on the server and sorts community works locally", async () => {
-  const [community, home, studio, library, publicWork, plotPage] = await Promise.all([
+  const [community, home, studio, library, publicWork, plotPage, communityData, workspaceData, publicWorkData] = await Promise.all([
     read("app/community-home.tsx"),
     read("app/page.tsx"),
     read("app/studio/page.tsx"),
     read("app/library.tsx"),
     read("app/public-work.tsx"),
     read("app/project/[id]/plot/page.tsx"),
+    read("app/community-data.ts"),
+    read("app/workspace-data.ts"),
+    read("app/public-work-data.ts"),
   ]);
-  assert.match(home, /getCommunityWorks/);
+  assert.match(home, /getCommunityPageData/);
   assert.match(home, /initialWorks/);
   assert.doesNotMatch(community, /fetch\(`\/api\/community\?sort=/);
   assert.doesNotMatch(community, /공개 작품을 불러오는 중/);
@@ -39,6 +42,9 @@ test("primes navigation data on the server and sorts community works locally", a
   assert.doesNotMatch(library, /작품 목록 불러오는 중/);
   assert.doesNotMatch(publicWork, /작품을 불러오는 중/);
   assert.match(plotPage, /initialSnapshot/);
+  assert.match(communityData, /env\.DB\.batch/);
+  assert.match(workspaceData, /env\.DB\.batch/);
+  assert.match(publicWorkData, /env\.DB\.batch/);
 });
 
 test("keeps credentials out of browser storage and uses durable secure sessions", async () => {

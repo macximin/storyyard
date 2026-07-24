@@ -44,13 +44,46 @@ export async function getCommunityWorks({
   sort?: "rating" | "new";
 } = {}): Promise<CommunityWork[]> {
   if (favoritesOnly && !userId) return [];
+  const result = await communityQuery({ userId, favoritesOnly }).all<CommunityRow>();
+  return sortCommunityWorks(mapCommunityRows((result.results ?? []) as CommunityRow[]), sort);
+}
+
+export async function getCommunityPageData({
+  userId = "",
+  favoritesOnly = false,
+  sort = "rating",
+}: {
+  userId?: string;
+  favoritesOnly?: boolean;
+  sort?: "rating" | "new";
+} = {}): Promise<{ setupRequired: boolean; works: CommunityWork[] }> {
+  const [usersResult, worksResult] = await env.DB.batch([
+    env.DB.prepare("SELECT id FROM users LIMIT 1"),
+    communityQuery({ userId, favoritesOnly }),
+  ]);
+  return {
+    setupRequired: !usersResult.results?.length,
+    works: sortCommunityWorks(
+      mapCommunityRows((worksResult.results ?? []) as CommunityRow[]),
+      sort,
+    ),
+  };
+}
+
+function communityQuery({
+  userId,
+  favoritesOnly,
+}: {
+  userId: string;
+  favoritesOnly: boolean;
+}) {
   const params: unknown[] = [userId];
   const favoriteWhere = favoritesOnly
     ? "AND EXISTS (SELECT 1 FROM publication_favorites pf2 WHERE pf2.publication_id = p.id AND pf2.user_id = ?)"
     : "";
   if (favoritesOnly) params.push(userId);
 
-  const result = await env.DB.prepare(
+  return env.DB.prepare(
     `SELECT p.id, p.slug, p.title, p.logline, p.genre, p.cover_url, p.author_name,
             p.published_at, p.updated_at,
             COALESCE((SELECT AVG(r.value) FROM ratings r WHERE r.publication_id = p.id), 0) AS rating_average,
@@ -63,9 +96,11 @@ export async function getCommunityWorks({
        FROM publications p
       WHERE p.status = 'published'
       ${favoriteWhere}`,
-  ).bind(...params).all<CommunityRow>();
+  ).bind(...params);
+}
 
-  const works = ((result.results ?? []) as CommunityRow[]).map((row) => ({
+function mapCommunityRows(rows: CommunityRow[]): CommunityWork[] {
+  return rows.map((row) => ({
     id: row.id,
     slug: row.slug,
     title: row.title,
@@ -82,7 +117,6 @@ export async function getCommunityWorks({
     rank: null,
     ranked: Number(row.rating_count ?? 0) >= 3,
   }));
-  return sortCommunityWorks(works, sort);
 }
 
 export function sortCommunityWorks(

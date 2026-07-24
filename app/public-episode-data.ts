@@ -37,41 +37,44 @@ export async function getPublicEpisode(
 ): Promise<PublicEpisodeSnapshot | null> {
   if (!Number.isInteger(episodeNo) || episodeNo < 1) return null;
 
-  const publication = await env.DB.prepare(
-    `SELECT id, slug, title, author_name
-       FROM publications
-      WHERE slug = ? AND status = 'published'`,
-  ).bind(slug).first<Record<string, unknown>>();
-  if (!publication) return null;
-
-  const publicationId = String(publication.id);
-  const [episode, episodes, comments] = await Promise.all([
+  const [publicationResult, episodeResult, episodesResult, commentsResult] = await env.DB.batch([
     env.DB.prepare(
-      `SELECT id, episode_no, title, body, published_at, updated_at
-         FROM publication_episodes
-        WHERE publication_id = ? AND episode_no = ?`,
-    ).bind(publicationId, episodeNo).first<PublicEpisodeSnapshot["episode"]>(),
+      `SELECT id, slug, title, author_name
+         FROM publications
+        WHERE slug = ? AND status = 'published'`,
+    ).bind(slug),
+    env.DB.prepare(
+      `SELECT pe.id, pe.episode_no, pe.title, pe.body, pe.published_at, pe.updated_at
+         FROM publication_episodes pe
+         JOIN publications p ON p.id = pe.publication_id
+        WHERE p.slug = ? AND p.status = 'published' AND pe.episode_no = ?`,
+    ).bind(slug, episodeNo),
     env.DB.prepare(
       `SELECT pe.id, pe.episode_no, pe.title,
               (SELECT COUNT(*) FROM comments c
                 WHERE c.episode_id = pe.id AND c.status = 'visible') AS comment_count
          FROM publication_episodes pe
-        WHERE pe.publication_id = ?
+         JOIN publications p ON p.id = pe.publication_id
+        WHERE p.slug = ? AND p.status = 'published'
         ORDER BY pe.episode_no ASC`,
-    ).bind(publicationId).all<PublicEpisodeSnapshot["episodes"][number]>(),
+    ).bind(slug),
     env.DB.prepare(
       `SELECT c.id, c.user_id, c.body, c.created_at, u.display_name, u.username
-         FROM comments c JOIN users u ON u.id = c.user_id
-        WHERE c.publication_id = ?
-          AND c.episode_id = (
-            SELECT id FROM publication_episodes
-             WHERE publication_id = ? AND episode_no = ?
-          )
+         FROM comments c
+         JOIN users u ON u.id = c.user_id
+         JOIN publication_episodes pe ON pe.id = c.episode_id
+         JOIN publications p ON p.id = pe.publication_id
+        WHERE p.slug = ? AND p.status = 'published'
+          AND pe.episode_no = ?
           AND c.status = 'visible'
         ORDER BY c.created_at DESC`,
-    ).bind(publicationId, publicationId, episodeNo)
-      .all<PublicEpisodeSnapshot["comments"][number]>(),
+    ).bind(slug, episodeNo),
   ]);
+  const publication = publicationResult.results?.[0] as Record<string, unknown> | undefined;
+  if (!publication) return null;
+
+  const publicationId = String(publication.id);
+  const episode = episodeResult.results?.[0] as PublicEpisodeSnapshot["episode"] | undefined;
   if (!episode) return null;
 
   return {
@@ -82,10 +85,10 @@ export async function getPublicEpisode(
       authorName: String(publication.author_name),
     },
     episode,
-    episodes: (episodes.results ?? []).map((item) => ({
+    episodes: ((episodesResult.results ?? []) as PublicEpisodeSnapshot["episodes"]).map((item) => ({
       ...item,
       comment_count: Number(item.comment_count ?? 0),
     })),
-    comments: (comments.results ?? []) as PublicEpisodeSnapshot["comments"],
+    comments: (commentsResult.results ?? []) as PublicEpisodeSnapshot["comments"],
   };
 }
