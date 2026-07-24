@@ -20,3 +20,13 @@ export const plotBlocks = sqliteTable("plot_blocks", {
   sortOrder: integer("sort_order").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const projectItems = sqliteTable("project_items", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  meta: text("meta").notNull().default("{}"),
+  updatedAt: text("updated_at").notNull(),
+});

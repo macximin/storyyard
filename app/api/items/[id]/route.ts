@@ -1,0 +1,5 @@
+import { eq } from "drizzle-orm";
+import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { getDb } from "@/db";
+import { projectItems, projects } from "@/db/schema";
+export async function PATCH(r:Request,c:{params:Promise<{id:string}>}){const user=await getChatGPTUser();const{id}=await c.params;const[item]=await getDb().select().from(projectItems).where(eq(projectItems.id,id));const[p]=item?await getDb().select().from(projects).where(eq(projects.id,item.projectId)):[];if(!user||!p||p.ownerEmail!==user.email)return Response.json({error:"Not found"},{status:404});const x=await r.json() as Partial<{title:string;body:string;meta:string}>;await getDb().update(projectItems).set({...x,updatedAt:new Date().toISOString()}).where(eq(projectItems.id,id));return Response.json({ok:true});}
