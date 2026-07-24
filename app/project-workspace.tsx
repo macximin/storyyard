@@ -2,14 +2,24 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 export type WorkspaceView = "overview" | "characters" | "plot" | "documents";
 type Project = { id: string; title: string; logline: string; genre: string; favorite: number; updatedAt: string };
 type Block = { id: string; act: number; kind: string; title: string; body: string; meta: string; sortOrder: number };
-type Item = { id: string; kind: string; title: string; body: string; meta: string };
+type Item = { id: string; kind: string; title: string; body: string; meta: string; updatedAt?: string };
 type Draft = { id?: string; title: string; body: string; act?: number };
 type BlockDraft = Draft & { act: number; characterIds: string[]; documentIds: string[] };
+type CharacterDraft = { id?: string; title: string; body: string; meta: string };
+type CharacterField = { id: string; label: string; value: string };
+type CharacterMeta = {
+  tags: string[];
+  pinned: boolean;
+  avatar: string;
+  fields: CharacterField[];
+  sortOrder: number;
+};
+type SaveStatus = "idle" | "saving" | "saved" | "error" | "recovered";
 type FolderDraft = { id?: string; title: string };
 type WorkspaceSnapshot = { project: Project; blocks: Block[]; items: Item[] };
 
@@ -38,7 +48,8 @@ export function ProjectWorkspace({
   const [draggedBlock, setDraggedBlock] = useState<string | null>(null);
   const [draggedDocument, setDraggedDocument] = useState<string | null>(null);
   const [blockDraft, setBlockDraft] = useState<BlockDraft | null>(null);
-  const [characterDraft, setCharacterDraft] = useState<Draft | null>(null);
+  const [blockSaveStatus, setBlockSaveStatus] = useState<SaveStatus>("idle");
+  const [characterDraft, setCharacterDraft] = useState<CharacterDraft | null>(null);
   const [actDraft, setActDraft] = useState<Draft | null>(null);
   const [folderDraft, setFolderDraft] = useState<FolderDraft | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(
@@ -48,6 +59,12 @@ export function ProjectWorkspace({
   const [treeMenu, setTreeMenu] = useState<string | null>(null);
   const [treeAddOpen, setTreeAddOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Item | null>(null);
+  const blockDraftRef = useRef<BlockDraft | null>(null);
+  const blockSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blockSaveInFlightRef = useRef(false);
+  const blockSaveWaitersRef = useRef<Array<() => void>>([]);
+  const blockSaveVersionRef = useRef(0);
+  const blockPersistedVersionRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -91,6 +108,19 @@ export function ProjectWorkspace({
     router.prefetch(`/project/${projectId}/documents`);
   }, [projectId, router]);
 
+  useEffect(() => {
+    function preservePendingDraft() {
+      const draft = blockDraftRef.current;
+      if (!draft || blockSaveVersionRef.current <= blockPersistedVersionRef.current) return;
+      localStorage.setItem(blockDraftStorageKey(projectId, draft.id), JSON.stringify(draft));
+    }
+    window.addEventListener("beforeunload", preservePendingDraft);
+    return () => {
+      window.removeEventListener("beforeunload", preservePendingDraft);
+      if (blockSaveTimerRef.current) clearTimeout(blockSaveTimerRef.current);
+    };
+  }, [projectId]);
+
   const characters = items.filter((item) => item.kind === "character");
   const documents = items.filter((item) => item.kind === "document");
   const folders = items.filter((item) => item.kind === "folder");
@@ -128,35 +158,118 @@ export function ProjectWorkspace({
 
   function inspectBlock(block: Block) {
     const links = readBlockLinks(block.meta);
-    setBlockDraft({ id: block.id, act: block.act, title: block.title, body: block.body, ...links });
+    openBlockDraft({ id: block.id, act: block.act, title: block.title, body: block.body, ...links });
   }
 
-  async function saveBlock(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!blockDraft) return;
-    const endpoint = blockDraft.id ? `/api/blocks/${blockDraft.id}` : `/api/projects/${projectId}/blocks`;
-    const meta = JSON.stringify({
-      characterIds: blockDraft.characterIds,
-      documentIds: blockDraft.documentIds,
-    });
-    const response = await fetch(endpoint, {
-      method: blockDraft.id ? "PATCH" : "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ act: blockDraft.act, title: blockDraft.title, body: blockDraft.body, meta }),
-    });
-    if (blockDraft.id) {
-      setBlocks((current) =>
-        current.map((block) =>
-          block.id === blockDraft.id
-            ? { ...block, title: blockDraft.title, body: blockDraft.body, act: blockDraft.act, meta }
-            : block,
-        ),
-      );
-    } else {
-      const data = await response.json();
-      if (data.block) setBlocks((current) => [...current, data.block]);
+  function openBlockDraft(draft: BlockDraft) {
+    if (blockSaveTimerRef.current) clearTimeout(blockSaveTimerRef.current);
+    blockSaveVersionRef.current = 0;
+    blockPersistedVersionRef.current = 0;
+    const recovered = readStoredBlockDraft(projectId, draft.id);
+    const next = recovered ? { ...draft, ...recovered, id: draft.id ?? recovered.id } : draft;
+    blockDraftRef.current = next;
+    setBlockDraft(next);
+    setBlockSaveStatus(recovered ? "recovered" : draft.id ? "saved" : "idle");
+  }
+
+  function changeBlockDraft(draft: BlockDraft) {
+    blockDraftRef.current = draft;
+    setBlockDraft(draft);
+    blockSaveVersionRef.current += 1;
+    setBlockSaveStatus("saving");
+    localStorage.setItem(blockDraftStorageKey(projectId, draft.id), JSON.stringify(draft));
+    if (blockSaveTimerRef.current) clearTimeout(blockSaveTimerRef.current);
+    blockSaveTimerRef.current = setTimeout(() => {
+      void persistBlockDraft();
+    }, 600);
+  }
+
+  async function persistBlockDraft() {
+    if (blockSaveInFlightRef.current) {
+      await new Promise<void>((resolve) => blockSaveWaitersRef.current.push(resolve));
+      if (blockSaveVersionRef.current > blockPersistedVersionRef.current) return persistBlockDraft();
+      return true;
     }
+    const draft = blockDraftRef.current;
+    const requestedVersion = blockSaveVersionRef.current;
+    if (!draft || requestedVersion <= blockPersistedVersionRef.current) return true;
+    if (!draft.id && !draft.title.trim() && !draft.body.trim()) {
+      setBlockSaveStatus("idle");
+      return true;
+    }
+
+    blockSaveInFlightRef.current = true;
+    setBlockSaveStatus("saving");
+    const endpoint = draft.id ? `/api/blocks/${draft.id}` : `/api/projects/${projectId}/blocks`;
+    const meta = JSON.stringify({
+      characterIds: draft.characterIds,
+      documentIds: draft.documentIds,
+    });
+    const payload = {
+      act: draft.act,
+      title: draft.title.trim() || "새 블록",
+      body: draft.body,
+      meta,
+    };
+    let savedSuccessfully = false;
+
+    try {
+      const response = await fetch(endpoint, {
+        method: draft.id ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error("block save failed");
+
+      if (draft.id) {
+        setBlocks((current) =>
+          current.map((block) =>
+            block.id === draft.id
+              ? { ...block, title: payload.title, body: payload.body, act: payload.act, meta }
+              : block,
+          ),
+        );
+      } else {
+        const data = await response.json();
+        if (!data.block) throw new Error("missing block");
+        setBlocks((current) => [...current, data.block]);
+        const latest = blockDraftRef.current;
+        if (latest && !latest.id) {
+          const identified = { ...latest, id: data.block.id };
+          blockDraftRef.current = identified;
+          setBlockDraft(identified);
+          localStorage.removeItem(blockDraftStorageKey(projectId));
+          localStorage.setItem(blockDraftStorageKey(projectId, data.block.id), JSON.stringify(identified));
+        }
+      }
+      blockPersistedVersionRef.current = requestedVersion;
+      const savedId = blockDraftRef.current?.id ?? draft.id;
+      localStorage.removeItem(blockDraftStorageKey(projectId, savedId));
+      localStorage.removeItem(blockDraftStorageKey(projectId));
+      setBlockSaveStatus("saved");
+      savedSuccessfully = true;
+      return true;
+    } catch {
+      const latest = blockDraftRef.current;
+      if (latest) localStorage.setItem(blockDraftStorageKey(projectId, latest.id), JSON.stringify(latest));
+      setBlockSaveStatus("error");
+      return false;
+    } finally {
+      blockSaveInFlightRef.current = false;
+      blockSaveWaitersRef.current.splice(0).forEach((resolve) => resolve());
+      if (savedSuccessfully && blockSaveVersionRef.current > blockPersistedVersionRef.current) {
+        if (blockSaveTimerRef.current) clearTimeout(blockSaveTimerRef.current);
+        blockSaveTimerRef.current = setTimeout(() => void persistBlockDraft(), 150);
+      }
+    }
+  }
+
+  async function closeBlockInspector() {
+    if (blockSaveTimerRef.current) clearTimeout(blockSaveTimerRef.current);
+    await persistBlockDraft();
+    blockDraftRef.current = null;
     setBlockDraft(null);
+    setBlockSaveStatus("idle");
   }
 
   async function moveBlock(act: number) {
@@ -172,24 +285,84 @@ export function ProjectWorkspace({
     });
   }
 
-  async function saveCharacter(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!characterDraft) return;
-    const endpoint = characterDraft.id ? `/api/items/${characterDraft.id}` : `/api/projects/${projectId}/items`;
+  async function persistCharacter(draft: CharacterDraft) {
+    const endpoint = draft.id ? `/api/items/${draft.id}` : `/api/projects/${projectId}/items`;
     const response = await fetch(endpoint, {
-      method: characterDraft.id ? "PATCH" : "POST",
+      method: draft.id ? "PATCH" : "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "character", title: characterDraft.title, body: characterDraft.body }),
+      body: JSON.stringify({
+        kind: "character",
+        title: draft.title.trim() || "새 인물",
+        body: draft.body,
+        meta: draft.meta,
+      }),
     });
-    if (characterDraft.id) {
+    if (!response.ok) throw new Error("character save failed");
+    const now = new Date().toISOString();
+    if (draft.id) {
+      const saved = { ...draft, title: draft.title.trim() || "새 인물", updatedAt: now };
       setItems((current) =>
-        current.map((item) => (item.id === characterDraft.id ? { ...item, ...characterDraft } : item)),
+        current.map((item) => (item.id === draft.id ? { ...item, ...saved } : item)),
       );
+      return saved;
     } else {
       const data = await response.json();
-      if (data.item) setItems((current) => [...current, data.item]);
+      if (!data.item) throw new Error("missing character");
+      setItems((current) => [...current, data.item]);
+      return { id: data.item.id, title: data.item.title, body: data.item.body, meta: data.item.meta };
     }
-    setCharacterDraft(null);
+  }
+
+  function openCharacterDraft(draft: CharacterDraft) {
+    setCharacterDraft(readStoredCharacterDraft(projectId, draft.id) ?? draft);
+  }
+
+  async function quickCreateItem(kind: "character" | "document", title: string) {
+    const response = await fetch(`/api/projects/${projectId}/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind,
+        title: title.trim() || (kind === "character" ? "새 인물" : "새 문서"),
+        body: "",
+        meta: kind === "character"
+          ? JSON.stringify(defaultCharacterMeta(Date.now()))
+          : JSON.stringify({ folderId: null, sortOrder: Date.now() }),
+      }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data.item) return null;
+    setItems((current) => [...current, data.item]);
+    return data.item as Item;
+  }
+
+  async function reorderCharacters(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
+    const ordered = [...characters].sort(
+      (left, right) => readCharacterMeta(left).sortOrder - readCharacterMeta(right).sortOrder,
+    );
+    const sourceIndex = ordered.findIndex((item) => item.id === sourceId);
+    const targetIndex = ordered.findIndex((item) => item.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const [source] = ordered.splice(sourceIndex, 1);
+    ordered.splice(targetIndex, 0, source);
+    const updates = ordered.map((item, index) => {
+      const meta = JSON.stringify({ ...readCharacterMeta(item), sortOrder: index });
+      return { ...item, meta };
+    });
+    setItems((current) =>
+      current.map((item) => updates.find((updated) => updated.id === item.id) ?? item),
+    );
+    await Promise.all(
+      updates.map((item) =>
+        fetch(`/api/items/${item.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ meta: item.meta }),
+        }),
+      ),
+    );
   }
 
   async function saveAct(event: FormEvent<HTMLFormElement>) {
@@ -347,17 +520,32 @@ export function ProjectWorkspace({
         {view === "characters" && (
           <Characters
             characters={characters}
-            onNew={() => setCharacterDraft({ title: "", body: "" })}
-            onEdit={(item) => setCharacterDraft({ id: item.id, title: item.title, body: item.body })}
+            blocks={blocks}
+            onNew={() => openCharacterDraft({
+              title: "",
+              body: "",
+              meta: JSON.stringify(defaultCharacterMeta(Date.now())),
+            })}
+            onEdit={(item) => openCharacterDraft({
+              id: item.id,
+              title: item.title,
+              body: item.body,
+              meta: item.meta,
+            })}
+            onReorder={reorderCharacters}
           />
         )}
         {view === "plot" && (
           <Plot
             project={project}
             columns={columns}
-            onNewBlock={(act) =>
-              setBlockDraft({ act, title: "", body: "", characterIds: [], documentIds: [] })
-            }
+            onNewBlock={(act) => openBlockDraft({
+              act,
+              title: "",
+              body: "",
+              characterIds: [],
+              documentIds: [],
+            })}
             onInspectBlock={inspectBlock}
             onEditAct={setActDraft}
             onDrag={setDraggedBlock}
@@ -375,18 +563,36 @@ export function ProjectWorkspace({
           actTitle={columns[blockDraft.act - 1]?.title ?? `${blockDraft.act}아크`}
           characters={characters}
           documents={documents}
-          setDraft={setBlockDraft}
-          onSubmit={saveBlock}
-          onClose={() => setBlockDraft(null)}
+          folders={folders}
+          saveStatus={blockSaveStatus}
+          setDraft={changeBlockDraft}
+          onCreateCharacter={(title) => quickCreateItem("character", title)}
+          onCreateDocument={(title) => quickCreateItem("document", title)}
+          onClose={() => void closeBlockInspector()}
         />
       )}
       {characterDraft && (
-        <EditorModal
-          title={characterDraft.id ? "인물 편집" : "새 인물"}
+        <CharacterInspector
+          projectId={projectId}
           draft={characterDraft}
+          blocks={blocks}
           setDraft={setCharacterDraft}
-          onSubmit={saveCharacter}
+          onPersist={persistCharacter}
           onClose={() => setCharacterDraft(null)}
+          onOpenBlock={(block) => {
+            setCharacterDraft(null);
+            inspectBlock(block);
+          }}
+          onAddBlock={(characterId) => {
+            setCharacterDraft(null);
+            openBlockDraft({
+              act: 1,
+              title: "",
+              body: "",
+              characterIds: [characterId],
+              documentIds: [],
+            });
+          }}
           onDelete={characterDraft.id ? () => {
             const character = characters.find((item) => item.id === characterDraft.id);
             if (character) setPendingDelete(character);
@@ -556,18 +762,115 @@ function Overview({ project, onSave }: { project: Project; onSave: (event: FormE
   );
 }
 
-function Characters({ characters, onNew, onEdit }: { characters: Item[]; onNew: () => void; onEdit: (item: Item) => void }) {
+function Characters({
+  characters,
+  blocks,
+  onNew,
+  onEdit,
+  onReorder,
+}: {
+  characters: Item[];
+  blocks: Block[];
+  onNew: () => void;
+  onEdit: (item: Item) => void;
+  onReorder: (sourceId: string, targetId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [tag, setTag] = useState("all");
+  const [sort, setSort] = useState<"manual" | "name" | "recent" | "links">("manual");
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const backlinkCount = (characterId: string) =>
+    blocks.filter((block) => readBlockLinks(block.meta).characterIds.includes(characterId)).length;
+  const tags = Array.from(new Set(characters.flatMap((character) => readCharacterMeta(character).tags)))
+    .sort((left, right) => left.localeCompare(right, "ko"));
+  const visible = characters
+    .filter((character) => {
+      const meta = readCharacterMeta(character);
+      const haystack = `${character.title} ${character.body} ${meta.tags.join(" ")}`.toLowerCase();
+      return haystack.includes(query.trim().toLowerCase()) && (tag === "all" || meta.tags.includes(tag));
+    })
+    .sort((left, right) => {
+      const leftMeta = readCharacterMeta(left);
+      const rightMeta = readCharacterMeta(right);
+      if (leftMeta.pinned !== rightMeta.pinned) return leftMeta.pinned ? -1 : 1;
+      if (sort === "name") return left.title.localeCompare(right.title, "ko");
+      if (sort === "recent") return (right.updatedAt ?? "").localeCompare(left.updatedAt ?? "");
+      if (sort === "links") return backlinkCount(right.id) - backlinkCount(left.id);
+      return leftMeta.sortOrder - rightMeta.sortOrder;
+    });
+
   return (
     <div className="page-wide">
       <PageHeader kicker="CHARACTERS" title={`등장인물 ${characters.length}`} description="욕망, 역할, 관계가 장면에서 바로 작동하게 정리." action={<button className="black-button" onClick={onNew}>＋ 새 인물</button>} />
-      <div className="table-head"><span>이름</span><span>역할과 설명</span></div>
+      <div className="character-toolbar">
+        <label className="character-search">
+          <span>검색</span>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="이름, 설명, 태그 검색"
+          />
+        </label>
+        <label>
+          <span>태그</span>
+          <select value={tag} onChange={(event) => setTag(event.target.value)}>
+            <option value="all">전체 태그</option>
+            {tags.map((value) => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>정렬</span>
+          <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}>
+            <option value="manual">직접 정렬</option>
+            <option value="name">이름순</option>
+            <option value="recent">최근 수정순</option>
+            <option value="links">연결 블록순</option>
+          </select>
+        </label>
+      </div>
+      <div className="table-head character-table-head">
+        <span>이름</span><span>태그와 설명</span><span>연결</span>
+      </div>
       <div className="character-list">
-        {characters.map((character) => (
-          <button className="character-row" key={character.id} onClick={() => onEdit(character)}>
-            <strong>{character.title}</strong><p>{character.body || "이 인물이 원하는 것과 방해받는 이유를 적어."}</p><span>편집 →</span>
-          </button>
-        ))}
-        {!characters.length && <div className="inline-empty">인물이 아직 없음. 주인공부터 박자.</div>}
+        {visible.map((character) => {
+          const meta = readCharacterMeta(character);
+          const links = backlinkCount(character.id);
+          return (
+            <article
+              className="character-row"
+              key={character.id}
+              draggable={sort === "manual"}
+              onDragStart={() => setDraggedId(character.id)}
+              onDragOver={(event) => {
+                if (sort === "manual") event.preventDefault();
+              }}
+              onDrop={() => {
+                if (draggedId) void onReorder(draggedId, character.id);
+                setDraggedId(null);
+              }}
+            >
+              <button className="character-row-main" onClick={() => onEdit(character)}>
+                <span className="character-name">
+                  {meta.pinned && <span className="pin-label">고정</span>}
+                  <strong>{character.title}</strong>
+                </span>
+                <span className="character-summary">
+                  <span className="character-tags">
+                    {meta.tags.map((value) => <span key={value}>{value}</span>)}
+                    {!meta.tags.length && <span className="tag-empty">태그 없음</span>}
+                  </span>
+                  <span>{character.body || "이 인물이 원하는 것과 방해받는 이유를 적어."}</span>
+                </span>
+                <span className="character-links">{links}개 블록</span>
+              </button>
+            </article>
+          );
+        })}
+        {!visible.length && (
+          <div className="inline-empty">
+            {characters.length ? "조건에 맞는 인물이 없음." : "인물이 아직 없음. 주인공부터 박자."}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -639,45 +942,486 @@ function BlockInspector(props: {
   actTitle: string;
   characters: Item[];
   documents: Item[];
-  setDraft: (draft: BlockDraft | null) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  folders: Item[];
+  saveStatus: SaveStatus;
+  setDraft: (draft: BlockDraft) => void;
+  onCreateCharacter: (title: string) => Promise<Item | null>;
+  onCreateDocument: (title: string) => Promise<Item | null>;
   onClose: () => void;
 }) {
-  function toggle(key: "characterIds" | "documentIds", id: string) {
-    const values = props.draft[key];
-    props.setDraft({ ...props.draft, [key]: values.includes(id) ? values.filter((value) => value !== id) : [...values, id] });
-  }
   return (
     <div className="inspector-backdrop" role="presentation" onMouseDown={props.onClose}>
-      <aside className="block-inspector" onMouseDown={(event) => event.stopPropagation()}>
-        <form onSubmit={props.onSubmit}>
-          <div className="inspector-top"><button type="button" onClick={props.onClose}>»</button><span>블록 상세</span><button type="button">···</button></div>
+      <aside className="block-inspector" role="dialog" aria-modal="true" aria-label="블록 상세" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="inspector-form">
+          <div className="inspector-top">
+            <button type="button" aria-label="블록 상세 닫기" onClick={props.onClose}>»</button>
+            <span>블록 상세</span>
+            <SaveStatusLabel status={props.saveStatus} />
+          </div>
           <p className="inspector-breadcrumb">↳ {props.actTitle}</p>
           <input className="inspector-title" aria-label="블록 제목" autoFocus value={props.draft.title} onChange={(event) => props.setDraft({ ...props.draft, title: event.target.value })} placeholder="새 블록" />
           <InspectorSection title="내용">
             <textarea value={props.draft.body} onChange={(event) => props.setDraft({ ...props.draft, body: event.target.value })} placeholder="내용을 입력하세요…" />
           </InspectorSection>
           <InspectorSection title="등장인물">
-            <div className="link-picker">
-              {props.characters.map((character) => (
-                <label key={character.id}><input type="checkbox" checked={props.draft.characterIds.includes(character.id)} onChange={() => toggle("characterIds", character.id)} /><span>{character.title}</span></label>
-              ))}
-              {!props.characters.length && <span className="picker-empty">등장인물이 비어 있음</span>}
-            </div>
+            <MultiLinkPicker
+              kind="character"
+              items={props.characters}
+              selectedIds={props.draft.characterIds}
+              onChange={(characterIds) => props.setDraft({ ...props.draft, characterIds })}
+              onCreate={async (title) => {
+                const item = await props.onCreateCharacter(title);
+                if (item) props.setDraft({
+                  ...props.draft,
+                  characterIds: [...props.draft.characterIds, item.id],
+                });
+              }}
+            />
           </InspectorSection>
           <InspectorSection title="문서">
-            <div className="link-picker">
-              {props.documents.map((document) => (
-                <label key={document.id}><input type="checkbox" checked={props.draft.documentIds.includes(document.id)} onChange={() => toggle("documentIds", document.id)} /><span>{document.title}</span></label>
-              ))}
-              {!props.documents.length && <span className="picker-empty">문서가 비어 있음</span>}
-            </div>
+            <MultiLinkPicker
+              kind="document"
+              items={props.documents}
+              folders={props.folders}
+              selectedIds={props.draft.documentIds}
+              onChange={(documentIds) => props.setDraft({ ...props.draft, documentIds })}
+              onCreate={async (title) => {
+                const item = await props.onCreateDocument(title);
+                if (item) props.setDraft({
+                  ...props.draft,
+                  documentIds: [...props.draft.documentIds, item.id],
+                });
+              }}
+            />
           </InspectorSection>
-          <div className="inspector-save"><button className="black-button" type="submit">블록 저장</button></div>
-        </form>
+          <div className="inspector-autosave-note">변경사항은 자동으로 저장됨.</div>
+        </div>
       </aside>
     </div>
   );
+}
+
+function MultiLinkPicker({
+  kind,
+  items,
+  folders = [],
+  selectedIds,
+  onChange,
+  onCreate,
+}: {
+  kind: "character" | "document";
+  items: Item[];
+  folders?: Item[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  onCreate: (title: string) => Promise<void>;
+}) {
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const selected = selectedIds.map((id) => items.find((item) => item.id === id)).filter((item): item is Item => Boolean(item));
+  const filtered = items.filter((item) => {
+    const label = pickerItemLabel(item, kind, folders);
+    return `${label} ${item.body}`.toLowerCase().includes(query.trim().toLowerCase());
+  });
+
+  function toggle(id: string) {
+    onChange(selectedIds.includes(id) ? selectedIds.filter((value) => value !== id) : [...selectedIds, id]);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown" && filtered.length) {
+      event.preventDefault();
+      setActiveIndex((current) => Math.min(current + 1, filtered.length - 1));
+    } else if (event.key === "ArrowUp" && filtered.length) {
+      event.preventDefault();
+      setActiveIndex((current) => Math.max(current - 1, 0));
+    } else if (event.key === "Enter" && filtered[activeIndex]) {
+      event.preventDefault();
+      toggle(filtered[activeIndex].id);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setQuery("");
+      setActiveIndex(0);
+    }
+  }
+
+  async function createFromQuery() {
+    setCreating(true);
+    await onCreate(query.trim());
+    setQuery("");
+    setActiveIndex(0);
+    setCreating(false);
+  }
+
+  return (
+    <div className="smart-picker">
+      <div className="picker-chips" aria-label={`선택된 ${kind === "character" ? "등장인물" : "문서"}`}>
+        {selected.map((item) => (
+          <button
+            type="button"
+            key={item.id}
+            onClick={() => toggle(item.id)}
+            aria-label={`${pickerItemLabel(item, kind, folders)} 제거`}
+          >
+            <span>{pickerItemLabel(item, kind, folders)}</span><b aria-hidden="true">×</b>
+          </button>
+        ))}
+        {!selected.length && <span className="picker-empty">선택된 항목 없음</span>}
+      </div>
+      <input
+        role="combobox"
+        aria-expanded="true"
+        aria-controls={`${kind}-picker-list`}
+        aria-activedescendant={filtered[activeIndex] ? `${kind}-option-${filtered[activeIndex].id}` : undefined}
+        value={query}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setActiveIndex(0);
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={kind === "character" ? "인물 검색…" : "문서 검색…"}
+      />
+      <div className="picker-results" id={`${kind}-picker-list`} role="listbox">
+        {filtered.map((item, index) => (
+          <button
+            type="button"
+            role="option"
+            aria-selected={selectedIds.includes(item.id)}
+            id={`${kind}-option-${item.id}`}
+            className={index === activeIndex ? "active" : ""}
+            key={item.id}
+            onMouseEnter={() => setActiveIndex(index)}
+            onClick={() => toggle(item.id)}
+          >
+            <strong>{pickerItemLabel(item, kind, folders)}</strong>
+            {kind === "character" && <span>{item.body || "설명 없음"}</span>}
+            <b>{selectedIds.includes(item.id) ? "선택됨" : "추가"}</b>
+          </button>
+        ))}
+        {!filtered.length && <span className="picker-empty">검색 결과 없음</span>}
+      </div>
+      <button className="picker-create" type="button" onClick={() => void createFromQuery()} disabled={creating}>
+        ＋ {query.trim() || `새 ${kind === "character" ? "인물" : "문서"}`} 만들기
+      </button>
+    </div>
+  );
+}
+
+function CharacterInspector({
+  projectId,
+  draft,
+  blocks,
+  setDraft,
+  onPersist,
+  onClose,
+  onOpenBlock,
+  onAddBlock,
+  onDelete,
+}: {
+  projectId: string;
+  draft: CharacterDraft;
+  blocks: Block[];
+  setDraft: (draft: CharacterDraft | null) => void;
+  onPersist: (draft: CharacterDraft) => Promise<CharacterDraft>;
+  onClose: () => void;
+  onOpenBlock: (block: Block) => void;
+  onAddBlock: (characterId: string) => void;
+  onDelete?: () => void;
+}) {
+  const [status, setStatus] = useState<SaveStatus>(() => {
+    if (typeof window !== "undefined" && localStorage.getItem(characterDraftStorageKey(projectId, draft.id))) {
+      return "recovered";
+    }
+    return draft.id ? "saved" : "idle";
+  });
+  const [tagInput, setTagInput] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const draftRef = useRef(draft);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const versionRef = useRef(0);
+  const persistedVersionRef = useRef(0);
+  const savePromiseRef = useRef<Promise<boolean> | null>(null);
+  const meta = readCharacterDraftMeta(draft);
+  const backlinks = draft.id
+    ? blocks.filter((block) => readBlockLinks(block.meta).characterIds.includes(draft.id as string))
+    : [];
+
+  useEffect(() => {
+    function preservePendingDraft() {
+      if (versionRef.current <= persistedVersionRef.current) return;
+      localStorage.setItem(characterDraftStorageKey(projectId, draftRef.current.id), JSON.stringify(draftRef.current));
+    }
+    window.addEventListener("beforeunload", preservePendingDraft);
+    return () => {
+      window.removeEventListener("beforeunload", preservePendingDraft);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+    // The inspector mounts once per selected character; recovery should not rerun while typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function change(next: CharacterDraft) {
+    draftRef.current = next;
+    setDraft(next);
+    versionRef.current += 1;
+    setStatus("saving");
+    localStorage.setItem(characterDraftStorageKey(projectId, next.id), JSON.stringify(next));
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => void persist(), 600);
+  }
+
+  async function persist(): Promise<boolean> {
+    if (savePromiseRef.current) {
+      await savePromiseRef.current;
+      if (versionRef.current > persistedVersionRef.current) return persist();
+      return true;
+    }
+    const snapshot = draftRef.current;
+    const requestedVersion = versionRef.current;
+    if (requestedVersion <= persistedVersionRef.current) return true;
+    if (!snapshot.id && !snapshot.title.trim() && !snapshot.body.trim()) {
+      setStatus("idle");
+      return true;
+    }
+
+    setStatus("saving");
+    const run = (async () => {
+      try {
+        const saved = await onPersist(snapshot);
+        const latest = draftRef.current;
+        if (!latest.id && saved.id) {
+          const identified = { ...latest, id: saved.id };
+          draftRef.current = identified;
+          setDraft(identified);
+          localStorage.removeItem(characterDraftStorageKey(projectId));
+        }
+        persistedVersionRef.current = requestedVersion;
+        localStorage.removeItem(characterDraftStorageKey(projectId, draftRef.current.id));
+        setStatus("saved");
+        return true;
+      } catch {
+        localStorage.setItem(
+          characterDraftStorageKey(projectId, draftRef.current.id),
+          JSON.stringify(draftRef.current),
+        );
+        setStatus("error");
+        return false;
+      }
+    })();
+    savePromiseRef.current = run;
+    const result = await run;
+    savePromiseRef.current = null;
+    if (result && versionRef.current > persistedVersionRef.current) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => void persist(), 150);
+    }
+    return result;
+  }
+
+  async function close() {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    await persist();
+    onClose();
+  }
+
+  function updateMeta(update: Partial<CharacterMeta>) {
+    change({ ...draft, meta: JSON.stringify({ ...meta, ...update }) });
+  }
+
+  function addTag() {
+    const value = tagInput.trim().replace(/^#/, "");
+    if (!value || meta.tags.includes(value)) {
+      setTagInput("");
+      return;
+    }
+    updateMeta({ tags: [...meta.tags, value] });
+    setTagInput("");
+  }
+
+  function handleTagKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      addTag();
+    }
+  }
+
+  async function handleAvatar(file: File | undefined) {
+    if (!file) return;
+    setAvatarError("");
+    try {
+      const avatar = await resizeAvatar(file);
+      updateMeta({ avatar });
+    } catch {
+      setAvatarError("이미지를 처리하지 못했음. JPG·PNG·WEBP 파일을 써 줘.");
+    }
+  }
+
+  return (
+    <div className="inspector-backdrop character-backdrop" role="presentation" onMouseDown={() => void close()}>
+      <aside className="character-inspector" role="dialog" aria-modal="true" aria-label="등장인물 상세" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="character-inspector-top">
+          <button type="button" aria-label="등장인물 상세 닫기" onClick={() => void close()}>»</button>
+          <span>{backlinks.length}개의 연결 블록</span>
+          <SaveStatusLabel status={status} />
+          <div className="character-more-wrap">
+            <button type="button" aria-label="등장인물 관리" onClick={() => setMenuOpen((current) => !current)}>···</button>
+            {menuOpen && (
+              <div className="character-more-menu">
+                <button type="button" onClick={() => updateMeta({ pinned: !meta.pinned })}>
+                  {meta.pinned ? "고정 해제" : "주연으로 고정"}
+                </button>
+                {onDelete && <button type="button" className="danger" onClick={onDelete}>인물 삭제</button>}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="character-detail-scroll">
+          <div className="character-profile-head">
+            <label className="character-avatar">
+              {meta.avatar ? (
+                // User-provided data URLs are already resized before storage and do not use an external loader.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={meta.avatar} alt="" />
+              ) : <span>이미지 추가</span>}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => void handleAvatar(event.target.files?.[0])}
+              />
+            </label>
+            <div className="character-title-wrap">
+              {meta.pinned && <span className="pinned-character">주연 고정</span>}
+              <input
+                aria-label="인물 이름"
+                className="character-detail-title"
+                autoFocus
+                value={draft.title}
+                onChange={(event) => change({ ...draft, title: event.target.value })}
+                placeholder="새 인물"
+              />
+            </div>
+          </div>
+          {avatarError && <p className="field-error" role="alert">{avatarError}</p>}
+
+          <section className="character-detail-section">
+            <div className="character-section-label"><strong>태그</strong><span>역할과 분류</span></div>
+            <div className="tag-editor">
+              <div className="tag-chips">
+                {meta.tags.map((value) => (
+                  <button
+                    type="button"
+                    key={value}
+                    onClick={() => updateMeta({ tags: meta.tags.filter((tag) => tag !== value) })}
+                    aria-label={`${value} 태그 제거`}
+                  >
+                    {value} ×
+                  </button>
+                ))}
+                {!meta.tags.length && <span>비어 있음</span>}
+              </div>
+              <div className="tag-input-row">
+                <input
+                  value={tagInput}
+                  onChange={(event) => setTagInput(event.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  onBlur={addTag}
+                  placeholder="태그 입력 후 Enter"
+                />
+                <button type="button" onClick={addTag}>추가</button>
+              </div>
+            </div>
+          </section>
+
+          <section className="character-detail-section">
+            <div className="character-section-label"><strong>설명</strong><span>욕망, 역할, 갈등</span></div>
+            <textarea
+              value={draft.body}
+              onChange={(event) => change({ ...draft, body: event.target.value })}
+              placeholder="이 인물이 원하는 것과 방해받는 이유를 적어."
+            />
+          </section>
+
+          <section className="character-detail-section custom-fields-section">
+            <div className="character-section-label"><strong>정보 블록</strong><span>필요한 항목을 직접 추가</span></div>
+            <div className="custom-fields">
+              {meta.fields.map((field) => (
+                <div className="custom-field" key={field.id}>
+                  <input
+                    aria-label="정보 블록 이름"
+                    value={field.label}
+                    onChange={(event) => updateMeta({
+                      fields: meta.fields.map((value) =>
+                        value.id === field.id ? { ...value, label: event.target.value } : value,
+                      ),
+                    })}
+                    placeholder="항목 이름"
+                  />
+                  <textarea
+                    aria-label={`${field.label || "사용자 항목"} 내용`}
+                    value={field.value}
+                    onChange={(event) => updateMeta({
+                      fields: meta.fields.map((value) =>
+                        value.id === field.id ? { ...value, value: event.target.value } : value,
+                      ),
+                    })}
+                    placeholder="내용을 입력"
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${field.label || "사용자 항목"} 삭제`}
+                    onClick={() => updateMeta({ fields: meta.fields.filter((value) => value.id !== field.id) })}
+                  >
+                    삭제
+                  </button>
+                </div>
+              ))}
+              <button
+                className="add-custom-field"
+                type="button"
+                onClick={() => updateMeta({
+                  fields: [...meta.fields, { id: crypto.randomUUID(), label: "새 항목", value: "" }],
+                })}
+              >
+                ＋ 정보 블록 추가
+              </button>
+            </div>
+          </section>
+
+          <section className="character-detail-section backlinks-section">
+            <div className="character-section-label"><strong>연결 블록</strong><span>이 인물이 실제로 등장하는 장면</span></div>
+            <div className="backlink-list">
+              {backlinks.map((block) => (
+                <button type="button" key={block.id} onClick={() => onOpenBlock(block)}>
+                  <span>{block.act}아크</span><strong>{block.title}</strong><p>{block.body || "내용 없음"}</p>
+                </button>
+              ))}
+              {!backlinks.length && <span className="picker-empty">연결된 블록이 아직 없음.</span>}
+            </div>
+            {draft.id && (
+              <button className="add-linked-block" type="button" onClick={() => onAddBlock(draft.id as string)}>
+                ＋ 이 인물이 연결된 블록 추가
+              </button>
+            )}
+          </section>
+        </div>
+        <div className="inspector-autosave-note">변경사항은 자동으로 저장됨.</div>
+      </aside>
+    </div>
+  );
+}
+
+function SaveStatusLabel({ status }: { status: SaveStatus }) {
+  const label = {
+    idle: "입력 대기",
+    saving: "저장 중…",
+    saved: "저장됨",
+    error: "저장 실패 · 다시 입력하면 재시도",
+    recovered: "임시 내용을 복구함",
+  }[status];
+  return <span className={`save-status ${status}`} aria-live="polite">{label}</span>;
 }
 
 function InspectorSection({ title, children }: { title: string; children: ReactNode }) {
@@ -741,6 +1485,123 @@ function ConfirmDeleteModal({ item, onClose, onConfirm }: { item: Item; onClose:
       </section>
     </div>
   );
+}
+
+function blockDraftStorageKey(projectId: string, blockId?: string) {
+  return `storyyard:block-draft:${projectId}:${blockId ?? "new"}`;
+}
+
+function characterDraftStorageKey(projectId: string, characterId?: string) {
+  return `storyyard:character-draft:${projectId}:${characterId ?? "new"}`;
+}
+
+function readStoredBlockDraft(projectId: string, blockId?: string): BlockDraft | null {
+  try {
+    const raw = localStorage.getItem(blockDraftStorageKey(projectId, blockId));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<BlockDraft>;
+    if (typeof value.act !== "number" || typeof value.title !== "string" || typeof value.body !== "string") return null;
+    return {
+      id: typeof value.id === "string" ? value.id : blockId,
+      act: value.act,
+      title: value.title,
+      body: value.body,
+      characterIds: Array.isArray(value.characterIds)
+        ? value.characterIds.filter((id): id is string => typeof id === "string")
+        : [],
+      documentIds: Array.isArray(value.documentIds)
+        ? value.documentIds.filter((id): id is string => typeof id === "string")
+        : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readStoredCharacterDraft(projectId: string, characterId?: string): CharacterDraft | null {
+  try {
+    const raw = localStorage.getItem(characterDraftStorageKey(projectId, characterId));
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<CharacterDraft>;
+    if (typeof value.title !== "string" || typeof value.body !== "string" || typeof value.meta !== "string") return null;
+    return {
+      id: typeof value.id === "string" ? value.id : characterId,
+      title: value.title,
+      body: value.body,
+      meta: value.meta,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function defaultCharacterMeta(sortOrder: number): CharacterMeta {
+  return { tags: [], pinned: false, avatar: "", fields: [], sortOrder };
+}
+
+function readCharacterMeta(item: Pick<Item, "meta" | "updatedAt">): CharacterMeta {
+  return parseCharacterMeta(item.meta, item.updatedAt ? new Date(item.updatedAt).getTime() : Date.now());
+}
+
+function readCharacterDraftMeta(draft: CharacterDraft): CharacterMeta {
+  return parseCharacterMeta(draft.meta, Date.now());
+}
+
+function parseCharacterMeta(meta: string, fallbackSortOrder: number): CharacterMeta {
+  const value = readObject(meta);
+  const fields = Array.isArray(value.fields)
+    ? value.fields.flatMap((field) => {
+        if (!field || typeof field !== "object") return [];
+        const candidate = field as Record<string, unknown>;
+        if (typeof candidate.id !== "string") return [];
+        return [{
+          id: candidate.id,
+          label: typeof candidate.label === "string" ? candidate.label : "",
+          value: typeof candidate.value === "string" ? candidate.value : "",
+        }];
+      })
+    : [];
+  return {
+    tags: Array.isArray(value.tags)
+      ? value.tags.filter((tag): tag is string => typeof tag === "string" && Boolean(tag.trim()))
+      : [],
+    pinned: value.pinned === true,
+    avatar: typeof value.avatar === "string" ? value.avatar : "",
+    fields,
+    sortOrder: typeof value.sortOrder === "number" ? value.sortOrder : fallbackSortOrder,
+  };
+}
+
+function pickerItemLabel(item: Item, kind: "character" | "document", folders: Item[]) {
+  if (kind === "character") return item.title;
+  const folder = folders.find((value) => value.id === documentFolder(item));
+  return folder ? `${folder.title} / ${item.title}` : item.title;
+}
+
+async function resizeAvatar(file: File) {
+  if (!file.type.startsWith("image/")) throw new Error("not an image");
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const candidate = new Image();
+      candidate.onload = () => resolve(candidate);
+      candidate.onerror = reject;
+      candidate.src = objectUrl;
+    });
+    const max = 480;
+    const scale = Math.min(1, max / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("canvas unavailable");
+    context.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", 0.78);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 function readAct(meta: string) {

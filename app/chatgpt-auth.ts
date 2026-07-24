@@ -19,7 +19,16 @@ const CALLBACK_PATH = "/callback";
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
   const email = requestHeaders.get(USER_EMAIL_HEADER);
-  if (!email) return null;
+  if (!email) {
+    if (import.meta.env.DEV) {
+      return {
+        displayName: "Storyyard 개발자",
+        email: "dev@storyyard.local",
+        fullName: "Storyyard 개발자",
+      };
+    }
+    return null;
+  }
 
   const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
   const fullName =
