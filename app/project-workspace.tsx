@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { DotsThree } from "@phosphor-icons/react/DotsThree";
+import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
+import { Plus } from "@phosphor-icons/react/Plus";
+import { Trash } from "@phosphor-icons/react/Trash";
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 export type WorkspaceView = "overview" | "characters" | "plot" | "documents";
@@ -9,9 +13,11 @@ type Project = { id: string; title: string; logline: string; genre: string; favo
 type Block = { id: string; act: number; kind: string; title: string; body: string; meta: string; sortOrder: number };
 type Item = { id: string; kind: string; title: string; body: string; meta: string; updatedAt?: string };
 type Draft = { id?: string; title: string; body: string; act?: number };
-type BlockDraft = Draft & { act: number; characterIds: string[]; documentIds: string[] };
+type BlockDraft = Draft & { act: number; plotId: string; characterIds: string[]; documentIds: string[] };
 type CharacterDraft = { id?: string; title: string; body: string; meta: string };
 type CharacterField = { id: string; label: string; value: string };
+type PlotDraft = { id: string; title: string; body: string; meta: string };
+type PlotMeta = { isDefault: boolean; sortOrder: number };
 type CharacterMeta = {
   tags: string[];
   pinned: boolean;
@@ -46,10 +52,14 @@ export function ProjectWorkspace({
   const [items, setItems] = useState<Item[]>(() => cached?.items ?? []);
   const [loading, setLoading] = useState(() => !cached);
   const [draggedBlock, setDraggedBlock] = useState<string | null>(null);
+  const [draggedPlot, setDraggedPlot] = useState<string | null>(null);
   const [draggedDocument, setDraggedDocument] = useState<string | null>(null);
   const [blockDraft, setBlockDraft] = useState<BlockDraft | null>(null);
   const [blockSaveStatus, setBlockSaveStatus] = useState<SaveStatus>("idle");
   const [characterDraft, setCharacterDraft] = useState<CharacterDraft | null>(null);
+  const [plotDraft, setPlotDraft] = useState<PlotDraft | null>(null);
+  const [plotMenuOpen, setPlotMenuOpen] = useState(false);
+  const [activePlotId, setActivePlotId] = useState<string | null>(null);
   const [actDraft, setActDraft] = useState<Draft | null>(null);
   const [folderDraft, setFolderDraft] = useState<FolderDraft | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(
@@ -65,6 +75,7 @@ export function ProjectWorkspace({
   const blockSaveWaitersRef = useRef<Array<() => void>>([]);
   const blockSaveVersionRef = useRef(0);
   const blockPersistedVersionRef = useRef(0);
+  const creatingDefaultPlotRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -74,6 +85,9 @@ export function ProjectWorkspace({
         if (!active) return;
         const loadedItems: Item[] = data.items ?? [];
         const loadedDocuments = loadedItems.filter((item) => item.kind === "document");
+        const loadedPlots = loadedItems
+          .filter((item) => item.kind === "plot")
+          .sort((left, right) => readPlotMeta(left).sortOrder - readPlotMeta(right).sortOrder);
         const loadedProject: Project | null = data.project ?? null;
         const loadedBlocks: Block[] = data.blocks ?? [];
         setProject(loadedProject);
@@ -83,10 +97,17 @@ export function ProjectWorkspace({
         setOpenFolders(loadedItems.filter((item) => item.kind === "folder").map((item) => item.id));
         const requestedDocument =
           typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("document") : null;
+        const requestedPlot =
+          typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("plot") : null;
         setDocumentId(
           loadedDocuments.some((item) => item.id === requestedDocument)
             ? requestedDocument
             : loadedDocuments[0]?.id ?? null,
+        );
+        setActivePlotId(
+          loadedPlots.some((item) => item.id === requestedPlot)
+            ? requestedPlot
+            : loadedPlots.find((item) => readPlotMeta(item).isDefault)?.id ?? loadedPlots[0]?.id ?? null,
         );
       })
       .finally(() => {
@@ -125,23 +146,69 @@ export function ProjectWorkspace({
   const documents = items.filter((item) => item.kind === "document");
   const folders = items.filter((item) => item.kind === "folder");
   const actItems = items.filter((item) => item.kind === "act");
+  const plots = items
+    .filter((item) => item.kind === "plot")
+    .sort((left, right) => readPlotMeta(left).sortOrder - readPlotMeta(right).sortOrder);
+  const defaultPlot = plots.find((item) => readPlotMeta(item).isDefault) ?? plots[0] ?? null;
+  const activePlot = plots.find((item) => item.id === activePlotId) ?? defaultPlot;
   const selectedDocument = documents.find((item) => item.id === documentId) ?? null;
   const columns = useMemo(
     () =>
       actDefaults.map((fallback, index) => {
         const act = index + 1;
-        const saved = actItems.find((item) => readAct(item.meta) === act);
+        const saved = actItems.find(
+          (item) =>
+            readAct(item.meta) === act &&
+            activePlot &&
+            belongsToPlot(item.meta, activePlot.id, readPlotMeta(activePlot).isDefault),
+        );
         return {
           act,
           title: normalizeArcTitle(saved?.title, act) || fallback.title,
           body: normalizeArcBody(saved?.body) || fallback.body,
           blocks: blocks
-            .filter((block) => block.act === act)
+            .filter(
+              (block) =>
+                block.act === act &&
+                activePlot &&
+                belongsToPlot(block.meta, activePlot.id, readPlotMeta(activePlot).isDefault),
+            )
             .sort((left, right) => left.sortOrder - right.sortOrder),
         };
       }),
-    [actItems, blocks],
+    [actItems, activePlot, blocks],
   );
+
+  useEffect(() => {
+    if (loading || !project || plots.length || creatingDefaultPlotRef.current) return;
+    creatingDefaultPlotRef.current = true;
+    void fetch(`/api/projects/${projectId}/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "plot",
+        title: `${project.title} — 아크 로드맵`,
+        body: project.logline,
+        meta: JSON.stringify({ isDefault: true, sortOrder: 0 }),
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (!data.item) return;
+        setItems((current) =>
+          current.some((item) => item.id === data.item.id) ? current : [...current, data.item],
+        );
+        setActivePlotId(data.item.id);
+        if (typeof window !== "undefined") {
+          const url = new URL(window.location.href);
+          url.searchParams.set("plot", data.item.id);
+          window.history.replaceState(window.history.state, "", url);
+        }
+      })
+      .finally(() => {
+        creatingDefaultPlotRef.current = false;
+      });
+  }, [loading, plots.length, project, projectId]);
 
   async function saveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -158,7 +225,15 @@ export function ProjectWorkspace({
 
   function inspectBlock(block: Block) {
     const links = readBlockLinks(block.meta);
-    openBlockDraft({ id: block.id, act: block.act, title: block.title, body: block.body, ...links });
+    openBlockDraft({
+      id: block.id,
+      act: block.act,
+      plotId: links.plotId ?? activePlot?.id ?? "",
+      title: block.title,
+      body: block.body,
+      characterIds: links.characterIds,
+      documentIds: links.documentIds,
+    });
   }
 
   function openBlockDraft(draft: BlockDraft) {
@@ -166,7 +241,9 @@ export function ProjectWorkspace({
     blockSaveVersionRef.current = 0;
     blockPersistedVersionRef.current = 0;
     const recovered = readStoredBlockDraft(projectId, draft.id);
-    const next = recovered ? { ...draft, ...recovered, id: draft.id ?? recovered.id } : draft;
+    const next = recovered
+      ? { ...draft, ...recovered, id: draft.id ?? recovered.id, plotId: recovered.plotId || draft.plotId }
+      : draft;
     blockDraftRef.current = next;
     setBlockDraft(next);
     setBlockSaveStatus(recovered ? "recovered" : draft.id ? "saved" : "idle");
@@ -202,6 +279,7 @@ export function ProjectWorkspace({
     setBlockSaveStatus("saving");
     const endpoint = draft.id ? `/api/blocks/${draft.id}` : `/api/projects/${projectId}/blocks`;
     const meta = JSON.stringify({
+      plotId: draft.plotId,
       characterIds: draft.characterIds,
       documentIds: draft.documentIds,
     });
@@ -365,11 +443,94 @@ export function ProjectWorkspace({
     );
   }
 
+  async function createPlot(isDefault = false) {
+    if (!project) return null;
+    const response = await fetch(`/api/projects/${projectId}/items`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "plot",
+        title: isDefault ? `${project.title} — 아크 로드맵` : "새 플롯",
+        body: isDefault ? project.logline : "TBD",
+        meta: JSON.stringify({ isDefault, sortOrder: isDefault ? 0 : Date.now() }),
+      }),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data.item) return null;
+    setItems((current) =>
+      current.some((item) => item.id === data.item.id) ? current : [...current, data.item],
+    );
+    selectPlot(data.item.id);
+    return data.item as Item;
+  }
+
+  function selectPlot(id: string) {
+    setActivePlotId(id);
+    setPlotMenuOpen(false);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("plot", id);
+      window.history.replaceState(window.history.state, "", url);
+    }
+  }
+
+  async function savePlot(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!plotDraft || !plotDraft.title.trim()) return;
+    const next = { ...plotDraft, title: plotDraft.title.trim() };
+    const response = await fetch(`/api/items/${next.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: next.title, body: next.body, meta: next.meta }),
+    });
+    if (!response.ok) return;
+    setItems((current) =>
+      current.map((item) =>
+        item.id === next.id
+          ? { ...item, title: next.title, body: next.body, meta: next.meta, updatedAt: new Date().toISOString() }
+          : item,
+      ),
+    );
+    setPlotDraft(null);
+  }
+
+  async function reorderPlots(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
+    const ordered = [...plots];
+    const sourceIndex = ordered.findIndex((item) => item.id === sourceId);
+    const targetIndex = ordered.findIndex((item) => item.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const [source] = ordered.splice(sourceIndex, 1);
+    ordered.splice(targetIndex, 0, source);
+    const updates = ordered.map((item, index) => ({
+      ...item,
+      meta: JSON.stringify({ ...readPlotMeta(item), sortOrder: index }),
+    }));
+    setItems((current) =>
+      current.map((item) => updates.find((updated) => updated.id === item.id) ?? item),
+    );
+    await Promise.all(
+      updates.map((item) =>
+        fetch(`/api/items/${item.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ meta: item.meta }),
+        }),
+      ),
+    );
+  }
+
   async function saveAct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!actDraft?.act) return;
-    const existing = actItems.find((item) => readAct(item.meta) === actDraft.act);
+    if (!actDraft?.act || !activePlot) return;
+    const existing = actItems.find(
+      (item) =>
+        readAct(item.meta) === actDraft.act &&
+        belongsToPlot(item.meta, activePlot.id, readPlotMeta(activePlot).isDefault),
+    );
     const endpoint = existing ? `/api/items/${existing.id}` : `/api/projects/${projectId}/items`;
+    const meta = JSON.stringify({ act: actDraft.act, plotId: activePlot.id });
     const response = await fetch(endpoint, {
       method: existing ? "PATCH" : "POST",
       headers: { "content-type": "application/json" },
@@ -377,13 +538,13 @@ export function ProjectWorkspace({
         kind: "act",
         title: actDraft.title,
         body: actDraft.body,
-        meta: JSON.stringify({ act: actDraft.act }),
+        meta,
       }),
     });
     if (existing) {
       setItems((current) =>
         current.map((item) =>
-          item.id === existing.id ? { ...item, title: actDraft.title, body: actDraft.body } : item,
+          item.id === existing.id ? { ...item, title: actDraft.title, body: actDraft.body, meta } : item,
         ),
       );
     } else {
@@ -465,6 +626,42 @@ export function ProjectWorkspace({
   }
 
   async function deleteItem(item: Item) {
+    if (item.kind === "plot") {
+      if (plots.length <= 1) return;
+      const itemMeta = readPlotMeta(item);
+      const doomedBlocks = blocks.filter((block) =>
+        belongsToPlot(block.meta, item.id, itemMeta.isDefault),
+      );
+      const doomedActs = actItems.filter((act) =>
+        belongsToPlot(act.meta, item.id, itemMeta.isDefault),
+      );
+      await Promise.all([
+        ...doomedBlocks.map((block) => fetch(`/api/blocks/${block.id}`, { method: "DELETE" })),
+        ...doomedActs.map((act) => fetch(`/api/items/${act.id}`, { method: "DELETE" })),
+      ]);
+      await fetch(`/api/items/${item.id}`, { method: "DELETE" });
+      const remaining = plots.filter((plot) => plot.id !== item.id);
+      let nextItems = items.filter(
+        (value) => value.id !== item.id && !doomedActs.some((act) => act.id === value.id),
+      );
+      if (itemMeta.isDefault && remaining[0]) {
+        const replacement = {
+          ...remaining[0],
+          meta: JSON.stringify({ ...readPlotMeta(remaining[0]), isDefault: true }),
+        };
+        await fetch(`/api/items/${replacement.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ meta: replacement.meta }),
+        });
+        nextItems = nextItems.map((value) => (value.id === replacement.id ? replacement : value));
+      }
+      setBlocks((current) => current.filter((block) => !doomedBlocks.some((doomed) => doomed.id === block.id)));
+      setItems(nextItems);
+      selectPlot(remaining[0]?.id ?? "");
+      setPlotMenuOpen(false);
+      return;
+    }
     if (item.kind === "folder") {
       const children = documents.filter((document) => documentFolder(document) === item.id);
       await Promise.all(children.map((document) => moveDocument(document, null)));
@@ -490,7 +687,7 @@ export function ProjectWorkspace({
         projectId={projectId}
         view={view}
         userName={userName}
-        blocks={blocks}
+        plots={plots}
         characters={characters}
         documents={documents}
         folders={folders}
@@ -535,12 +732,37 @@ export function ProjectWorkspace({
             onReorder={reorderCharacters}
           />
         )}
-        {view === "plot" && (
+        {view === "plot" && activePlot && (
           <Plot
-            project={project}
+            plots={plots}
+            activePlot={activePlot}
             columns={columns}
+            menuOpen={plotMenuOpen}
+            draggedPlot={draggedPlot}
+            onSelectPlot={selectPlot}
+            onNewPlot={() => void createPlot(false)}
+            onEditPlot={() => {
+              setPlotDraft({
+                id: activePlot.id,
+                title: activePlot.title,
+                body: activePlot.body,
+                meta: activePlot.meta,
+              });
+              setPlotMenuOpen(false);
+            }}
+            onDeletePlot={() => {
+              setPendingDelete(activePlot);
+              setPlotMenuOpen(false);
+            }}
+            onToggleMenu={() => setPlotMenuOpen((current) => !current)}
+            onDragPlot={setDraggedPlot}
+            onDropPlot={(targetId) => {
+              if (draggedPlot) void reorderPlots(draggedPlot, targetId);
+              setDraggedPlot(null);
+            }}
             onNewBlock={(act) => openBlockDraft({
               act,
+              plotId: activePlot.id,
               title: "",
               body: "",
               characterIds: [],
@@ -551,6 +773,9 @@ export function ProjectWorkspace({
             onDrag={setDraggedBlock}
             onDrop={moveBlock}
           />
+        )}
+        {view === "plot" && !activePlot && (
+          <div className="plot-initializing">첫 플롯을 준비하는 중…</div>
         )}
         {view === "documents" && (
           <Documents selected={selectedDocument} onSave={saveDocument} onNew={() => createDocument(null)} />
@@ -587,6 +812,7 @@ export function ProjectWorkspace({
             setCharacterDraft(null);
             openBlockDraft({
               act: 1,
+              plotId: activePlot?.id ?? defaultPlot?.id ?? "",
               title: "",
               body: "",
               characterIds: [characterId],
@@ -602,6 +828,14 @@ export function ProjectWorkspace({
       )}
       {actDraft && (
         <EditorModal title={`${actDraft.act}아크 설정`} draft={actDraft} setDraft={setActDraft} onSubmit={saveAct} onClose={() => setActDraft(null)} />
+      )}
+      {plotDraft && (
+        <PlotEditorModal
+          draft={plotDraft}
+          setDraft={setPlotDraft}
+          onSubmit={savePlot}
+          onClose={() => setPlotDraft(null)}
+        />
       )}
       {folderDraft && (
         <NameModal draft={folderDraft} setDraft={setFolderDraft} onSubmit={saveFolder} onClose={() => setFolderDraft(null)} />
@@ -625,7 +859,7 @@ function ProjectSidebar(props: {
   projectId: string;
   view: WorkspaceView;
   userName: string;
-  blocks: Block[];
+  plots: Item[];
   characters: Item[];
   documents: Item[];
   folders: Item[];
@@ -654,7 +888,7 @@ function ProjectSidebar(props: {
       <nav className="project-nav" aria-label="작품 메뉴">
         <Link className={props.view === "overview" ? "active" : ""} href={`/project/${props.projectId}`}>◇ <span>작품 개요</span></Link>
         <Link className={props.view === "characters" ? "active" : ""} href={`/project/${props.projectId}/characters`}>♙ <span>등장인물</span><b>{props.characters.length}</b></Link>
-        <Link className={props.view === "plot" ? "active" : ""} href={`/project/${props.projectId}/plot`}>▦ <span>플롯</span><b>{props.blocks.length}</b></Link>
+        <Link className={props.view === "plot" ? "active" : ""} href={`/project/${props.projectId}/plot`}>▦ <span>플롯</span><b>{props.plots.length}</b></Link>
       </nav>
 
       <section
@@ -779,8 +1013,11 @@ function Characters({
   const [tag, setTag] = useState("all");
   const [sort, setSort] = useState<"manual" | "name" | "recent" | "links">("manual");
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const backlinkCount = (characterId: string) =>
-    blocks.filter((block) => readBlockLinks(block.meta).characterIds.includes(characterId)).length;
+  const characterBlocks = (characterId: string) =>
+    blocks
+      .filter((block) => readBlockLinks(block.meta).characterIds.includes(characterId))
+      .sort((left, right) => right.sortOrder - left.sortOrder);
+  const backlinkCount = (characterId: string) => characterBlocks(characterId).length;
   const tags = Array.from(new Set(characters.flatMap((character) => readCharacterMeta(character).tags)))
     .sort((left, right) => left.localeCompare(right, "ko"));
   const visible = characters
@@ -829,12 +1066,12 @@ function Characters({
         </label>
       </div>
       <div className="table-head character-table-head">
-        <span>이름</span><span>태그와 설명</span><span>연결</span>
+        <span>이름</span><span>태그와 설명</span><span>연결 블록</span>
       </div>
       <div className="character-list">
         {visible.map((character) => {
           const meta = readCharacterMeta(character);
-          const links = backlinkCount(character.id);
+          const linkedBlocks = characterBlocks(character.id);
           return (
             <article
               className="character-row"
@@ -861,7 +1098,13 @@ function Characters({
                   </span>
                   <span>{character.body || "이 인물이 원하는 것과 방해받는 이유를 적어."}</span>
                 </span>
-                <span className="character-links">{links}개 블록</span>
+                <span className="character-links">
+                  {linkedBlocks.slice(0, 3).map((block) => (
+                    <span key={block.id}>{block.title}</span>
+                  ))}
+                  {!linkedBlocks.length && <span className="character-links-empty">0개 블록</span>}
+                  {linkedBlocks.length > 3 && <b>＋{linkedBlocks.length - 3}</b>}
+                </span>
               </button>
             </article>
           );
@@ -877,8 +1120,18 @@ function Characters({
 }
 
 function Plot(props: {
-  project: Project;
+  plots: Item[];
+  activePlot: Item;
   columns: Array<{ act: number; title: string; body: string; blocks: Block[] }>;
+  menuOpen: boolean;
+  draggedPlot: string | null;
+  onSelectPlot: (id: string) => void;
+  onNewPlot: () => void;
+  onEditPlot: () => void;
+  onDeletePlot: () => void;
+  onToggleMenu: () => void;
+  onDragPlot: (id: string) => void;
+  onDropPlot: (id: string) => void;
   onNewBlock: (act: number) => void;
   onInspectBlock: (block: Block) => void;
   onEditAct: (draft: Draft) => void;
@@ -887,30 +1140,98 @@ function Plot(props: {
 }) {
   return (
     <div className="plot-page">
-      <PageHeader kicker="PLOT BOARD" title={props.project.title} description={props.project.logline} />
-      <div className="plot-board">
-        {props.columns.map((column) => (
-          <article className="act-column" key={column.act} onDragOver={(event) => event.preventDefault()} onDrop={() => props.onDrop(column.act)}>
-            <button className="act-heading" onClick={() => props.onEditAct({ act: column.act, title: column.title, body: column.body })}>
-              <div><strong>{column.title}</strong><p>{column.body}</p></div><span>{column.blocks.length}</span>
-            </button>
-            <div className="block-stack">
-              {column.blocks.map((block) => {
-                const links = readBlockLinks(block.meta);
-                return (
-                  <button className="plot-card" key={block.id} draggable onDragStart={() => props.onDrag(block.id)} onClick={() => props.onInspectBlock(block)}>
-                    <strong>{block.title}</strong>
-                    <p>{block.body || "이 블록에서 벌어지는 사건을 적어."}</p>
-                    {(links.characterIds.length > 0 || links.documentIds.length > 0) && (
-                      <span className="plot-card-links">인물 {links.characterIds.length} · 문서 {links.documentIds.length}</span>
-                    )}
-                  </button>
-                );
-              })}
+      <div className="plot-tabs-bar" role="tablist" aria-label="플롯 탭">
+        <div className="plot-tabs-scroll">
+          {props.plots.map((plot) => {
+            const selected = plot.id === props.activePlot.id;
+            return (
+              <button
+                className={`plot-tab ${selected ? "active" : ""} ${props.draggedPlot === plot.id ? "dragging" : ""}`}
+                key={plot.id}
+                role="tab"
+                aria-selected={selected}
+                draggable
+                onDragStart={() => props.onDragPlot(plot.id)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  props.onDropPlot(plot.id);
+                }}
+                onClick={() => props.onSelectPlot(plot.id)}
+              >
+                <span>{plot.title}</span>
+              </button>
+            );
+          })}
+          <button className="new-plot-tab" type="button" onClick={props.onNewPlot}>
+            <Plus size={17} weight="bold" aria-hidden="true" />
+            <span>새 플롯</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="plot-content">
+        <header className="plot-heading">
+          <div>
+            <div className="plot-title-line">
+              <h1>{props.activePlot.title}</h1>
+              <div className="plot-menu-wrap">
+                <button
+                  className="plot-menu-trigger"
+                  type="button"
+                  aria-label="플롯 관리"
+                  aria-expanded={props.menuOpen}
+                  onClick={props.onToggleMenu}
+                >
+                  <DotsThree size={22} weight="bold" aria-hidden="true" />
+                </button>
+                {props.menuOpen && (
+                  <div className="plot-menu">
+                    <button type="button" onClick={props.onEditPlot}>
+                      <PencilSimple size={16} aria-hidden="true" />
+                      이름과 소개 편집
+                    </button>
+                    <button
+                      className="danger"
+                      type="button"
+                      disabled={props.plots.length <= 1}
+                      onClick={props.onDeletePlot}
+                    >
+                      <Trash size={16} aria-hidden="true" />
+                      플롯 삭제
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <button className="add-block" onClick={() => props.onNewBlock(column.act)}>＋ 새 블록</button>
-          </article>
-        ))}
+            <p>{props.activePlot.body || "TBD"}</p>
+          </div>
+        </header>
+
+        <div className="plot-board">
+          {props.columns.map((column) => (
+            <article className="act-column" key={column.act} onDragOver={(event) => event.preventDefault()} onDrop={() => props.onDrop(column.act)}>
+              <button className="act-heading" onClick={() => props.onEditAct({ act: column.act, title: column.title, body: column.body })}>
+                <div><strong>{column.title}</strong><p>{column.body}</p></div><span>{column.blocks.length}</span>
+              </button>
+              <div className="block-stack">
+                {column.blocks.map((block) => {
+                  const links = readBlockLinks(block.meta);
+                  return (
+                    <button className="plot-card" key={block.id} draggable onDragStart={() => props.onDrag(block.id)} onClick={() => props.onInspectBlock(block)}>
+                      <strong>{block.title}</strong>
+                      <p>{block.body || "이 블록에서 벌어지는 사건을 적어."}</p>
+                      {(links.characterIds.length > 0 || links.documentIds.length > 0) && (
+                        <span className="plot-card-links">인물 {links.characterIds.length} · 문서 {links.documentIds.length}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <button className="add-block" onClick={() => props.onNewBlock(column.act)}>＋ 새 블록</button>
+            </article>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -1472,12 +1793,46 @@ function NameModal(props: {
   );
 }
 
+function PlotEditorModal(props: {
+  draft: PlotDraft;
+  setDraft: (draft: PlotDraft | null) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={props.onClose}>
+      <form className="modal-card plot-editor-modal" onSubmit={props.onSubmit} onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-heading">
+          <h2>플롯 정보 편집</h2>
+          <button type="button" className="icon-button" aria-label="플롯 편집 닫기" onClick={props.onClose}>×</button>
+        </div>
+        <label>
+          플롯 이름
+          <input
+            autoFocus
+            value={props.draft.title}
+            onChange={(event) => props.setDraft({ ...props.draft, title: event.target.value })}
+          />
+        </label>
+        <label>
+          한 줄 소개
+          <textarea
+            value={props.draft.body}
+            onChange={(event) => props.setDraft({ ...props.draft, body: event.target.value })}
+          />
+        </label>
+        <button className="black-button" type="submit">저장</button>
+      </form>
+    </div>
+  );
+}
+
 function ConfirmDeleteModal({ item, onClose, onConfirm }: { item: Item; onClose: () => void; onConfirm: () => void }) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <section className="modal-card confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="modal-heading"><h2 id="delete-title">{item.kind === "folder" ? "폴더 삭제" : item.kind === "character" ? "인물 삭제" : "문서 삭제"}</h2><button type="button" className="icon-button" onClick={onClose}>×</button></div>
-        <p><strong>{item.title}</strong>을(를) 삭제할까? {item.kind === "folder" ? "안의 문서는 최상위로 이동됨." : "이 작업은 되돌릴 수 없음."}</p>
+        <div className="modal-heading"><h2 id="delete-title">{item.kind === "folder" ? "폴더 삭제" : item.kind === "character" ? "인물 삭제" : item.kind === "plot" ? "플롯 삭제" : "문서 삭제"}</h2><button type="button" className="icon-button" onClick={onClose}>×</button></div>
+        <p><strong>{item.title}</strong>을(를) 삭제할까? {item.kind === "folder" ? "안의 문서는 최상위로 이동됨." : item.kind === "plot" ? "이 플롯의 아크와 블록도 함께 삭제되며 되돌릴 수 없음." : "이 작업은 되돌릴 수 없음."}</p>
         <div className="modal-actions">
           <button className="outline-cancel" type="button" onClick={onClose}>취소</button>
           <button className="confirm-delete" type="button" onClick={onConfirm}>삭제하기</button>
@@ -1504,6 +1859,7 @@ function readStoredBlockDraft(projectId: string, blockId?: string): BlockDraft |
     return {
       id: typeof value.id === "string" ? value.id : blockId,
       act: value.act,
+      plotId: typeof value.plotId === "string" ? value.plotId : "",
       title: value.title,
       body: value.body,
       characterIds: Array.isArray(value.characterIds)
@@ -1608,6 +1964,24 @@ function readAct(meta: string) {
   return Number(readObject(meta).act ?? 0);
 }
 
+function readPlotMeta(item: Pick<Item, "meta" | "updatedAt">): PlotMeta {
+  const value = readObject(item.meta);
+  return {
+    isDefault: value.isDefault === true,
+    sortOrder:
+      typeof value.sortOrder === "number"
+        ? value.sortOrder
+        : item.updatedAt
+          ? new Date(item.updatedAt).getTime()
+          : Date.now(),
+  };
+}
+
+function belongsToPlot(meta: string, plotId: string, isDefaultPlot: boolean) {
+  const value = readObject(meta).plotId;
+  return typeof value === "string" && value ? value === plotId : isDefaultPlot;
+}
+
 function normalizeArcTitle(title: string | undefined, act: number) {
   const value = title?.trim();
   if (!value || value === "TBD") return `${act}아크`;
@@ -1634,6 +2008,7 @@ function documentFolder(item: Item) {
 function readBlockLinks(meta: string) {
   const value = readObject(meta);
   return {
+    plotId: typeof value.plotId === "string" && value.plotId ? value.plotId : null,
     characterIds: Array.isArray(value.characterIds) ? value.characterIds.filter((id): id is string => typeof id === "string") : [],
     documentIds: Array.isArray(value.documentIds) ? value.documentIds.filter((id): id is string => typeof id === "string") : [],
   };

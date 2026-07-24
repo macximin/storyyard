@@ -4,15 +4,17 @@
 
 - Block relationship picker reference: `C:\Users\wjjo\AppData\Local\Temp\codex-clipboard-df7c2c65-e440-449f-9ee3-64bfe9dccad3.png` (352×330)
 - Character detail reference: `C:\Users\wjjo\AppData\Local\Temp\codex-clipboard-837bf6ea-48a7-4d3b-bb5d-b3d80399040a.png` (702×471)
-- Implementation captures: `work/design-qa/block-inspector-local.png` (1265×712), `work/design-qa/character-list-local.png` (1280×720), `work/design-qa/character-detail-local-top.png` (1280×720)
-- Side-by-side normalized comparisons: `work/design-qa/compare-block-picker.png`, `work/design-qa/compare-character-detail.png` (1400×760 each)
+- Multi-plot tabs reference: `C:\Users\wjjo\AppData\Local\Temp\codex-clipboard-45911c72-db25-41e8-814f-c5ba1e08dd75.png` (575×166)
+- Implementation captures: `work/design-qa/block-inspector-local.png` (1265×712), `work/design-qa/character-list-local.png` (1280×720), `work/design-qa/character-detail-local-top.png` (1280×720), `work/design-qa/multi-plot-local.png` (1265×712), `work/design-qa/character-links-local.png` (1280×720)
+- Side-by-side normalized comparisons: `work/design-qa/compare-block-picker.png`, `work/design-qa/compare-character-detail.png` (1400×760 each), `work/design-qa/compare-multi-plot.png` (1400×430)
 
 ## State and viewport
 
 - Local authenticated development state at 1265×712 and 1280×720.
 - Plot inspector: one saved block with one linked character and one linked document.
 - Character inspector: one character with a tag, description, custom field, and one linked plot block.
-- Reference and implementation were normalized into the same 1400×760 comparison canvas without changing source aspect ratio.
+- Multi-plot state: two plot tabs, plot-specific titles and descriptions, different arc copy, and isolated block sets.
+- Reference and implementation were normalized into shared comparison canvases without changing source aspect ratio. The multi-plot comparison uses a focused 720×180 implementation crop aligned to the reference's top tab-and-heading region.
 
 ## Fidelity review
 
@@ -20,6 +22,8 @@
 - Spacing: right inspectors use full-height, left-aligned sections with consistent separators and no centered Notion-style content column.
 - Color: white, black, gray, and pale yellow remain the only dominant interface colors.
 - Components: selected items are chips with immediate removal; search results are grouped in bordered selectors and show selected state; character metadata is broken into scannable sections.
+- Plot tabs: the selected tab uses the same raised-tab silhouette and top-of-page placement as the reference. The source green accent is intentionally mapped to Storyyard's pale-yellow product token.
+- Icons: new plot actions use Phosphor interface icons rather than text-drawn icon substitutes.
 - Copy: product language uses `아크`; unassigned arc descriptions use `TBD`.
 - Image quality: no supplied raster assets are stretched. Avatar uploads are resized before storage and rendered with `object-fit: cover`.
 
@@ -31,6 +35,9 @@
 - Character/document pickers support search, chips, add/remove, quick create, Arrow keys, Enter, and Escape.
 - Character edits autosave after 600 ms and support tags, avatar, custom fields, pin/delete menu, sorting/filtering, linked-block backlinks, and linked-block creation.
 - Character backlink opened the corresponding plot block inspector successfully.
+- Character list rows expose up to three linked block titles and preserve linked-block-count sorting.
+- Created a second plot, renamed it, edited its description and first arc, created a block, linked a character, switched between plots, and verified that blocks and arc copy do not leak across tabs.
+- Created and deleted a temporary third plot, confirming the destructive confirmation flow and return to a surviving plot. The final plot cannot be deleted.
 - Current-route browser interaction produced no new console warning or error. Two earlier local-library JSON errors predated local database initialization and did not recur after initialization.
 
 ## Comparison history
@@ -38,5 +45,7 @@
 1. Compared the supplied picker reference and rendered block inspector in one image. The same selection hierarchy, chips, search field, result list, and remove action are present; the implementation intentionally adds quick create and saved-state feedback.
 2. Compared the supplied character reference and rendered character inspector in one image. The same avatar/name/metadata hierarchy is present; the implementation intentionally adds direct editing, autosave, custom fields, and linked-block actions.
 3. Reopened both inspectors after saving and verified that saved content and relationships persisted.
+4. Compared the supplied multi-plot header and the rendered two-tab plot workspace in one focused image. Tab placement, selected state, add action, page title, overflow menu, and one-line description are all present. No P0/P1/P2 mismatch remained.
+5. Captured the revised character list and verified that linked block names are readable in the third column without collapsing the name or description columns.
 
 final result: passed
