@@ -355,7 +355,18 @@ export function ProjectWorkspace({
         />
       )}
       {characterDraft && (
-        <EditorModal title={characterDraft.id ? "인물 편집" : "새 인물"} draft={characterDraft} setDraft={setCharacterDraft} onSubmit={saveCharacter} onClose={() => setCharacterDraft(null)} />
+        <EditorModal
+          title={characterDraft.id ? "인물 편집" : "새 인물"}
+          draft={characterDraft}
+          setDraft={setCharacterDraft}
+          onSubmit={saveCharacter}
+          onClose={() => setCharacterDraft(null)}
+          onDelete={characterDraft.id ? () => {
+            const character = characters.find((item) => item.id === characterDraft.id);
+            if (character) void deleteItem(character);
+            setCharacterDraft(null);
+          } : undefined}
+        />
       )}
       {actDraft && (
         <EditorModal title={`${actDraft.act}막 설정`} draft={actDraft} setDraft={setActDraft} onSubmit={saveAct} onClose={() => setActDraft(null)} />
@@ -647,6 +658,7 @@ function EditorModal(props: {
   setDraft: (draft: Draft | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onClose: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={props.onClose}>
@@ -654,7 +666,10 @@ function EditorModal(props: {
         <div className="modal-heading"><h2>{props.title}</h2><button type="button" className="icon-button" onClick={props.onClose}>×</button></div>
         <label>제목<input autoFocus value={props.draft.title} onChange={(event) => props.setDraft({ ...props.draft, title: event.target.value })} /></label>
         <label>설명<textarea value={props.draft.body} onChange={(event) => props.setDraft({ ...props.draft, body: event.target.value })} /></label>
-        <button className="black-button" type="submit">저장</button>
+        <div className="modal-actions">
+          {props.onDelete ? <button className="delete-button" type="button" onClick={props.onDelete}>삭제</button> : <span />}
+          <button className="black-button" type="submit">저장</button>
+        </div>
       </form>
     </div>
   );

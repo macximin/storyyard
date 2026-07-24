@@ -257,6 +257,9 @@ a { color: inherit; text-decoration: none; }
 .modal-card textarea { min-height: 120px; resize: vertical; line-height: 1.6; }
 .modal-card .black-button { justify-self: end; }
 .name-modal { width: min(420px, 100%); }
+.modal-actions { display: flex; justify-content: space-between; align-items: center; }
+.delete-button { padding: 9px 0; border: 0; background: transparent; color: #a33424; font-size: .78rem; font-weight: 800; cursor: pointer; }
+.delete-button:hover { text-decoration: underline; }
 
 @media (max-width: 900px) {
   .library-shell, .project-shell { grid-template-columns: 72px minmax(0, 1fr); }
