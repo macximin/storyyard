@@ -17,7 +17,7 @@ type CharacterDraft = { id?: string; title: string; body: string; meta: string }
 type CharacterField = { id: string; label: string; value: string };
 type PlotDraft = { id: string; title: string; body: string; meta: string };
 type PlotMeta = { isDefault: boolean; sortOrder: number };
-type FoundryPackageSummary = {
+export type FoundryPackageSummary = {
   workSlug: string;
   title: string;
   sourceCommit: string;
@@ -41,11 +41,13 @@ export function ProjectWorkspace({
   view,
   userName,
   initialSnapshot,
+  initialFoundryPackages,
 }: {
   projectId: string;
   view: WorkspaceView;
   userName: string;
   initialSnapshot?: WorkspaceSnapshot | null;
+  initialFoundryPackages?: FoundryPackageSummary[];
 }) {
   const router = useRouter();
   const cached = workspaceCache.get(projectId) ?? initialSnapshot ?? undefined;
@@ -74,7 +76,9 @@ export function ProjectWorkspace({
   const [treeMenu, setTreeMenu] = useState<string | null>(null);
   const [treeAddOpen, setTreeAddOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Item | null>(null);
-  const [foundryPackages, setFoundryPackages] = useState<FoundryPackageSummary[]>([]);
+  const [foundryPackages, setFoundryPackages] = useState<FoundryPackageSummary[]>(
+    () => initialFoundryPackages ?? [],
+  );
   const [foundrySyncing, setFoundrySyncing] = useState(false);
   const [foundrySyncMessage, setFoundrySyncMessage] = useState("");
   const blockDraftRef = useRef<BlockDraft | null>(null);
@@ -229,6 +233,9 @@ export function ProjectWorkspace({
 
   useEffect(() => {
     if (view !== "plot" || !project) return;
+    if (initialFoundryPackages !== undefined) {
+      return;
+    }
     let active = true;
     fetch(`/api/projects/${projectId}/foundry-sync`)
       .then(async (response) => response.ok ? response.json() : { packages: [] })
@@ -241,7 +248,7 @@ export function ProjectWorkspace({
     return () => {
       active = false;
     };
-  }, [project, projectId, view]);
+  }, [initialFoundryPackages, project, projectId, view]);
 
   async function saveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1709,7 +1716,7 @@ function Plot(props: {
                           return (
                             <button className="plot-card" key={block.id} draggable onDragStart={() => props.onDrag(block.id)} onClick={() => props.onInspectBlock(block)}>
                               <strong>{block.title}</strong>
-                              <p>{block.body || "이 블록에서 벌어지는 사건을 적어."}</p>
+                              <p>{blockBodyPreview(block.body) || "이 블록에서 벌어지는 사건을 적어."}</p>
                               {blockSync && <span className={`foundry-sync-state state-${blockSync.status}`}>{blockSync.status === "committed" ? "정본 화" : "가설 화"}</span>}
                               {(links.characterIds.length > 0 || links.documentIds.length > 0) && (
                                 <span className="plot-card-links">인물 {links.characterIds.length} · 문서 {links.documentIds.length}</span>
@@ -2215,7 +2222,7 @@ function CharacterInspector({
             <div className="backlink-list">
               {backlinks.map((block) => (
                 <button type="button" key={block.id} onClick={() => onOpenBlock(block)}>
-                  <span>{block.act}아크</span><strong>{block.title}</strong><p>{block.body || "내용 없음"}</p>
+                  <span>{block.act}아크</span><strong>{block.title}</strong><p>{blockBodyPreview(block.body) || "내용 없음"}</p>
                 </button>
               ))}
               {!backlinks.length && <span className="picker-empty">연결된 블록이 아직 없음.</span>}
@@ -2497,6 +2504,12 @@ function normalizeArcBody(body: string | undefined) {
     "가장 큰 대가 앞에서 주인공이 마지막 선택을 내린다.",
   ].includes(value)) return "TBD";
   return value;
+}
+
+function blockBodyPreview(body: string, maxLength = 320) {
+  const normalized = body.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength).trimEnd()}…`;
 }
 
 function documentFolder(item: Item) {

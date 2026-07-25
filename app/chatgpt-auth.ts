@@ -19,9 +19,8 @@ const SESSION_DAYS = 30;
 const PASSWORD_ITERATIONS = 100_000;
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  const tokenHash = await sha256(token);
+  const tokenHash = await getSessionTokenHash();
+  if (!tokenHash) return null;
   const now = new Date().toISOString();
   const [row] = await getDb()
     .select({ session: sessions, user: users })
@@ -37,6 +36,11 @@ export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
     fullName: row.user.displayName,
     role: row.user.role === "admin" ? "admin" : "user",
   };
+}
+
+export async function getSessionTokenHash(): Promise<string | null> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return token ? sha256(token) : null;
 }
 
 export async function requireChatGPTUser(returnTo: string): Promise<ChatGPTUser> {

@@ -67,6 +67,25 @@ test("primes navigation data on the server and sorts community works locally", a
   assert.match(publicWorkData, /env\.DB\.batch/);
 });
 
+test("batches authenticated workspace reads and primes Foundry packages on the plot route", async () => {
+  const [auth, workspaceData, workspaceRoute, plotPage, workspace] = await Promise.all([
+    read("app/chatgpt-auth.ts"),
+    read("app/workspace-data.ts"),
+    read("app/api/projects/[id]/workspace/route.ts"),
+    read("app/project/[id]/plot/page.tsx"),
+    read("app/project-workspace.tsx"),
+  ]);
+  assert.match(auth, /getSessionTokenHash/);
+  assert.match(workspaceData, /getAuthenticatedWorkspace/);
+  assert.match(workspaceData, /env\.DB\.batch/);
+  assert.match(workspaceData, /FROM sessions s/);
+  assert.match(workspaceData, /requireAuthenticatedWorkspace/);
+  assert.doesNotMatch(workspaceRoute, /getChatGPTUser/);
+  assert.match(plotPage, /initialFoundryPackages/);
+  assert.match(plotPage, /listCanonPackages/);
+  assert.match(workspace, /initialFoundryPackages !== undefined/);
+});
+
 test("avoids duplicate route prefetches and shows navigation progress", async () => {
   const [sidebar, work, reader, library, workspace, progress, layout] = await Promise.all([
     read("app/global-sidebar.tsx"),
@@ -246,12 +265,32 @@ test("projects Foundry B-Rail arcs into one Storyyard block per episode without 
   );
   assert.match(exporter, /committedEpisodeBets/);
   assert.match(exporter, /parseProvisionalEpisodes/);
-  assert.match(syncRoute, /user\.role !== "admin"/);
+  assert.match(syncRoute, /loadAdminOwnerState/);
+  assert.match(syncRoute, /u\.role = 'admin'/);
   assert.match(syncRoute, /projectedContentSha256/);
   assert.match(syncRoute, /report\.conflicts\.push/);
   assert.match(syncRoute, /reverseSync: false/);
+  assert.match(syncRoute, /env\.DB\.batch\(writes\)/);
+  assert.match(syncRoute, /if \(writes\.length\)/);
   assert.doesNotMatch(syncRoute, /\.delete\(|DELETE FROM/);
   assert.match(workspace, /정본 아크·화 동기화/);
+  assert.match(workspace, /blockBodyPreview\(block\.body\)/);
   assert.match(workspace, /\.\.\.\(existingBlock \? readObject\(existingBlock\.meta\) : \{\}\)/);
   assert.match(workspace, /\.\.\.\(existing \? readObject\(existing\.meta\) : \{\}\)/);
+});
+
+test("indexes the private workspace lookup paths", async () => {
+  const [schema, migration] = await Promise.all([
+    read("db/schema.ts"),
+    read("drizzle/0008_youthful_doctor_faustus.sql"),
+  ]);
+  for (const indexName of [
+    "projects_owner_updated_idx",
+    "project_items_project_kind_updated_idx",
+    "plot_blocks_project_act_sort_idx",
+  ]) {
+    assert.match(schema, new RegExp(indexName));
+    assert.match(migration, new RegExp(`CREATE INDEX \\\`${indexName}\\\``));
+  }
+  assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM|ALTER TABLE/);
 });

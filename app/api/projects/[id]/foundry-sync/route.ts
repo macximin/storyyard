@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { env } from "cloudflare:workers";
+import { getSessionTokenHash } from "@/app/chatgpt-auth";
 import { getCanonPackage, listCanonPackages } from "@/app/canon-packages";
-import { getDb } from "@/db";
-import { plotBlocks, projectItems, projects } from "@/db/schema";
+import { plotBlocks, projectItems } from "@/db/schema";
 
 type JsonObject = Record<string, unknown>;
+type ProjectItemRow = typeof projectItems.$inferSelect;
+type PlotBlockRow = typeof plotBlocks.$inferSelect;
 type FoundrySyncMeta = {
   mappingVersion: string;
   workSlug: string;
@@ -50,22 +51,71 @@ function syncMeta(
   return JSON.stringify({ ...base, foundrySync: input });
 }
 
-async function requireAdminOwner(projectId: string) {
-  const user = await getChatGPTUser();
-  if (!user || user.role !== "admin") return { error: "관리자 권한이 필요함.", status: 403 } as const;
-  const [project] = await getDb().select().from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.ownerEmail, user.email)));
-  if (!project) return { error: "작품을 찾을 수 없음.", status: 404 } as const;
-  return { user, project } as const;
+async function loadAdminOwnerState(projectId: string) {
+  const tokenHash = await getSessionTokenHash();
+  if (!tokenHash) return { error: "관리자 권한이 필요함.", status: 403 } as const;
+  const now = new Date().toISOString();
+  const [userResult, projectResult, itemsResult, blocksResult] = await env.DB.batch([
+    env.DB.prepare(
+      `SELECT u.id, u.role
+         FROM sessions s
+         JOIN users u ON u.id = s.user_id
+        WHERE s.token_hash = ? AND s.expires_at > ?
+        LIMIT 1`,
+    ).bind(tokenHash, now),
+    env.DB.prepare(
+      `SELECT p.id
+         FROM projects p
+         JOIN users u ON u.owner_key = p.owner_email
+         JOIN sessions s ON s.user_id = u.id
+        WHERE p.id = ? AND s.token_hash = ? AND s.expires_at > ? AND u.role = 'admin'
+        LIMIT 1`,
+    ).bind(projectId, tokenHash, now),
+    env.DB.prepare(
+      `SELECT pi.id, pi.project_id AS "projectId", pi.kind, pi.title, pi.body,
+              pi.meta, pi.updated_at AS "updatedAt"
+         FROM project_items pi
+         JOIN projects p ON p.id = pi.project_id
+         JOIN users u ON u.owner_key = p.owner_email
+         JOIN sessions s ON s.user_id = u.id
+        WHERE pi.project_id = ?
+          AND s.token_hash = ?
+          AND s.expires_at > ?
+          AND u.role = 'admin'`,
+    ).bind(projectId, tokenHash, now),
+    env.DB.prepare(
+      `SELECT pb.id, pb.project_id AS "projectId", pb.act, pb.kind, pb.title,
+              pb.body, pb.meta, pb.sort_order AS "sortOrder",
+              pb.updated_at AS "updatedAt"
+         FROM plot_blocks pb
+         JOIN projects p ON p.id = pb.project_id
+         JOIN users u ON u.owner_key = p.owner_email
+         JOIN sessions s ON s.user_id = u.id
+        WHERE pb.project_id = ?
+          AND s.token_hash = ?
+          AND s.expires_at > ?
+          AND u.role = 'admin'`,
+    ).bind(projectId, tokenHash, now),
+  ]);
+  const user = userResult.results?.[0] as { id: string; role: string } | undefined;
+  if (!user || user.role !== "admin") {
+    return { error: "관리자 권한이 필요함.", status: 403 } as const;
+  }
+  if (!projectResult.results?.length) {
+    return { error: "작품을 찾을 수 없음.", status: 404 } as const;
+  }
+  return {
+    items: (itemsResult.results ?? []) as ProjectItemRow[],
+    blocks: (blocksResult.results ?? []) as PlotBlockRow[],
+  } as const;
 }
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const { id: projectId } = await context.params;
-  const access = await requireAdminOwner(projectId);
+  const access = await loadAdminOwnerState(projectId);
   if ("error" in access) return Response.json({ error: access.error }, { status: access.status });
 
-  const items = await getDb().select().from(projectItems).where(eq(projectItems.projectId, projectId));
-  const syncedPlots = items.flatMap((item) => {
+  const syncedPlots = access.items.flatMap((item) => {
     if (item.kind !== "plot") return [];
     const sync = readFoundrySync(item.meta);
     return sync?.entityKey === "plot"
@@ -87,7 +137,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id: projectId } = await context.params;
-  const access = await requireAdminOwner(projectId);
+  const access = await loadAdminOwnerState(projectId);
   if ("error" in access) return Response.json({ error: access.error }, { status: access.status });
 
   const input = await request.json().catch(() => null) as { workSlug?: string } | null;
@@ -100,11 +150,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return Response.json({ error: "Storyyard 아크·화 투영 계약과 맞지 않음." }, { status: 409 });
   }
 
-  const db = getDb();
-  const [existingItems, existingBlocks] = await Promise.all([
-    db.select().from(projectItems).where(eq(projectItems.projectId, projectId)),
-    db.select().from(plotBlocks).where(eq(plotBlocks.projectId, projectId)),
-  ]);
+  const existingItems = access.items;
+  const existingBlocks = access.blocks;
+  const writes: ReturnType<typeof env.DB.prepare>[] = [];
   const timestamp = new Date().toISOString();
   const plotEntity = existingItems.find((item) => {
     const sync = readFoundrySync(item.meta);
@@ -129,18 +177,28 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     reverseSync: false,
   });
   if (plotEntity) {
-    await db.update(projectItems).set({ meta: plotMeta, updatedAt: timestamp })
-      .where(eq(projectItems.id, plotEntity.id));
+    if (plotEntity.meta !== plotMeta) {
+      writes.push(
+        env.DB.prepare(
+          `UPDATE project_items SET meta = ?, updated_at = ? WHERE id = ?`,
+        ).bind(plotMeta, timestamp, plotEntity.id),
+      );
+    }
   } else {
-    await db.insert(projectItems).values({
-      id: plotId,
-      projectId,
-      kind: "plot",
-      title: `Foundry · ${canonPackage.title}`,
-      body: `B-Rail을 아크로, 한 화를 블록 하나로 비추는 읽기 투영 · source ${canonPackage.sourceGitCommit.slice(0, 12)}`,
-      meta: plotMeta,
-      updatedAt: timestamp,
-    });
+    writes.push(
+      env.DB.prepare(
+        `INSERT INTO project_items
+          (id, project_id, kind, title, body, meta, updated_at)
+         VALUES (?, ?, 'plot', ?, ?, ?, ?)`,
+      ).bind(
+        plotId,
+        projectId,
+        `Foundry · ${canonPackage.title}`,
+        `B-Rail을 아크로, 한 화를 블록 하나로 비추는 읽기 투영 · source ${canonPackage.sourceGitCommit.slice(0, 12)}`,
+        plotMeta,
+        timestamp,
+      ),
+    );
   }
 
   const report = {
@@ -190,15 +248,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       },
     );
     if (!existing) {
-      await db.insert(projectItems).values({
-        id: crypto.randomUUID(),
-        projectId,
-        kind: "act",
-        title: arc.title,
-        body: arc.body,
-        meta,
-        updatedAt: timestamp,
-      });
+      writes.push(
+        env.DB.prepare(
+          `INSERT INTO project_items
+            (id, project_id, kind, title, body, meta, updated_at)
+           VALUES (?, ?, 'act', ?, ?, ?, ?)`,
+        ).bind(crypto.randomUUID(), projectId, arc.title, arc.body, meta, timestamp),
+      );
       report.created += 1;
     } else if (
       currentHash === desiredHash
@@ -207,8 +263,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     ) {
       report.unchanged += 1;
     } else {
-      await db.update(projectItems).set({ title: arc.title, body: arc.body, meta, updatedAt: timestamp })
-        .where(eq(projectItems.id, existing.id));
+      writes.push(
+        env.DB.prepare(
+          `UPDATE project_items
+              SET title = ?, body = ?, meta = ?, updated_at = ?
+            WHERE id = ?`,
+        ).bind(arc.title, arc.body, meta, timestamp, existing.id),
+      );
       report.updated += 1;
     }
   }
@@ -255,17 +316,22 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       },
     );
     if (!existing) {
-      await db.insert(plotBlocks).values({
-        id: crypto.randomUUID(),
-        projectId,
-        act,
-        kind: "episode",
-        title: episode.title,
-        body: episode.body,
-        meta,
-        sortOrder: episode.sortOrder,
-        updatedAt: timestamp,
-      });
+      writes.push(
+        env.DB.prepare(
+          `INSERT INTO plot_blocks
+            (id, project_id, act, kind, title, body, meta, sort_order, updated_at)
+           VALUES (?, ?, ?, 'episode', ?, ?, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(),
+          projectId,
+          act,
+          episode.title,
+          episode.body,
+          meta,
+          episode.sortOrder,
+          timestamp,
+        ),
+      );
       report.created += 1;
     } else if (
       currentHash === desiredHash
@@ -274,15 +340,22 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     ) {
       report.unchanged += 1;
     } else {
-      await db.update(plotBlocks).set({
-        act,
-        kind: "episode",
-        title: episode.title,
-        body: episode.body,
-        meta,
-        sortOrder: episode.sortOrder,
-        updatedAt: timestamp,
-      }).where(eq(plotBlocks.id, existing.id));
+      writes.push(
+        env.DB.prepare(
+          `UPDATE plot_blocks
+              SET act = ?, kind = 'episode', title = ?, body = ?, meta = ?,
+                  sort_order = ?, updated_at = ?
+            WHERE id = ?`,
+        ).bind(
+          act,
+          episode.title,
+          episode.body,
+          meta,
+          episode.sortOrder,
+          timestamp,
+          existing.id,
+        ),
+      );
       report.updated += 1;
     }
   }
@@ -294,7 +367,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const sync = readFoundrySync(entity.meta);
     return sync?.workSlug === canonPackage.workSlug && !projectedKeys.has(sync.entityKey);
   }).length;
-  await db.update(projects).set({ updatedAt: timestamp }).where(eq(projects.id, projectId));
+  if (writes.length) {
+    writes.push(
+      env.DB.prepare(`UPDATE projects SET updated_at = ? WHERE id = ?`)
+        .bind(timestamp, projectId),
+    );
+    await env.DB.batch(writes);
+  }
 
   return Response.json({
     report,

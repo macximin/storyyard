@@ -33,7 +33,9 @@ export const projects = sqliteTable("projects", {
   favorite: integer("favorite").notNull().default(0),
   updatedAt: text("updated_at").notNull(),
   createdAt: text("created_at").notNull(),
-});
+}, (table) => [
+  index("projects_owner_updated_idx").on(table.ownerEmail, table.updatedAt),
+]);
 
 export const plotBlocks = sqliteTable("plot_blocks", {
   id: text("id").primaryKey(),
@@ -45,7 +47,9 @@ export const plotBlocks = sqliteTable("plot_blocks", {
   meta: text("meta").notNull().default("{}"),
   sortOrder: integer("sort_order").notNull(),
   updatedAt: text("updated_at").notNull(),
-});
+}, (table) => [
+  index("plot_blocks_project_act_sort_idx").on(table.projectId, table.act, table.sortOrder),
+]);
 
 export const projectItems = sqliteTable("project_items", {
   id: text("id").primaryKey(),
@@ -55,7 +59,9 @@ export const projectItems = sqliteTable("project_items", {
   body: text("body").notNull().default(""),
   meta: text("meta").notNull().default("{}"),
   updatedAt: text("updated_at").notNull(),
-});
+}, (table) => [
+  index("project_items_project_kind_updated_idx").on(table.projectId, table.kind, table.updatedAt),
+]);
 
 export const manuscripts = sqliteTable("manuscripts", {
   id: text("id").primaryKey(),

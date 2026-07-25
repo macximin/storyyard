@@ -1,11 +1,9 @@
-import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { getOwnedWorkspace } from "@/app/workspace-data";
+import { getAuthenticatedWorkspace } from "@/app/workspace-data";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getChatGPTUser();
-  if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
   const { id } = await context.params;
-  const snapshot = await getOwnedWorkspace(id, user.email);
+  const { user, snapshot } = await getAuthenticatedWorkspace(id);
+  if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
   if (!snapshot) return Response.json({ error: "Not found" }, { status: 404 });
   return Response.json(snapshot);
 }
