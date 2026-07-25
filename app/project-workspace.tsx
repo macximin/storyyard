@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startNavigationProgress } from "./navigation-progress";
-import { DotsThree, FileText, GlobeHemisphereWest, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
+import { ArrowsClockwise, DotsThree, FileText, GlobeHemisphereWest, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkspaceSnapshot } from "./workspace-data";
 
@@ -17,6 +17,14 @@ type CharacterDraft = { id?: string; title: string; body: string; meta: string }
 type CharacterField = { id: string; label: string; value: string };
 type PlotDraft = { id: string; title: string; body: string; meta: string };
 type PlotMeta = { isDefault: boolean; sortOrder: number };
+type FoundryPackageSummary = {
+  workSlug: string;
+  title: string;
+  sourceCommit: string;
+  bundleSha256: string;
+  currentEpisode: string;
+  currentBArc: string;
+};
 type CharacterMeta = {
   tags: string[];
   pinned: boolean;
@@ -66,6 +74,9 @@ export function ProjectWorkspace({
   const [treeMenu, setTreeMenu] = useState<string | null>(null);
   const [treeAddOpen, setTreeAddOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Item | null>(null);
+  const [foundryPackages, setFoundryPackages] = useState<FoundryPackageSummary[]>([]);
+  const [foundrySyncing, setFoundrySyncing] = useState(false);
+  const [foundrySyncMessage, setFoundrySyncMessage] = useState("");
   const blockDraftRef = useRef<BlockDraft | null>(null);
   const blockSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blockSaveInFlightRef = useRef(false);
@@ -175,6 +186,7 @@ export function ProjectWorkspace({
           act,
           title: normalizeArcTitle(saved?.title, act),
           body: normalizeArcBody(saved?.body),
+          meta: saved?.meta ?? "{}",
           blocks: plotBlocks
             .filter((block) => block.act === act)
             .sort((left, right) => left.sortOrder - right.sortOrder),
@@ -214,6 +226,22 @@ export function ProjectWorkspace({
         creatingDefaultPlotRef.current = false;
       });
   }, [loading, plots.length, project, projectId]);
+
+  useEffect(() => {
+    if (view !== "plot" || !project) return;
+    let active = true;
+    fetch(`/api/projects/${projectId}/foundry-sync`)
+      .then(async (response) => response.ok ? response.json() : { packages: [] })
+      .then((data) => {
+        if (active) setFoundryPackages(Array.isArray(data.packages) ? data.packages : []);
+      })
+      .catch(() => {
+        if (active) setFoundryPackages([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [project, projectId, view]);
 
   async function saveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -283,7 +311,9 @@ export function ProjectWorkspace({
     blockSaveInFlightRef.current = true;
     setBlockSaveStatus("saving");
     const endpoint = draft.id ? `/api/blocks/${draft.id}` : `/api/projects/${projectId}/blocks`;
+    const existingBlock = draft.id ? blocks.find((block) => block.id === draft.id) : null;
     const meta = JSON.stringify({
+      ...(existingBlock ? readObject(existingBlock.meta) : {}),
       plotId: draft.plotId,
       characterIds: draft.characterIds,
       documentIds: draft.documentIds,
@@ -535,7 +565,11 @@ export function ProjectWorkspace({
         belongsToPlot(item.meta, activePlot.id, readPlotMeta(activePlot).isDefault),
     );
     const endpoint = existing ? `/api/items/${existing.id}` : `/api/projects/${projectId}/items`;
-    const meta = JSON.stringify({ act: actDraft.act, plotId: activePlot.id });
+    const meta = JSON.stringify({
+      ...(existing ? readObject(existing.meta) : {}),
+      act: actDraft.act,
+      plotId: activePlot.id,
+    });
     const response = await fetch(endpoint, {
       method: existing ? "PATCH" : "POST",
       headers: { "content-type": "application/json" },
@@ -557,6 +591,51 @@ export function ProjectWorkspace({
       if (data.item) setItems((current) => [...current, data.item]);
     }
     setActDraft(null);
+  }
+
+  async function syncFoundryProjection() {
+    if (!project || foundrySyncing) return;
+    const activeSync = activePlot ? readFoundrySyncInfo(activePlot.meta) : null;
+    const canonPackage = foundryPackages.find((item) => item.workSlug === activeSync?.workSlug)
+      ?? foundryPackages.find((item) => item.title.trim() === project.title.trim());
+    if (!canonPackage) {
+      setFoundrySyncMessage("작품 제목과 일치하는 Foundry 정본이 없음.");
+      return;
+    }
+    setFoundrySyncing(true);
+    setFoundrySyncMessage("");
+    try {
+      const response = await fetch(`/api/projects/${projectId}/foundry-sync`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ workSlug: canonPackage.workSlug }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Foundry 동기화 실패");
+      const workspaceResponse = await fetch(`/api/projects/${projectId}/workspace`);
+      if (!workspaceResponse.ok) throw new Error("동기화 결과 새로고침 실패");
+      const snapshot = await workspaceResponse.json() as WorkspaceSnapshot;
+      setProject(snapshot.project);
+      setBlocks(snapshot.blocks);
+      setItems(snapshot.items);
+      workspaceCache.set(projectId, snapshot);
+      setActivePlotId(data.report.plotId);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("plot", data.report.plotId);
+        window.history.replaceState(window.history.state, "", url);
+      }
+      const changed = data.report.created + data.report.updated;
+      setFoundrySyncMessage(
+        data.report.conflicts.length
+          ? `${changed}개 반영 · 편집 충돌 ${data.report.conflicts.length}개 보존`
+          : `${changed}개 반영 · ${data.report.unchanged}개 최신`,
+      );
+    } catch (error) {
+      setFoundrySyncMessage(error instanceof Error ? error.message : "Foundry 동기화 실패");
+    } finally {
+      setFoundrySyncing(false);
+    }
   }
 
   async function createAct() {
@@ -809,6 +888,14 @@ export function ProjectWorkspace({
             onNewAct={() => void createAct()}
             onDrag={setDraggedBlock}
             onDrop={moveBlock}
+            foundryPackage={
+              foundryPackages.find((item) => item.workSlug === readFoundrySyncInfo(activePlot.meta)?.workSlug)
+              ?? foundryPackages.find((item) => item.title.trim() === project.title.trim())
+              ?? null
+            }
+            foundrySyncing={foundrySyncing}
+            foundrySyncMessage={foundrySyncMessage}
+            onSyncFoundry={() => void syncFoundryProjection()}
           />
         )}
         {view === "plot" && !activePlot && (
@@ -1459,7 +1546,7 @@ function Characters({
 function Plot(props: {
   plots: Item[];
   activePlot: Item;
-  columns: Array<{ act: number; title: string; body: string; blocks: Block[] }>;
+  columns: Array<{ act: number; title: string; body: string; meta: string; blocks: Block[] }>;
   creatingAct: boolean;
   menuOpen: boolean;
   draggedPlot: string | null;
@@ -1476,6 +1563,10 @@ function Plot(props: {
   onNewAct: () => void;
   onDrag: (id: string) => void;
   onDrop: (act: number) => void;
+  foundryPackage: FoundryPackageSummary | null;
+  foundrySyncing: boolean;
+  foundrySyncMessage: string;
+  onSyncFoundry: () => void;
 }) {
   const [collapsedActs, setCollapsedActs] = useState<number[]>([]);
   const boardScrollRef = useRef<HTMLDivElement | null>(null);
@@ -1563,12 +1654,23 @@ function Plot(props: {
             </div>
             <p>{props.activePlot.body || "TBD"}</p>
           </div>
+          {props.foundryPackage && (
+            <div className="foundry-sync-panel">
+              <span>FOUNDRY SSOT · {props.foundryPackage.currentBArc} / {props.foundryPackage.currentEpisode}</span>
+              <button type="button" disabled={props.foundrySyncing} onClick={props.onSyncFoundry}>
+                <ArrowsClockwise size={16} weight="bold" aria-hidden="true" />
+                {props.foundrySyncing ? "동기화 중…" : "정본 아크·화 동기화"}
+              </button>
+              {props.foundrySyncMessage && <small>{props.foundrySyncMessage}</small>}
+            </div>
+          )}
         </header>
 
         <div className="plot-board-scroll" ref={boardScrollRef} aria-label="아크 보드">
           <div className="plot-board">
             {props.columns.map((column) => {
               const collapsed = collapsedActs.includes(column.act);
+              const arcSync = readFoundrySyncInfo(column.meta);
               return (
                 <article
                   className={`act-column ${collapsed ? "collapsed" : ""}`}
@@ -1583,6 +1685,7 @@ function Plot(props: {
                     >
                       <strong>{column.title}</strong>
                       {!collapsed && <p>{column.body}</p>}
+                      {arcSync && <span className={`foundry-sync-state state-${arcSync.status}`}>{arcSync.status}</span>}
                     </button>
                     <div className="act-heading-actions">
                       <span className="act-count" aria-label={`${column.blocks.length}개 블록`}>{column.blocks.length}</span>
@@ -1602,10 +1705,12 @@ function Plot(props: {
                       <div className="block-stack">
                         {column.blocks.map((block) => {
                           const links = readBlockLinks(block.meta);
+                          const blockSync = readFoundrySyncInfo(block.meta);
                           return (
                             <button className="plot-card" key={block.id} draggable onDragStart={() => props.onDrag(block.id)} onClick={() => props.onInspectBlock(block)}>
                               <strong>{block.title}</strong>
                               <p>{block.body || "이 블록에서 벌어지는 사건을 적어."}</p>
+                              {blockSync && <span className={`foundry-sync-state state-${blockSync.status}`}>{blockSync.status === "committed" ? "정본 화" : "가설 화"}</span>}
                               {(links.characterIds.length > 0 || links.documentIds.length > 0) && (
                                 <span className="plot-card-links">인물 {links.characterIds.length} · 문서 {links.documentIds.length}</span>
                               )}
@@ -2405,6 +2510,19 @@ function readBlockLinks(meta: string) {
     plotId: typeof value.plotId === "string" && value.plotId ? value.plotId : null,
     characterIds: Array.isArray(value.characterIds) ? value.characterIds.filter((id): id is string => typeof id === "string") : [],
     documentIds: Array.isArray(value.documentIds) ? value.documentIds.filter((id): id is string => typeof id === "string") : [],
+  };
+}
+
+function readFoundrySyncInfo(meta: string) {
+  const value = readObject(meta).foundrySync;
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.workSlug !== "string" || typeof record.entityKey !== "string") return null;
+  return {
+    workSlug: record.workSlug,
+    entityKey: record.entityKey,
+    status: typeof record.status === "string" ? record.status : "synced",
+    sourceCommit: typeof record.sourceCommit === "string" ? record.sourceCommit : "",
   };
 }
 

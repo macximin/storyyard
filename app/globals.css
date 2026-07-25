@@ -359,7 +359,7 @@ a { color: inherit; text-decoration: none; }
 }
 .new-plot-tab:hover { color: var(--ink); background: var(--yellow); }
 .plot-content { padding: 30px clamp(26px, 5vw, 74px) 0; }
-.plot-heading { margin-bottom: 30px; }
+.plot-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
 .plot-heading > div { max-width: 900px; }
 .plot-title-line { display: flex; align-items: center; gap: 7px; }
 .plot-title-line h1 {
@@ -369,6 +369,32 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: -.055em;
 }
 .plot-heading p { margin: 11px 0 0; color: #765648; font-size: .86rem; line-height: 1.55; }
+.foundry-sync-panel {
+  flex: 0 0 min(330px, 38%);
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+  padding: 13px;
+  border: 1px solid var(--ink);
+  background: #fffdf0;
+  box-shadow: 4px 4px 0 var(--yellow);
+}
+.foundry-sync-panel span { color: #756000; font-size: .63rem; font-weight: 900; letter-spacing: .055em; }
+.foundry-sync-panel button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid var(--ink);
+  border-radius: 4px;
+  background: var(--ink);
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+.foundry-sync-panel button:disabled { opacity: .55; cursor: wait; }
+.foundry-sync-panel small { color: #666; font-size: .64rem; line-height: 1.45; }
 .plot-menu-wrap { position: relative; }
 .plot-menu-trigger {
   width: 34px;
@@ -420,6 +446,21 @@ a { color: inherit; text-decoration: none; }
 .act-title-button { min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
 .act-title-button strong { font-size: .96rem; }
 .act-title-button p { min-height: 55px; margin: 9px 0 0; color: #666; font-size: .78rem; line-height: 1.5; }
+.foundry-sync-state {
+  width: max-content;
+  display: inline-block;
+  margin-top: 9px;
+  padding: 3px 6px;
+  border: 1px solid #b6b095;
+  border-radius: 10px;
+  background: #fff;
+  color: #716b51;
+  font-size: .58rem;
+  font-weight: 900;
+}
+.foundry-sync-state.state-active,
+.foundry-sync-state.state-committed { border-color: #5f846a; background: #eef8f1; color: #2d6240; }
+.foundry-sync-state.state-provisional { border-color: #b39300; background: #fff9d9; color: #756000; }
 .act-heading-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .act-count { display: grid; place-items: center; min-width: 26px; height: 26px; border-radius: 50%; background: var(--yellow); font-size: .72rem; font-weight: 900; }
 .act-collapse { padding: 3px 1px; border: 0; background: transparent; color: #888; font-size: .64rem; cursor: pointer; }
@@ -431,7 +472,17 @@ a { color: inherit; text-decoration: none; }
 .plot-card { width: 100%; padding: 15px; border: 1px solid #c9c9c9; border-radius: 5px; background: #fff; text-align: left; cursor: grab; }
 .plot-card:hover { border-color: var(--ink); box-shadow: 3px 3px 0 var(--yellow); }
 .plot-card strong { font-size: .88rem; }
-.plot-card p { margin: 9px 0 0; color: #666; font-size: .78rem; line-height: 1.55; }
+.plot-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 9px 0 0;
+  color: #666;
+  font-size: .78rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
 .plot-card-links { display: inline-block; margin-top: 11px; padding: 3px 6px; background: var(--yellow); color: #625100; font-size: .65rem; font-weight: 800; }
 .add-block { width: 100%; margin-top: 8px; padding: 12px 7px; border: 0; background: transparent; color: #777; text-align: left; font-size: .78rem; font-weight: 800; cursor: pointer; }
 .add-block:hover { color: var(--ink); background: var(--yellow); }
@@ -1042,6 +1093,8 @@ a { color: inherit; text-decoration: none; }
   .plot-page { padding-bottom: 55px; }
   .plot-tabs-scroll { padding-left: 10px; padding-right: 10px; }
   .plot-content { padding: 25px 18px 0; }
+  .plot-heading { align-items: stretch; flex-direction: column; }
+  .foundry-sync-panel { width: 100%; max-width: none; }
   .act-column { flex-basis: min(82vw, 340px); }
   .act-column.collapsed { flex-basis: 104px; }
   .library-header, .page-header { align-items: start; flex-direction: column; }

@@ -211,3 +211,47 @@ test("ships an admin-only Foundry canon review board with pending decisions", as
     assert.match(canonPackage, new RegExp(hash));
   }
 });
+
+test("projects Foundry B-Rail arcs into one Storyyard block per episode without reverse sync", async () => {
+  const [canonSource, syncRoute, workspace, exporter] = await Promise.all([
+    read("data/canon/afterlife_restaurant.json"),
+    read("app/api/projects/[id]/foundry-sync/route.ts"),
+    read("app/project-workspace.tsx"),
+    read("scripts/export-firefly-canon-package.mjs"),
+  ]);
+  const canonPackage = JSON.parse(canonSource);
+  const projection = canonPackage.storyyardProjection;
+  assert.equal(projection.mappingVersion, "foundry_storyyard_arc_episode_v1");
+  assert.equal(projection.arcUnit, "b_rail_arc");
+  assert.equal(projection.blockUnit, "episode");
+  assert.equal(projection.reverseSync, false);
+  assert.deepEqual(
+    projection.arcs.map((item) => [item.bId, item.status]),
+    [["B001", "closed"], ["B002", "active"], ["B003", "provisional"]],
+  );
+  assert.deepEqual(
+    projection.episodeBlocks.map((item) => [item.episode, item.bId, item.status]),
+    [
+      ["ep001", "B001", "committed"],
+      ["ep002", "B001", "committed"],
+      ["ep003", "B001", "committed"],
+      ["ep004", "B002", "provisional"],
+      ["ep005", "B002", "provisional"],
+      ["ep006", "B002", "provisional"],
+    ],
+  );
+  assert.equal(
+    new Set(projection.episodeBlocks.map((item) => item.episode)).size,
+    projection.episodeBlocks.length,
+  );
+  assert.match(exporter, /committedEpisodeBets/);
+  assert.match(exporter, /parseProvisionalEpisodes/);
+  assert.match(syncRoute, /user\.role !== "admin"/);
+  assert.match(syncRoute, /projectedContentSha256/);
+  assert.match(syncRoute, /report\.conflicts\.push/);
+  assert.match(syncRoute, /reverseSync: false/);
+  assert.doesNotMatch(syncRoute, /\.delete\(|DELETE FROM/);
+  assert.match(workspace, /정본 아크·화 동기화/);
+  assert.match(workspace, /\.\.\.\(existingBlock \? readObject\(existingBlock\.meta\) : \{\}\)/);
+  assert.match(workspace, /\.\.\.\(existing \? readObject\(existing\.meta\) : \{\}\)/);
+});

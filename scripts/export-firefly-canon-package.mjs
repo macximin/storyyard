@@ -27,6 +27,10 @@ const definitions = [
   ["adoption_review", "1~3화 승격 영수증", "review", "05_review/ep001-003_adoption_review.md", "owner_approved"],
   ["narrative_state", "Narrative State", "state", "08_state/narrative_state.yaml", "derived_projection"],
 ];
+const committedEpisodeBets = ["ep001", "ep002", "ep003"].map((episode) => ({
+  episode,
+  relativePath: `03_episode_bet/${episode}_episode_bet.md`,
+}));
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -116,8 +120,56 @@ function parseBRail(source) {
   });
 }
 
+function episodeNumber(value) {
+  return Number(value.replace(/^ep/, "")) || 0;
+}
+
+function compactArcTitle(bArc) {
+  const summary = bArc.narrativeFunction.replace(/[.。]\s*$/, "").trim();
+  const leadingPhrase = summary.split(/으로|[를을] 통해|하고/)[0]?.trim() ?? "";
+  const candidate = leadingPhrase.length >= 6 ? leadingPhrase : summary;
+  const compact = candidate.length > 26 ? `${candidate.slice(0, 26).trim()}…` : candidate;
+  return `${bArc.id} · ${compact}`;
+}
+
+function episodeArcId(episode, bArcs) {
+  const number = episodeNumber(episode);
+  return bArcs.find((bArc) => {
+    const start = episodeNumber(bArc.startEpisode);
+    const end = episodeNumber(bArc.endEpisode);
+    return start > 0 && end >= start && number >= start && number <= end;
+  })?.id ?? "";
+}
+
+function parseProvisionalEpisodes(source) {
+  const currentBArc = source.match(/current_b_arc:\s*\n\s+b_id:\s*(B\d+)/m)?.[1] ?? "";
+  const hypothesisSource = source
+    .split(/^## 현재 B 회차 가설\s*$/m)[1]
+    ?.split(/^## 회차 가치 순환\s*$/m)[0]
+    ?.trim() ?? "";
+  if (!currentBArc || !hypothesisSource) return [];
+  return hypothesisSource.split(/\n(?=###\s+ep\d+\s+—\s+)/).flatMap((chunk) => {
+    const match = chunk.match(/^###\s+(ep\d+)\s+—\s+(.+)\n+([\s\S]+)$/);
+    if (!match) return [];
+    const [, episode, title, body] = match;
+    const normalizedBody = body.trim();
+    return [{
+      episode,
+      bId: currentBArc,
+      title: `${episode} · ${title.trim()}`,
+      body: normalizedBody,
+      status: "provisional",
+      authority: "owner_approved_story_plan_hypothesis",
+      sourcePath: `${foundryWorkPath}/02_story/rolling_corridor.md#${episode}`,
+      sourceSha256: sha256(`${title.trim()}\n${normalizedBody}`),
+      sortOrder: episodeNumber(episode) * 100,
+    }];
+  });
+}
+
 const sourcePaths = [
   ...definitions.map(([, , , relativePath]) => `${foundryWorkPath}/${relativePath}`),
+  ...committedEpisodeBets.map(({ relativePath }) => `${foundryWorkPath}/${relativePath}`),
   manifestRelativePath,
 ];
 const sourceGitCommit = git("rev-parse", "HEAD");
@@ -144,6 +196,15 @@ const artifactRows = await Promise.all(definitions.map(async ([key, label, kind,
   };
 }));
 const artifactByKey = Object.fromEntries(artifactRows.map((artifact) => [artifact.key, artifact]));
+const episodeBetRows = await Promise.all(committedEpisodeBets.map(async ({ episode, relativePath }) => {
+  const body = await readFile(path.join(workRoot, relativePath), "utf8");
+  return {
+    episode,
+    relativePath,
+    body,
+    sourceSha256: sha256(body),
+  };
+}));
 const manifest = await readFile(path.join(workRoot, "04_manuscript/manifest.yaml"), "utf8");
 const status = parseStatus(artifactByKey.status.body);
 const adoptionReceipt = artifactByKey.adoption_review.body;
@@ -194,6 +255,42 @@ if (!adoptionReceipt.includes(`승인 revision-set SHA-256: \`${declaredRevision
   throw new Error("Canon export refused: adoption receipt does not attest the manifest revision set.");
 }
 
+const anchors = parseAnchors(artifactByKey.a_rail.body);
+const bArcs = parseBRail(artifactByKey.b_rail.body);
+const projectedArcs = bArcs
+  .filter((bArc) => ["closed", "active", "provisional"].includes(bArc.status))
+  .map((bArc) => ({
+    bId: bArc.id,
+    routeOrder: bArc.order,
+    status: bArc.status,
+    targetAnchor: bArc.targetAnchor,
+    title: compactArcTitle(bArc),
+    body: [
+      `상태: ${bArc.status}`,
+      `목표 앵커: ${bArc.targetAnchor}`,
+      `서사 기능: ${bArc.narrativeFunction}`,
+      `보상 축: ${bArc.payoffAxis}`,
+      `이어받은 독자 부채: ${bArc.readerDebt}`,
+      `대비 조건: ${bArc.contrast}`,
+    ].join("\n"),
+    sourceSha256: sha256(JSON.stringify(bArc)),
+  }));
+const committedBlocks = episodeBetRows.map((row) => ({
+  episode: row.episode,
+  bId: episodeArcId(row.episode, bArcs),
+  title: `${row.episode} · 화별 약속`,
+  body: row.body,
+  status: "committed",
+  authority: "owner_approved",
+  sourcePath: `${foundryWorkPath}/${row.relativePath}`,
+  sourceSha256: row.sourceSha256,
+  sortOrder: episodeNumber(row.episode) * 100,
+}));
+if (committedBlocks.some((block) => !block.bId)) {
+  throw new Error("Canon export refused: every committed Episode Bet must belong to a closed B-Rail arc.");
+}
+const provisionalBlocks = parseProvisionalEpisodes(artifactByKey.rolling_corridor.body);
+
 const packageWithoutHash = {
   schemaVersion: "firefly_story_package_v1",
   workSlug,
@@ -208,8 +305,16 @@ const packageWithoutHash = {
     excludes: ["30_materials", "unapproved ep004+", "automatic Foundry mutation"],
   },
   status,
-  anchors: parseAnchors(artifactByKey.a_rail.body),
-  bArcs: parseBRail(artifactByKey.b_rail.body),
+  anchors,
+  bArcs,
+  storyyardProjection: {
+    mappingVersion: "foundry_storyyard_arc_episode_v1",
+    arcUnit: "b_rail_arc",
+    blockUnit: "episode",
+    reverseSync: false,
+    arcs: projectedArcs,
+    episodeBlocks: [...committedBlocks, ...provisionalBlocks],
+  },
   artifacts: artifactRows,
 };
 const output = {

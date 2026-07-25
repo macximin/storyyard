@@ -13,6 +13,28 @@ export type CanonArtifact = {
   body: string;
 };
 
+export type StoryyardProjectionArc = {
+  bId: string;
+  routeOrder: number;
+  status: string;
+  targetAnchor: string;
+  title: string;
+  body: string;
+  sourceSha256: string;
+};
+
+export type StoryyardProjectionEpisode = {
+  episode: string;
+  bId: string;
+  title: string;
+  body: string;
+  status: "committed" | "provisional";
+  authority: "owner_approved" | "owner_approved_story_plan_hypothesis";
+  sourcePath: string;
+  sourceSha256: string;
+  sortOrder: number;
+};
+
 export type CanonPackage = {
   schemaVersion: "firefly_story_package_v1";
   workSlug: string;
@@ -60,6 +82,14 @@ export type CanonPackage = {
     startEpisode: string;
     endEpisode: string;
   }>;
+  storyyardProjection: {
+    mappingVersion: "foundry_storyyard_arc_episode_v1";
+    arcUnit: "b_rail_arc";
+    blockUnit: "episode";
+    reverseSync: false;
+    arcs: StoryyardProjectionArc[];
+    episodeBlocks: StoryyardProjectionEpisode[];
+  };
   artifacts: CanonArtifact[];
 };
 

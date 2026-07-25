@@ -118,6 +118,21 @@ Decisions are recorded in `canon_decisions` with the exact bundle and artifact
 SHA-256. An external, separately authorized apply worker may later consume
 pending decisions; that worker is intentionally outside Storyyard.
 
+### Foundry arc and episode projection
+
+An administrator who owns a Storyyard project with the same title as a bundled
+canon package can use `정본 아크·화 동기화` from the plot board. The projection
+creates a separate `Foundry · <title>` plot and maps:
+
+- one closed, active, or provisional B-Rail entry to one Storyyard arc;
+- one committed or current-corridor episode to one Storyyard block;
+- `work_slug + B ID + episode ID` to stable upstream identities in metadata.
+
+The projection never deletes Storyyard content and never writes back to
+Foundry. Source commit and hashes are retained. If a projected arc or episode
+was edited locally after the last sync, the next sync reports a conflict and
+preserves the local edit instead of overwriting it.
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
