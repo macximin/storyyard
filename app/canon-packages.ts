@@ -1,4 +1,5 @@
 import afterlifeRestaurant from "@/data/canon/afterlife_restaurant.json";
+import knightsRestaurant from "@/data/canon/knights_restaurant.json";
 
 export type CanonDecisionValue = "approve" | "conditional" | "revise" | "reject";
 export type CanonDecisionStatus = "pending" | "applied" | "stale" | "rejected";
@@ -42,6 +43,7 @@ export type CanonPackage = {
   workflowSchema: string;
   sourcePath: string;
   sourceGitCommit: string;
+  sourceState?: "committed" | "working_tree";
   sourceUpdatedAt: string;
   revisionSetSha256: string;
   bundleSha256: string;
@@ -95,6 +97,7 @@ export type CanonPackage = {
 
 const registry: Record<string, CanonPackage> = {
   afterlife_restaurant: afterlifeRestaurant as CanonPackage,
+  knights_restaurant: knightsRestaurant as CanonPackage,
 };
 
 export function getCanonPackage(workSlug: string): CanonPackage | null {
@@ -103,4 +106,13 @@ export function getCanonPackage(workSlug: string): CanonPackage | null {
 
 export function listCanonPackages(): CanonPackage[] {
   return Object.values(registry);
+}
+
+export function getSyncableCanonPackage(workSlug: string): CanonPackage | null {
+  const canonPackage = getCanonPackage(workSlug);
+  return canonPackage?.sourceState === "working_tree" ? null : canonPackage;
+}
+
+export function listSyncableCanonPackages(): CanonPackage[] {
+  return listCanonPackages().filter((canonPackage) => canonPackage.sourceState !== "working_tree");
 }

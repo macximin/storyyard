@@ -9,6 +9,7 @@ const foundryRoot = process.env.FOUNDRY_ROOT
   ? path.resolve(process.env.FOUNDRY_ROOT)
   : path.resolve(storyyardRoot, "../company_firefly_studio/edge_repos/company_ff_foundry");
 const workSlug = process.env.WORK_SLUG || "afterlife_restaurant";
+const allowWorkingTree = process.env.CANON_ALLOW_WORKTREE === "1";
 const workRoot = path.join(foundryRoot, "40_works", workSlug);
 const outputPath = path.join(storyyardRoot, "data", "canon", `${workSlug}.json`);
 const foundryWorkPath = `40_works/${workSlug}`;
@@ -173,14 +174,21 @@ const sourcePaths = [
   manifestRelativePath,
 ];
 const sourceGitCommit = git("rev-parse", "HEAD");
+let sourceState = "committed";
 try {
   git("ls-files", "--error-unmatch", "--", ...sourcePaths);
 } catch {
-  throw new Error("Canon export refused: every included Foundry source must be tracked by Git.");
+  if (!allowWorkingTree) {
+    throw new Error("Canon export refused: every included Foundry source must be tracked by Git.");
+  }
+  sourceState = "working_tree";
 }
 const sourceStatus = git("status", "--porcelain", "--untracked-files=all", "--", ...sourcePaths);
 if (sourceStatus) {
-  throw new Error(`Canon export refused: included Foundry sources have uncommitted changes.\n${sourceStatus}`);
+  if (!allowWorkingTree) {
+    throw new Error(`Canon export refused: included Foundry sources have uncommitted changes.\n${sourceStatus}`);
+  }
+  sourceState = "working_tree";
 }
 
 const artifactRows = await Promise.all(definitions.map(async ([key, label, kind, relativePath, authority]) => {
@@ -298,6 +306,7 @@ const packageWithoutHash = {
   workflowSchema: status.workflowSchema,
   sourcePath: `40_works/${workSlug}`,
   sourceGitCommit,
+  sourceState,
   sourceUpdatedAt: status.updatedAt,
   revisionSetSha256: declaredRevisionSet,
   scope: {
@@ -326,4 +335,5 @@ await mkdir(path.dirname(outputPath), { recursive: true });
 await writeFile(outputPath, `${JSON.stringify(output, null, 2)}\n`, "utf8");
 console.log(`Wrote ${path.relative(storyyardRoot, outputPath)}`);
 console.log(`bundle_sha256=${output.bundleSha256}`);
+console.log(`source_state=${output.sourceState}`);
 console.log(`artifacts=${output.artifacts.length}, b_arcs=${output.bArcs.length}, anchors=${output.anchors.length}`);

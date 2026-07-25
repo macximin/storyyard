@@ -9,7 +9,7 @@ import type { PublicWorkSnapshot } from "./public-work-data";
 
 type Work = PublicWorkSnapshot["work"];
 type PublicTab = "manuscript" | "characters" | "documents" | "plots";
-type PublicContent = { sourceId: string; kind: string; parentSourceId: string; sortOrder: number; title: string; body: string; meta: string };
+type PublicContent = PublicWorkSnapshot["content"][number];
 
 export function PublicWork({
   user,
@@ -23,25 +23,9 @@ export function PublicWork({
   const [work, setWork] = useState<Work | null>(initialSnapshot?.work ?? null);
   const episodes = initialSnapshot?.episodes ?? [];
   const comments = initialSnapshot?.comments ?? [];
+  const content = initialSnapshot?.content ?? [];
   const [message, setMessage] = useState(initialSnapshot ? "" : "작품을 찾지 못했음.");
   const [activeTab, setActiveTab] = useState<PublicTab>("manuscript");
-  const [content, setContent] = useState<Partial<Record<Exclude<PublicTab, "manuscript">, PublicContent[]>>>({});
-  const [loadingTab, setLoadingTab] = useState<Exclude<PublicTab, "manuscript"> | null>(null);
-
-  async function selectTab(nextTab: PublicTab) {
-    setActiveTab(nextTab);
-    if (!work || nextTab === "manuscript" || content[nextTab]) return;
-    setLoadingTab(nextTab);
-    try {
-      const response = await fetch(`/api/community/${work.id}/content?type=${nextTab}`);
-      const data = response.ok ? await response.json() : { content: [] };
-      setContent((current) => ({ ...current, [nextTab]: data.content ?? [] }));
-    } catch {
-      setContent((current) => ({ ...current, [nextTab]: [] }));
-    } finally {
-      setLoadingTab((current) => current === nextTab ? null : current);
-    }
-  }
 
   async function toggleFavorite() {
     if (!user || !work) return setMessage("선호작은 로그인 후 사용할 수 있음.");
@@ -79,15 +63,15 @@ export function PublicWork({
           </header>
 
           <nav className="public-content-tabs" aria-label="작품 공개 정보">
-            <TabButton tab="manuscript" active={activeTab} onClick={selectTab}>원고</TabButton>
-            <TabButton tab="characters" active={activeTab} onClick={selectTab}>등장인물</TabButton>
-            <TabButton tab="documents" active={activeTab} onClick={selectTab}>자료실</TabButton>
-            <TabButton tab="plots" active={activeTab} onClick={selectTab}>플롯</TabButton>
+            <TabButton tab="manuscript" active={activeTab} onClick={setActiveTab}>원고</TabButton>
+            <TabButton tab="characters" active={activeTab} onClick={setActiveTab}>등장인물</TabButton>
+            <TabButton tab="documents" active={activeTab} onClick={setActiveTab}>자료실</TabButton>
+            <TabButton tab="plots" active={activeTab} onClick={setActiveTab}>플롯</TabButton>
           </nav>
           {activeTab === "manuscript" && <Manuscripts episodes={episodes} slug={work.slug} />}
-          {activeTab === "characters" && <PublicCharacters content={content.characters ?? []} loading={loadingTab === "characters"} />}
-          {activeTab === "documents" && <PublicDocuments content={content.documents ?? []} loading={loadingTab === "documents"} />}
-          {activeTab === "plots" && <PublicPlots content={content.plots ?? []} loading={loadingTab === "plots"} />}
+          {activeTab === "characters" && <PublicCharacters content={content.filter((item) => item.kind === "character")} />}
+          {activeTab === "documents" && <PublicDocuments content={content.filter((item) => item.kind === "document")} />}
+          {activeTab === "plots" && <PublicPlots content={content} />}
 
           <CommentThread publicationId={work.id} initialComments={comments} user={user} title="작품 댓글" />
         </>}
@@ -101,11 +85,10 @@ function TabButton({ tab, active, onClick, children }: { tab: PublicTab; active:
 }
 
 function Manuscripts({ episodes, slug }: { episodes: PublicWorkSnapshot["episodes"]; slug: string }) {
-  return <section className="episode-section"><div className="section-title"><div><p className="kicker">MANUSCRIPT</p><h2>공개 원고</h2></div><span>{episodes.length}편</span></div><div className="episode-list">{episodes.map((episode) => <article className="episode-card" key={episode.id}><Link className="episode-heading" href={`/works/${slug}/episodes/${episode.episode_no}`} prefetch={false}><span>{episode.episode_no}화</span><strong>{episode.title}</strong><small>읽기 →</small></Link></article>)}</div></section>;
+  return <section className="episode-section"><div className="section-title"><div><p className="kicker">MANUSCRIPT</p><h2>공개 원고</h2></div><span>{episodes.length}편</span></div><div className="episode-list">{episodes.map((episode) => <article className="episode-card" key={episode.id}><Link className="episode-heading" href={`/works/${slug}/episodes/${episode.episode_no}`}><span>{episode.episode_no}화</span><strong>{episode.title}</strong><small>읽기 →</small></Link></article>)}</div></section>;
 }
 
-function PublicCharacters({ content, loading }: { content: PublicContent[]; loading: boolean }) {
-  if (loading) return <PublicContentState label="등장인물 정보를 불러오는 중…" />;
+function PublicCharacters({ content }: { content: PublicContent[] }) {
   if (!content.length) return <PublicContentState label="공개된 등장인물 정보가 아직 없음." />;
   return <section className="public-content-section"><div className="section-title"><div><p className="kicker">CHARACTERS</p><h2>등장인물</h2></div><span>{content.length}명</span></div><div className="public-character-grid">{content.map((item) => {
     const meta = parseMeta(item.meta);
@@ -113,26 +96,57 @@ function PublicCharacters({ content, loading }: { content: PublicContent[]; load
   })}</div></section>;
 }
 
-function PublicDocuments({ content, loading }: { content: PublicContent[]; loading: boolean }) {
-  if (loading) return <PublicContentState label="자료실을 불러오는 중…" />;
+function PublicDocuments({ content }: { content: PublicContent[] }) {
   if (!content.length) return <PublicContentState label="공개된 자료가 아직 없음." />;
   return <section className="public-content-section"><div className="section-title"><div><p className="kicker">REFERENCE</p><h2>자료실</h2></div><span>{content.length}개</span></div><div className="public-document-list">{content.map((item) => <details key={item.sourceId}><summary>{item.title}</summary><p>{item.body || "내용 없음."}</p></details>)}</div></section>;
 }
 
-function PublicPlots({ content, loading }: { content: PublicContent[]; loading: boolean }) {
-  if (loading) return <PublicContentState label="공개 플롯을 불러오는 중…" />;
-  const plots = content.filter((item) => item.kind === "plot");
+function PublicPlots({ content }: { content: PublicContent[] }) {
+  const plots = content.filter((item) => item.kind === "plot").sort((left, right) => left.sortOrder - right.sortOrder);
+  const [activePlotId, setActivePlotId] = useState(plots[0]?.sourceId ?? "");
+  const [collapsedActs, setCollapsedActs] = useState<number[]>([]);
+  const [selectedBlock, setSelectedBlock] = useState<PublicContent | null>(null);
   if (!plots.length) return <PublicContentState label="공개된 플롯이 아직 없음." />;
-  return <section className="public-content-section"><div className="section-title"><div><p className="kicker">PLOT</p><h2>플롯</h2></div><span>{plots.length}개</span></div>{plots.map((plot) => {
-    const acts = content.filter((item) => item.kind === "act" && item.parentSourceId === plot.sourceId);
-    const blocks = content.filter((item) => item.kind === "block" && item.parentSourceId === plot.sourceId);
-    return <article className="public-plot" key={plot.sourceId}><h3>{plot.title}</h3>{plot.body && <p>{plot.body}</p>}{acts.map((act) => <section key={act.sourceId}><h4>{act.title}</h4>{act.body && <p>{act.body}</p>}<div>{blocks.filter((block) => parseMeta(block.meta).act === parseMeta(act.meta).act).map((block) => <article className="public-plot-block" key={block.sourceId}><strong>{block.title}</strong>{block.body && <p>{block.body}</p>}</article>)}</div></section>)}{blocks.filter((block) => !acts.some((act) => parseMeta(act.meta).act === parseMeta(block.meta).act)).map((block) => <article className="public-plot-block" key={block.sourceId}><strong>{block.title}</strong>{block.body && <p>{block.body}</p>}</article>)}</article>;
-  })}</section>;
+  const activePlot = plots.find((plot) => plot.sourceId === activePlotId) ?? plots[0];
+  const acts = content.filter((item) => item.kind === "act" && item.parentSourceId === activePlot.sourceId).sort((left, right) => parseMeta(left.meta).act - parseMeta(right.meta).act);
+  const blocks = content.filter((item) => item.kind === "block" && item.parentSourceId === activePlot.sourceId);
+  const actNumbers = [...new Set([...acts.map((act) => parseMeta(act.meta).act), ...blocks.map((block) => parseMeta(block.meta).act)])].filter(Boolean).sort((a, b) => a - b);
+  return <section className="public-content-section public-plot-board">
+    <div className="plot-tabs-bar" role="tablist" aria-label="공개 플롯">
+      {plots.map((plot) => <button key={plot.sourceId} role="tab" aria-selected={plot.sourceId === activePlot.sourceId} className={plot.sourceId === activePlot.sourceId ? "active" : ""} onClick={() => setActivePlotId(plot.sourceId)}>{plot.title}</button>)}
+    </div>
+    <div className="section-title"><div><p className="kicker">PLOT BOARD</p><h2>{activePlot.title}</h2>{activePlot.body && <p>{activePlot.body}</p>}</div><span>{blocks.length}개 블록</span></div>
+    <div className="plot-board">
+      {actNumbers.map((actNumber) => {
+        const act = acts.find((item) => parseMeta(item.meta).act === actNumber);
+        const collapsed = collapsedActs.includes(actNumber);
+        return <section className={`act-column ${collapsed ? "collapsed" : ""}`} key={actNumber}>
+          <header className="act-heading">
+            <button type="button" className="act-title-button" onClick={() => setCollapsedActs((current) => current.includes(actNumber) ? current.filter((value) => value !== actNumber) : [...current, actNumber])}>{act?.title || `${actNumber}아크`}</button>
+            <span>{blocks.filter((block) => parseMeta(block.meta).act === actNumber).length}</span>
+          </header>
+          {!collapsed && <div className="plot-card-list">{blocks.filter((block) => parseMeta(block.meta).act === actNumber).sort((left, right) => left.sortOrder - right.sortOrder).map((block) => {
+            const meta = parseMeta(block.meta);
+            return <button type="button" className="plot-card public" key={block.sourceId} onClick={() => setSelectedBlock(block)}>
+              <strong>{block.title}</strong>
+              {meta.status && <span className={`sync-status ${meta.status}`}>{meta.status}</span>}
+              {block.body && <p>{preview(block.body)}</p>}
+            </button>;
+          })}</div>}
+        </section>;
+      })}
+    </div>
+    {selectedBlock && <div className="public-plot-detail-backdrop" role="presentation" onClick={() => setSelectedBlock(null)}><article className="public-plot-detail" role="dialog" aria-modal="true" aria-label={selectedBlock.title} onClick={(event) => event.stopPropagation()}><button type="button" className="public-plot-detail-close" onClick={() => setSelectedBlock(null)}>닫기</button><p className="kicker">PLOT BLOCK</p><h2>{selectedBlock.title}</h2><div>{selectedBlock.body || "내용 없음."}</div></article></div>}
+  </section>;
 }
 
 function PublicContentState({ label }: { label: string }) { return <section className="public-content-section"><div className="public-content-empty">{label}</div></section>; }
 
-function parseMeta(value: string): { tags: string[]; fields: Array<{ id: string; label: string; value: string }>; act: number } {
+function preview(value: string) {
+  return value.length > 320 ? `${value.slice(0, 320).trimEnd()}…` : value;
+}
+
+function parseMeta(value: string): { tags: string[]; fields: Array<{ id: string; label: string; value: string }>; act: number; status: string } {
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     return {
@@ -143,8 +157,9 @@ function parseMeta(value: string): { tags: string[]; fields: Array<{ id: string;
         return typeof item.id === "string" ? [{ id: item.id, label: typeof item.label === "string" ? item.label : "", value: typeof item.value === "string" ? item.value : "" }] : [];
       }) : [],
       act: typeof parsed.act === "number" ? parsed.act : 0,
+      status: typeof parsed.status === "string" ? parsed.status : "",
     };
-  } catch { return { tags: [], fields: [], act: 0 }; }
+  } catch { return { tags: [], fields: [], act: 0, status: "" }; }
 }
 
 function RatingPicker({ value, onRate, compact = false }: { value: number; onRate: (value: number) => void; compact?: boolean }) {

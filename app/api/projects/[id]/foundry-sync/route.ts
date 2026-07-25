@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getSessionTokenHash } from "@/app/chatgpt-auth";
-import { getCanonPackage, listCanonPackages } from "@/app/canon-packages";
+import { getSyncableCanonPackage, listSyncableCanonPackages } from "@/app/canon-packages";
 import { plotBlocks, projectItems } from "@/db/schema";
 
 type JsonObject = Record<string, unknown>;
@@ -123,7 +123,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       : [];
   });
   return Response.json({
-    packages: listCanonPackages().map((canonPackage) => ({
+    packages: listSyncableCanonPackages().map((canonPackage) => ({
       workSlug: canonPackage.workSlug,
       title: canonPackage.title,
       sourceCommit: canonPackage.sourceGitCommit,
@@ -141,8 +141,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if ("error" in access) return Response.json({ error: access.error }, { status: access.status });
 
   const input = await request.json().catch(() => null) as { workSlug?: string } | null;
-  const canonPackage = getCanonPackage(input?.workSlug?.trim() ?? "");
-  if (!canonPackage) return Response.json({ error: "등록되지 않은 캐논 패키지임." }, { status: 404 });
+  const canonPackage = getSyncableCanonPackage(input?.workSlug?.trim() ?? "");
+  if (!canonPackage) return Response.json({ error: "커밋된 정본만 Storyyard 플롯으로 동기화할 수 있음." }, { status: 409 });
   if (
     canonPackage.storyyardProjection.mappingVersion !== "foundry_storyyard_arc_episode_v1"
     || canonPackage.storyyardProjection.blockUnit !== "episode"

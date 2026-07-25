@@ -82,11 +82,11 @@ test("batches authenticated workspace reads and primes Foundry packages on the p
   assert.match(workspaceData, /requireAuthenticatedWorkspace/);
   assert.doesNotMatch(workspaceRoute, /getChatGPTUser/);
   assert.match(plotPage, /initialFoundryPackages/);
-  assert.match(plotPage, /listCanonPackages/);
+  assert.match(plotPage, /listSyncableCanonPackages/);
   assert.match(workspace, /initialFoundryPackages !== undefined/);
 });
 
-test("avoids duplicate route prefetches and shows navigation progress", async () => {
+test("uses route prefetching and shows navigation progress", async () => {
   const [sidebar, work, reader, library, workspace, progress, layout] = await Promise.all([
     read("app/global-sidebar.tsx"),
     read("app/public-work.tsx"),
@@ -97,9 +97,9 @@ test("avoids duplicate route prefetches and shows navigation progress", async ()
     read("app/layout.tsx"),
   ]);
   assert.doesNotMatch(`${work}\n${reader}\n${library}\n${workspace}`, /router\.prefetch/);
-  assert.match(sidebar, /prefetch=\{false\}/);
-  assert.match(work, /prefetch=\{false\}/);
-  assert.match(reader, /prefetch=\{false\}/);
+  assert.doesNotMatch(sidebar, /prefetch=\{false\}/);
+  assert.doesNotMatch(work, /prefetch=\{false\}/);
+  assert.doesNotMatch(reader, /prefetch=\{false\}/);
   assert.match(progress, /storyyard:navigation-start/);
   assert.match(layout, /NavigationProgress/);
   assert.doesNotMatch(layout, /Geist_Mono|Geist\(/);
@@ -120,7 +120,7 @@ test("keeps credentials out of browser storage and uses durable secure sessions"
   assert.match(schema, /passwordHash/);
 });
 
-test("publishes only selected manuscript and planning snapshots", async () => {
+test("publishes the entire workspace and renders public planning snapshots immediately", async () => {
   const [schema, publicationRoute, contentRoute, projectRoute, workspace, publicWork] = await Promise.all([
     read("db/schema.ts"),
     read("app/api/projects/[id]/publication/route.ts"),
@@ -134,16 +134,18 @@ test("publishes only selected manuscript and planning snapshots", async () => {
   assert.match(publicationRoute, /INSERT INTO publication_episodes/);
   assert.match(publicationRoute, /INSERT INTO publication_content/);
   assert.match(publicationRoute, /characterFieldIds/);
+  assert.match(publicationRoute, /publishAll/);
   assert.match(publicationRoute, /validItemKinds/);
   assert.match(contentRoute, /p\.status = 'published'/);
   assert.match(projectRoute, /UPDATE publications SET title = \?, logline = \?, genre = \?/);
-  for (const label of ["공개할 원고", "공개할 등장인물", "공개할 자료", "공개할 플롯"]) {
-    assert.match(workspace, new RegExp(label));
-  }
+  assert.match(workspace, /전체 공개본 갱신/);
+  assert.match(workspace, /publishAll: true/);
   for (const tab of ["원고", "등장인물", "자료실", "플롯"]) {
     assert.match(publicWork, new RegExp(`>${tab}<`));
   }
-  assert.match(publicWork, /fetch\(`\/api\/community\/\$\{work\.id\}\/content\?type=\$\{nextTab\}`\)/);
+  assert.doesNotMatch(publicWork, /\/content\?type=/);
+  assert.match(publicWork, /className="plot-board"/);
+  assert.match(publicWork, /className="plot-card public"/);
 });
 
 test("cascades project deletion through public and private records", async () => {
@@ -184,8 +186,8 @@ test("opens manuscripts as dedicated episode pages with episode comments and del
   assert.match(schema, /episodeId/);
 });
 
-test("ships an admin-only Foundry canon review board with pending decisions", async () => {
-  const [page, board, route, schema, packages, sidebar, canonPackage, exporter] = await Promise.all([
+test("ships a multi-work admin-only Foundry canon review board with pending decisions", async () => {
+  const [page, board, route, schema, packages, sidebar, canonPackage, knightPackage, exporter] = await Promise.all([
     read("app/canon/page.tsx"),
     read("app/canon/canon-review-board.tsx"),
     read("app/api/canon/decisions/route.ts"),
@@ -193,6 +195,7 @@ test("ships an admin-only Foundry canon review board with pending decisions", as
     read("app/canon-packages.ts"),
     read("app/global-sidebar.tsx"),
     read("data/canon/afterlife_restaurant.json"),
+    read("data/canon/knights_restaurant.json"),
     read("scripts/export-firefly-canon-package.mjs"),
   ]);
   assert.match(page, /user\.role !== "admin"/);
@@ -209,6 +212,11 @@ test("ships an admin-only Foundry canon review board with pending decisions", as
   assert.match(board, /ArtifactReader artifact=\{artifacts\.b_rail\}/);
   assert.match(board, /sourceGitCommit/);
   assert.match(board, /pending 판정 기록/);
+  assert.match(board, /승격 준비 스냅샷/);
+  assert.match(packages, /knights_restaurant/);
+  assert.match(packages, /listSyncableCanonPackages/);
+  assert.match(knightPackage, /"title": "기사식당"/);
+  assert.match(knightPackage, /"sourceState": "working_tree"/);
   assert.match(route, /user\?\.role === "admin"/);
   assert.match(route, /artifact\.sha256 !== input\.artifactSha256/);
   assert.match(route, /status: "pending"/);

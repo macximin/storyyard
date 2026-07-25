@@ -1,4 +1,4 @@
-import { listCanonPackages } from "@/app/canon-packages";
+import { listSyncableCanonPackages } from "@/app/canon-packages";
 import { ProjectWorkspace, type FoundryPackageSummary } from "@/app/project-workspace";
 import { requireAuthenticatedWorkspace } from "@/app/workspace-data";
 
@@ -8,7 +8,7 @@ export default async function PlotPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const { user, initialSnapshot } = await requireAuthenticatedWorkspace(id, `/project/${id}/plot`);
   const initialFoundryPackages: FoundryPackageSummary[] = user.role === "admin"
-    ? listCanonPackages().map((canonPackage) => ({
+    ? listSyncableCanonPackages().map((canonPackage) => ({
       workSlug: canonPackage.workSlug,
       title: canonPackage.title,
       sourceCommit: canonPackage.sourceGitCommit,

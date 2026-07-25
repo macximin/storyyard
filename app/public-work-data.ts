@@ -30,13 +30,22 @@ export type PublicWorkSnapshot = {
     display_name: string;
     username: string;
   }>;
+  content: Array<{
+    sourceId: string;
+    kind: string;
+    parentSourceId: string;
+    sortOrder: number;
+    title: string;
+    body: string;
+    meta: string;
+  }>;
 };
 
 export async function getPublicWork(
   idOrSlug: string,
   userId = "",
 ): Promise<PublicWorkSnapshot | null> {
-  const [publicationResult, episodesResult, commentsResult] = await env.DB.batch([
+  const [publicationResult, episodesResult, commentsResult, contentResult] = await env.DB.batch([
     env.DB.prepare(
       `SELECT p.*,
             COALESCE((SELECT AVG(r.value) FROM ratings r WHERE r.publication_id = p.id), 0) AS rating_average,
@@ -69,6 +78,16 @@ export async function getPublicWork(
           AND c.status = 'visible'
         ORDER BY c.created_at DESC`,
     ).bind(idOrSlug, idOrSlug),
+    env.DB.prepare(
+      `SELECT source_id AS "sourceId", kind, parent_source_id AS "parentSourceId",
+              sort_order AS "sortOrder", title, body, meta
+         FROM publication_content
+        WHERE publication_id = (
+          SELECT id FROM publications
+           WHERE (id = ? OR slug = ?) AND status = 'published'
+        )
+        ORDER BY kind ASC, sort_order ASC`,
+    ).bind(idOrSlug, idOrSlug),
   ]);
   const publication = publicationResult.results?.[0] as Record<string, unknown> | undefined;
   if (!publication) return null;
@@ -92,5 +111,6 @@ export async function getPublicWork(
     },
     episodes: (episodesResult.results ?? []) as PublicWorkSnapshot["episodes"],
     comments: (commentsResult.results ?? []) as PublicWorkSnapshot["comments"],
+    content: (contentResult.results ?? []) as PublicWorkSnapshot["content"],
   };
 }

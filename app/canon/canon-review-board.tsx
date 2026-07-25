@@ -51,21 +51,24 @@ const viewLabels: Array<[ViewKey, string]> = [
 
 export function CanonReviewBoard({
   user,
-  canonPackage,
-  initialDecisions,
+  canonPackages,
+  initialDecisionSets,
 }: {
   user: Exclude<SidebarUser, null>;
-  canonPackage: CanonPackage;
-  initialDecisions: DecisionRow[];
+  canonPackages: CanonPackage[];
+  initialDecisionSets: Record<string, DecisionRow[]>;
 }) {
+  const [activeWorkSlug, setActiveWorkSlug] = useState(canonPackages[0]?.workSlug ?? "");
+  const canonPackage = canonPackages.find((item) => item.workSlug === activeWorkSlug) ?? canonPackages[0];
   const [view, setView] = useState<ViewKey>("overview");
   const [episode, setEpisode] = useState<"ep001" | "ep002" | "ep003">("ep001");
   const [selectedKey, setSelectedKey] = useState("__bundle__");
   const [selectedDecision, setSelectedDecision] = useState<CanonDecisionValue>("approve");
   const [comment, setComment] = useState("");
-  const [history, setHistory] = useState(initialDecisions);
+  const [histories, setHistories] = useState(initialDecisionSets);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const history = histories[canonPackage.workSlug] ?? [];
 
   const artifacts = useMemo(
     () => Object.fromEntries(canonPackage.artifacts.map((artifact) => [artifact.key, artifact])),
@@ -84,6 +87,14 @@ export function CanonReviewBoard({
     if (nextView === "overview") setSelectedKey("__bundle__");
     else if (nextView === "manuscripts") setSelectedKey(episode);
     else setSelectedKey(nextView);
+    setMessage("");
+  }
+
+  function selectWork(workSlug: string) {
+    setActiveWorkSlug(workSlug);
+    setView("overview");
+    setSelectedKey("__bundle__");
+    setEpisode("ep001");
     setMessage("");
   }
 
@@ -114,7 +125,10 @@ export function CanonReviewBoard({
         setMessage(data.error || "판정을 기록하지 못했음.");
         return;
       }
-      setHistory((current) => [data.decision!, ...current.filter((row) => row.id !== data.decision!.id)]);
+      setHistories((current) => ({
+        ...current,
+        [canonPackage.workSlug]: [data.decision!, ...(current[canonPackage.workSlug] ?? []).filter((row) => row.id !== data.decision!.id)],
+      }));
       setComment("");
       setMessage("판정을 pending으로 기록했음. Foundry에는 아직 반영되지 않음.");
     } catch {
@@ -128,18 +142,21 @@ export function CanonReviewBoard({
     <main className="library-shell canon-shell">
       <GlobalSidebar user={user} active="canon" />
       <section className="canon-main">
+        <nav className="canon-work-switcher" aria-label="확인할 작품">
+          {canonPackages.map((item) => <button type="button" key={item.workSlug} className={item.workSlug === canonPackage.workSlug ? "active" : ""} onClick={() => selectWork(item.workSlug)}><strong>{item.title}</strong><span>{item.sourceState === "working_tree" ? "승격 준비 스냅샷" : "커밋 정본"}</span></button>)}
+        </nav>
         <header className="canon-hero">
           <div>
             <p className="kicker">HUMAN CANON REVIEW · READ SNAPSHOT</p>
             <h1>{canonPackage.title}</h1>
             <p>Foundry 정본을 읽고 사람의 판정을 남기는 확인판. 여기서 원고나 Story Plan을 직접 고치지 않습니다.</p>
           </div>
-          <div className="canon-lock"><LockKey size={18} /><strong>Foundry SSOT</strong><span>자동 승격 꺼짐</span></div>
+          <div className="canon-lock"><LockKey size={18} /><strong>Foundry SSOT</strong><span>{canonPackage.sourceState === "working_tree" ? "동기화 잠김" : "자동 승격 꺼짐"}</span></div>
         </header>
 
         <div className="canon-integrity">
-          <span><Check size={15} weight="bold" /> 스냅샷 {canonPackage.sourceUpdatedAt}</span>
-          <code>source {canonPackage.sourceGitCommit.slice(0, 12)}…</code>
+          <span><Check size={15} weight="bold" /> {canonPackage.sourceState === "working_tree" ? "작업 스냅샷" : "커밋 스냅샷"} {canonPackage.sourceUpdatedAt}</span>
+          <code>{canonPackage.sourceState === "working_tree" ? "base" : "source"} {canonPackage.sourceGitCommit.slice(0, 12)}…</code>
           <code>bundle {canonPackage.bundleSha256.slice(0, 12)}…</code>
           <code>revision {canonPackage.revisionSetSha256.slice(0, 12)}…</code>
         </div>
@@ -158,7 +175,7 @@ export function CanonReviewBoard({
                   <StatusCard label="제작 단계" value={canonPackage.status.productionStage} detail={`현재 ${canonPackage.status.currentEpisode}`} />
                   <StatusCard label="승인 원고" value={`${canonPackage.status.approvedThrough}까지`} detail={`감리 ${canonPackage.status.reviewedThrough}`} />
                   <StatusCard label="현재 B" value={canonPackage.status.currentBArc} detail="한 아크 최대 5화" />
-                  <StatusCard label="다음 작업" value="ep004 Episode Bet" detail={canonPackage.status.nextAction} />
+                  <StatusCard label="다음 작업" value={canonPackage.status.currentEpisode} detail={canonPackage.status.nextAction} />
                 </div>
                 <section className="canon-section">
                   <div className="canon-section-head"><div><p className="kicker">STORY PLAN MODEL</p><h2>장기 방향과 단기 확정을 분리</h2></div></div>
@@ -182,7 +199,7 @@ export function CanonReviewBoard({
             {view === "a_rail" && (
               <section className="canon-section no-top">
                 <div className="canon-section-head">
-                  <div><p className="kicker">A-RAIL · LONG HORIZON</p><h2>8개 장기 앵커</h2><p>도착점은 보존하되, 실제 승인 원고에 맞춰 band와 중간 경로는 다시 계산합니다.</p></div>
+                  <div><p className="kicker">A-RAIL · LONG HORIZON</p><h2>{canonPackage.anchors.length}개 장기 앵커</h2><p>도착점은 보존하되, 실제 승인 원고에 맞춰 band와 중간 경로는 다시 계산합니다.</p></div>
                 </div>
                 <div className="anchor-grid">
                   {canonPackage.anchors.map((anchor) => (
@@ -203,7 +220,7 @@ export function CanonReviewBoard({
             {view === "b_rail" && (
               <section className="canon-section no-top">
                 <div className="canon-section-head">
-                  <div><p className="kicker">B-RAIL · ROUTE CAPACITY</p><h2>51개 가변 아크 슬롯</h2><p>현재·다음만 실행 후보입니다. hypothesis는 결말까지의 용량 골격이지 확정 연표가 아닙니다.</p></div>
+                  <div><p className="kicker">B-RAIL · ROUTE CAPACITY</p><h2>{canonPackage.bArcs.length}개 가변 아크 슬롯</h2><p>현재·다음만 실행 후보입니다. hypothesis는 결말까지의 용량 골격이지 확정 연표가 아닙니다.</p></div>
                   <div className="rail-counts"><span>closed {bArcCounts.closed ?? 0}</span><span>active {bArcCounts.active ?? 0}</span><span>provisional {bArcCounts.provisional ?? 0}</span><span>hypothesis {bArcCounts.hypothesis ?? 0}</span></div>
                 </div>
                 <div className="b-rail-list">

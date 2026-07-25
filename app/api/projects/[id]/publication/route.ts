@@ -46,6 +46,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const project = await ownedProject(projectId, user.email);
   if (!project) return Response.json({ error: "Not found" }, { status: 404 });
   const input = await request.json() as Partial<{
+    publishAll: boolean;
     coverUrl: string;
     authorName: string;
     episodeIds: string[];
@@ -56,18 +57,26 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     actIds: string[];
     blockIds: string[];
   }>;
-  const episodeIds = Array.isArray(input.episodeIds) ? input.episodeIds.filter(Boolean) : [];
+  const db = getDb();
+  const publishAll = input.publishAll === true;
+  const allManuscripts = publishAll
+    ? await db.select().from(manuscripts)
+      .where(eq(manuscripts.projectId, projectId))
+      .orderBy(asc(manuscripts.episodeNo))
+    : [];
+  const episodeIds = publishAll
+    ? allManuscripts.map((item) => item.id)
+    : Array.isArray(input.episodeIds) ? input.episodeIds.filter(Boolean) : [];
   if (!episodeIds.length) {
-    return Response.json({ error: "공개할 원고를 한 편 이상 골라 줘." }, { status: 400 });
+    return Response.json({ error: "공개할 원고가 아직 없음. 원고를 한 편 이상 작성해 줘." }, { status: 400 });
   }
-  const selected = await getDb().select().from(manuscripts)
+  const selected = publishAll ? allManuscripts : await db.select().from(manuscripts)
     .where(inArray(manuscripts.id, episodeIds))
     .orderBy(asc(manuscripts.episodeNo));
   if (selected.length !== episodeIds.length || selected.some((item) => item.projectId !== projectId)) {
     return Response.json({ error: "공개 원고 선택이 올바르지 않음." }, { status: 400 });
   }
 
-  const db = getDb();
   const [allItems, allBlocks] = await Promise.all([
     db.select().from(projectItems).where(eq(projectItems.projectId, projectId)),
     db.select().from(plotBlocks).where(eq(plotBlocks.projectId, projectId)).orderBy(asc(plotBlocks.act), asc(plotBlocks.sortOrder)),
@@ -75,11 +84,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const itemById = new Map(allItems.map((item) => [item.id, item]));
   const blockById = new Map(allBlocks.map((block) => [block.id, block]));
   const requested = {
-    characterIds: uniqueStrings(input.characterIds),
-    documentIds: uniqueStrings(input.documentIds),
-    plotIds: uniqueStrings(input.plotIds),
-    actIds: uniqueStrings(input.actIds),
-    blockIds: uniqueStrings(input.blockIds),
+    characterIds: publishAll ? allItems.filter((item) => item.kind === "character").map((item) => item.id) : uniqueStrings(input.characterIds),
+    documentIds: publishAll ? allItems.filter((item) => item.kind === "document").map((item) => item.id) : uniqueStrings(input.documentIds),
+    plotIds: publishAll ? allItems.filter((item) => item.kind === "plot").map((item) => item.id) : uniqueStrings(input.plotIds),
+    actIds: publishAll ? allItems.filter((item) => item.kind === "act").map((item) => item.id) : uniqueStrings(input.actIds),
+    blockIds: publishAll ? allBlocks.map((item) => item.id) : uniqueStrings(input.blockIds),
   };
   if (
     !validItemKinds(requested.characterIds, itemById, "character") ||
@@ -138,6 +147,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       allBlocks,
       requested,
       characterFieldIds: input.characterFieldIds ?? {},
+      includeAllCharacterFields: publishAll,
     }).map((item) =>
       env.DB.prepare(
         `INSERT INTO publication_content
@@ -197,7 +207,7 @@ function validItemKinds(ids: string[], items: Map<string, { kind: string }>, kin
   return ids.every((id) => items.get(id)?.kind === kind);
 }
 
-function readMeta(value: string): { plotId: string; act: number; tags: string[]; fields: Array<{ id: string; label: string; value: string }> } {
+function readMeta(value: string): { plotId: string; act: number; status: string; tags: string[]; fields: Array<{ id: string; label: string; value: string }> } {
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     const fields = Array.isArray(parsed.fields)
@@ -214,11 +224,16 @@ function readMeta(value: string): { plotId: string; act: number; tags: string[];
     return {
       plotId: typeof parsed.plotId === "string" ? parsed.plotId : "",
       act: typeof parsed.act === "number" ? parsed.act : 0,
+      status: typeof parsed.status === "string"
+        ? parsed.status
+        : parsed.foundrySync && typeof parsed.foundrySync === "object" && typeof (parsed.foundrySync as Record<string, unknown>).status === "string"
+          ? String((parsed.foundrySync as Record<string, unknown>).status)
+          : "",
       tags: Array.isArray(parsed.tags) ? parsed.tags.filter((tag): tag is string => typeof tag === "string") : [],
       fields,
     };
   } catch {
-    return { plotId: "", act: 0, tags: [], fields: [] };
+    return { plotId: "", act: 0, status: "", tags: [], fields: [] };
   }
 }
 
@@ -227,11 +242,13 @@ function buildContentSnapshots({
   allBlocks,
   requested,
   characterFieldIds,
+  includeAllCharacterFields,
 }: {
   allItems: Array<{ id: string; kind: string; title: string; body: string; meta: string }>;
   allBlocks: Array<{ id: string; act: number; title: string; body: string; meta: string; sortOrder: number }>;
   requested: { characterIds: string[]; documentIds: string[]; plotIds: string[]; actIds: string[]; blockIds: string[] };
   characterFieldIds: Record<string, string[]>;
+  includeAllCharacterFields: boolean;
 }): ContentRow[] {
   const result: ContentRow[] = [];
   const itemById = new Map(allItems.map((item) => [item.id, item]));
@@ -245,7 +262,7 @@ function buildContentSnapshots({
   requested.characterIds.forEach((id, index) => {
     const item = itemById.get(id)!;
     const meta = readMeta(item.meta);
-    const selectedFields = new Set(uniqueStrings(characterFieldIds[id]));
+    const selectedFields = new Set(includeAllCharacterFields ? meta.fields.map((field) => field.id) : uniqueStrings(characterFieldIds[id]));
     result.push({
       sourceId: item.id, kind: "character", parentSourceId: "", sortOrder: index,
       title: item.title, body: item.body,
@@ -264,12 +281,12 @@ function buildContentSnapshots({
   requested.actIds.forEach((id, index) => {
     const item = itemById.get(id)!;
     const meta = readMeta(item.meta);
-    result.push({ sourceId: item.id, kind: "act", parentSourceId: meta.plotId, sortOrder: meta.act || index + 1, title: item.title, body: item.body, meta: JSON.stringify({ act: meta.act || index + 1 }) });
+    result.push({ sourceId: item.id, kind: "act", parentSourceId: meta.plotId, sortOrder: meta.act || index + 1, title: item.title, body: item.body, meta: JSON.stringify({ act: meta.act || index + 1, status: meta.status }) });
   });
   requested.blockIds.forEach((id, index) => {
     const block = allBlocks.find((item) => item.id === id)!;
     const meta = readMeta(block.meta);
-    result.push({ sourceId: block.id, kind: "block", parentSourceId: meta.plotId, sortOrder: block.sortOrder || index, title: block.title, body: block.body, meta: JSON.stringify({ act: block.act }) });
+    result.push({ sourceId: block.id, kind: "block", parentSourceId: meta.plotId, sortOrder: block.sortOrder || index, title: block.title, body: block.body, meta: JSON.stringify({ act: block.act, status: meta.status }) });
   });
   return result;
 }

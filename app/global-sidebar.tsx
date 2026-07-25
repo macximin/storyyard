@@ -94,7 +94,7 @@ export function GlobalSidebar({
 
   return (
     <aside className="global-sidebar">
-      <Link className="wordmark" href="/" prefetch={false}>STORYYARD</Link>
+      <Link className="wordmark" href="/">STORYYARD</Link>
       {user ? (
         <div className="signed-user">
           <div className="user-chip">
@@ -157,26 +157,26 @@ export function GlobalSidebar({
 
       <nav className="global-nav" aria-label="주 메뉴">
         <p>커뮤니티</p>
-        <Link className={active === "community" ? "active" : ""} href="/" prefetch={false} aria-label="전체장르">
+        <Link className={active === "community" ? "active" : ""} href="/" aria-label="전체장르">
           <BookOpen size={18} /><span>전체장르</span>
         </Link>
-        <Link className={active === "preferred" ? "active" : ""} href="/preferred" prefetch={false} aria-label="선호작">
+        <Link className={active === "preferred" ? "active" : ""} href="/preferred" aria-label="선호작">
           <BookmarkSimple size={18} /><span>선호작</span>
         </Link>
         <p>개인 작업실</p>
-        <Link className={active === "studio" ? "active" : ""} href="/studio" prefetch={false} aria-label="내 작품">
+        <Link className={active === "studio" ? "active" : ""} href="/studio" aria-label="내 작품">
           <House size={18} /><span>내 작품</span>
         </Link>
-        <Link className={active === "studio-favorites" ? "active" : ""} href="/studio?filter=favorites" prefetch={false} aria-label="즐겨찾기">
+        <Link className={active === "studio-favorites" ? "active" : ""} href="/studio?filter=favorites" aria-label="즐겨찾기">
           <Star size={18} /><span>즐겨찾기</span>
         </Link>
         {user?.role === "admin" && (
           <>
             <p>관리자</p>
-            <Link className={active === "canon" ? "active" : ""} href="/canon" prefetch={false} aria-label="캐논 확인판">
+            <Link className={active === "canon" ? "active" : ""} href="/canon" aria-label="캐논 확인판">
               <ShieldCheck size={18} /><span>캐논 확인판</span>
             </Link>
-            <Link className={active === "admin" ? "active" : ""} href="/admin" prefetch={false} aria-label="운영 관리">
+            <Link className={active === "admin" ? "active" : ""} href="/admin" aria-label="운영 관리">
               <GearSix size={18} /><span>운영 관리</span>
             </Link>
           </>

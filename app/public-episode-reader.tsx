@@ -56,7 +56,7 @@ export function PublicEpisodeReader({
                 key={item.id}
                 className={item.id === episode.id ? "active" : ""}
                 href={episodeHref(item.episode_no)}
-                prefetch={false}
+
                 onClick={() => setTocOpen(false)}
               >
                 <span>{item.episode_no}화</span>
@@ -83,7 +83,7 @@ export function PublicEpisodeReader({
             {previous ? (
               <Link
                 href={episodeHref(previous.episode_no)}
-                prefetch={false}
+
               >
                 <ArrowLeft size={18} /><span><small>이전화</small>{previous.title}</span>
               </Link>
@@ -92,7 +92,7 @@ export function PublicEpisodeReader({
               <Link
                 className="next"
                 href={episodeHref(next.episode_no)}
-                prefetch={false}
+
               >
                 <span><small>다음화</small>{next.title}</span><ArrowRight size={18} />
               </Link>
