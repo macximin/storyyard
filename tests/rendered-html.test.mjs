@@ -166,7 +166,7 @@ test("opens manuscripts as dedicated episode pages with episode comments and del
 });
 
 test("ships an admin-only Foundry canon review board with pending decisions", async () => {
-  const [page, board, route, schema, packages, sidebar, canonPackage] = await Promise.all([
+  const [page, board, route, schema, packages, sidebar, canonPackage, exporter] = await Promise.all([
     read("app/canon/page.tsx"),
     read("app/canon/canon-review-board.tsx"),
     read("app/api/canon/decisions/route.ts"),
@@ -174,6 +174,7 @@ test("ships an admin-only Foundry canon review board with pending decisions", as
     read("app/canon-packages.ts"),
     read("app/global-sidebar.tsx"),
     read("data/canon/afterlife_restaurant.json"),
+    read("scripts/export-firefly-canon-package.mjs"),
   ]);
   assert.match(page, /user\.role !== "admin"/);
   assert.match(page, /ensureCanonSnapshot/);
@@ -184,6 +185,10 @@ test("ships an admin-only Foundry canon review board with pending decisions", as
   assert.match(board, /A-Rail/);
   assert.match(board, /B-Rail/);
   assert.match(board, /Rolling Corridor/);
+  assert.match(board, /상태 스냅샷/);
+  assert.match(board, /ArtifactReader artifact=\{artifacts\.a_rail\}/);
+  assert.match(board, /ArtifactReader artifact=\{artifacts\.b_rail\}/);
+  assert.match(board, /sourceGitCommit/);
   assert.match(board, /pending 판정 기록/);
   assert.match(route, /user\?\.role === "admin"/);
   assert.match(route, /artifact\.sha256 !== input\.artifactSha256/);
@@ -191,7 +196,13 @@ test("ships an admin-only Foundry canon review board with pending decisions", as
   assert.match(schema, /canonSnapshots/);
   assert.match(schema, /canonDecisions/);
   assert.match(packages, /firefly_story_package_v1/);
+  assert.match(packages, /sourceGitCommit: string/);
+  assert.match(exporter, /ls-files/);
+  assert.match(exporter, /included Foundry sources have uncommitted changes/);
+  assert.match(exporter, /owner adoption receipt/);
+  assert.match(exporter, /computedRevisionSet/);
   assert.match(canonPackage, /"revisionSetSha256": "4aa9de3ba689973cd86ba45377387024ca6d09ed2ac4e52eb6e22aa7a3483ea6"/);
+  assert.match(canonPackage, /"sourceGitCommit": "[0-9a-f]{40}"/);
   for (const hash of [
     "2b8d1bca981c1c7b0731c918e581b36ce7d4d1dc169bec4571311eab72eb241a",
     "6baec3ac49cc771f6e9be445347bfda6faa5dea0de9281d6e1dbf33b8aebb94c",

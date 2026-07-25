@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -10,6 +11,8 @@ const foundryRoot = process.env.FOUNDRY_ROOT
 const workSlug = process.env.WORK_SLUG || "afterlife_restaurant";
 const workRoot = path.join(foundryRoot, "40_works", workSlug);
 const outputPath = path.join(storyyardRoot, "data", "canon", `${workSlug}.json`);
+const foundryWorkPath = `40_works/${workSlug}`;
+const manifestRelativePath = `${foundryWorkPath}/04_manuscript/manifest.yaml`;
 
 const definitions = [
   ["status", "운영 상태", "status", "00_status.md", "work_status"],
@@ -29,9 +32,29 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function git(...args) {
+  return execFileSync("git", ["-C", foundryRoot, ...args], { encoding: "utf8" }).trim();
+}
+
 function yamlScalar(source, key) {
   const match = source.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
   return match?.[1]?.trim().replace(/^["']|["']$/g, "") ?? "";
+}
+
+function indentedYamlScalar(source, key, spaces = 2) {
+  const match = source.match(new RegExp(`^\\s{${spaces}}${key}:\\s*(.+)$`, "m"));
+  return match?.[1]?.trim().replace(/^["']|["']$/g, "") ?? "";
+}
+
+function parseManifestEntries(source) {
+  return source.split("\n").flatMap((line) => {
+    const match = line.match(/^  - \{ (.+) \}$/);
+    if (!match) return [];
+    return [Object.fromEntries(match[1].split(", ").map((field) => {
+      const separator = field.indexOf(": ");
+      return [field.slice(0, separator), field.slice(separator + 2).replace(/^["']|["']$/g, "")];
+    }))];
+  });
 }
 
 function parseStatus(source) {
@@ -93,6 +116,21 @@ function parseBRail(source) {
   });
 }
 
+const sourcePaths = [
+  ...definitions.map(([, , , relativePath]) => `${foundryWorkPath}/${relativePath}`),
+  manifestRelativePath,
+];
+const sourceGitCommit = git("rev-parse", "HEAD");
+try {
+  git("ls-files", "--error-unmatch", "--", ...sourcePaths);
+} catch {
+  throw new Error("Canon export refused: every included Foundry source must be tracked by Git.");
+}
+const sourceStatus = git("status", "--porcelain", "--untracked-files=all", "--", ...sourcePaths);
+if (sourceStatus) {
+  throw new Error(`Canon export refused: included Foundry sources have uncommitted changes.\n${sourceStatus}`);
+}
+
 const artifactRows = await Promise.all(definitions.map(async ([key, label, kind, relativePath, authority]) => {
   const body = await readFile(path.join(workRoot, relativePath), "utf8");
   return {
@@ -108,12 +146,52 @@ const artifactRows = await Promise.all(definitions.map(async ([key, label, kind,
 const artifactByKey = Object.fromEntries(artifactRows.map((artifact) => [artifact.key, artifact]));
 const manifest = await readFile(path.join(workRoot, "04_manuscript/manifest.yaml"), "utf8");
 const status = parseStatus(artifactByKey.status.body);
+const adoptionReceipt = artifactByKey.adoption_review.body;
+const adoptionDecisionId = yamlScalar(adoptionReceipt, "decision_id");
+const exactManuscriptRevision = indentedYamlScalar(adoptionReceipt, "exact_manuscript_revision");
+if (
+  !adoptionDecisionId
+  || indentedYamlScalar(adoptionReceipt, "frozen_pitch") !== "approved"
+  || indentedYamlScalar(adoptionReceipt, "story_plan") !== "approved"
+  || !exactManuscriptRevision
+) {
+  throw new Error("Canon export refused: owner adoption receipt does not approve the pitch, Story Plan, and exact manuscript revision.");
+}
+if (!artifactByKey.status.body.includes(`  - ${adoptionDecisionId}`)) {
+  throw new Error(`Canon export refused: status does not reference owner decision ${adoptionDecisionId}.`);
+}
 
-for (const episode of ["ep001", "ep002", "ep003"]) {
-  const expected = manifest.match(new RegExp(`episode:\\s*${episode}[^\\n]*sha256:\\s*([a-f0-9]{64})`))?.[1];
-  if (!expected || expected !== artifactByKey[episode].sha256) {
-    throw new Error(`${episode} canonical hash mismatch: expected ${expected}, got ${artifactByKey[episode].sha256}`);
+const expectedEpisodes = ["ep001", "ep002", "ep003"];
+const manifestEntries = parseManifestEntries(manifest);
+if (
+  manifestEntries.length !== expectedEpisodes.length
+  || manifestEntries.some((entry, index) => entry.episode !== expectedEpisodes[index])
+) {
+  throw new Error("Canon export refused: manuscript manifest must contain ep001~ep003 in canonical order.");
+}
+
+for (const entry of manifestEntries) {
+  const artifact = artifactByKey[entry.episode];
+  if (!artifact || entry.sha256 !== artifact.sha256) {
+    throw new Error(`${entry.episode} canonical hash mismatch: expected ${entry.sha256}, got ${artifact?.sha256}`);
   }
+  if (entry.authority !== "owner_approved" || entry.owner_decision !== adoptionDecisionId) {
+    throw new Error(`Canon export refused: ${entry.episode} is not tied to owner decision ${adoptionDecisionId}.`);
+  }
+  if (!adoptionReceipt.includes(`| ${entry.episode} | \`${entry.sha256}\``)) {
+    throw new Error(`Canon export refused: adoption receipt does not attest ${entry.episode} hash ${entry.sha256}.`);
+  }
+}
+
+const declaredRevisionSet = yamlScalar(manifest, "revision_set_sha256");
+const computedRevisionSet = sha256(manifestEntries.map(
+  (entry) => `${entry.sha256}  ${foundryWorkPath}/04_manuscript/${entry.repo_snapshot}\n`,
+).join(""));
+if (computedRevisionSet !== declaredRevisionSet) {
+  throw new Error(`Canon revision-set mismatch: expected ${declaredRevisionSet}, got ${computedRevisionSet}.`);
+}
+if (!adoptionReceipt.includes(`승인 revision-set SHA-256: \`${declaredRevisionSet}\``)) {
+  throw new Error("Canon export refused: adoption receipt does not attest the manifest revision set.");
 }
 
 const packageWithoutHash = {
@@ -122,8 +200,9 @@ const packageWithoutHash = {
   title: status.title,
   workflowSchema: status.workflowSchema,
   sourcePath: `40_works/${workSlug}`,
+  sourceGitCommit,
   sourceUpdatedAt: status.updatedAt,
-  revisionSetSha256: yamlScalar(manifest, "revision_set_sha256"),
+  revisionSetSha256: declaredRevisionSet,
   scope: {
     includes: ["Frozen Pitch", "Story Plan 4 surfaces", "owner-approved ep001~ep003", "adoption review", "Narrative State"],
     excludes: ["30_materials", "unapproved ep004+", "automatic Foundry mutation"],

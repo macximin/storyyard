@@ -823,6 +823,9 @@ a { color: inherit; text-decoration: none; }
 .artifact-hash span { font-weight: 900; }
 .artifact-hash code { overflow: hidden; color: #555; text-overflow: ellipsis; white-space: nowrap; }
 .canon-document { overflow: auto; max-height: 72vh; margin: 0; padding: clamp(18px, 3vw, 34px); border: 1px solid #aaa; background: #fff; color: #252525; font-family: Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; font-size: .83rem; line-height: 1.85; white-space: pre-wrap; word-break: keep-all; }
+.canon-source-details { margin-top: 28px; border-top: 1px solid var(--ink); }
+.canon-source-details > summary { padding: 16px 2px; font-size: .76rem; font-weight: 900; cursor: pointer; }
+.canon-source-details[open] > summary { margin-bottom: 18px; border-bottom: 1px solid #c8c7c1; }
 .episode-switcher { display: flex; gap: 6px; margin-bottom: 10px; }
 .episode-switcher button { min-width: 100px; display: grid; gap: 3px; padding: 10px; border: 1px solid #aaa; background: #fff; font-size: .74rem; font-weight: 850; cursor: pointer; }
 .episode-switcher button.active { border-color: var(--ink); background: var(--yellow); box-shadow: 3px 3px 0 var(--ink); }

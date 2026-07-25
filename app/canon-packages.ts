@@ -19,6 +19,7 @@ export type CanonPackage = {
   title: string;
   workflowSchema: string;
   sourcePath: string;
+  sourceGitCommit: string;
   sourceUpdatedAt: string;
   revisionSetSha256: string;
   bundleSha256: string;

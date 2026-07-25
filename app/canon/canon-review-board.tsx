@@ -21,7 +21,7 @@ type DecisionRow = {
   applyReceiptPath: string | null;
 };
 
-type ViewKey = "overview" | "frozen_pitch" | "living_spine" | "a_rail" | "b_rail" | "rolling_corridor" | "manuscripts" | "adoption_review";
+type ViewKey = "overview" | "frozen_pitch" | "living_spine" | "a_rail" | "b_rail" | "rolling_corridor" | "manuscripts" | "adoption_review" | "narrative_state";
 
 const decisionLabels: Record<CanonDecisionValue, string> = {
   approve: "승인",
@@ -46,6 +46,7 @@ const viewLabels: Array<[ViewKey, string]> = [
   ["rolling_corridor", "Rolling Corridor"],
   ["manuscripts", "승인 원고"],
   ["adoption_review", "승격 근거"],
+  ["narrative_state", "상태 스냅샷"],
 ];
 
 export function CanonReviewBoard({
@@ -138,6 +139,7 @@ export function CanonReviewBoard({
 
         <div className="canon-integrity">
           <span><Check size={15} weight="bold" /> 스냅샷 {canonPackage.sourceUpdatedAt}</span>
+          <code>source {canonPackage.sourceGitCommit.slice(0, 12)}…</code>
           <code>bundle {canonPackage.bundleSha256.slice(0, 12)}…</code>
           <code>revision {canonPackage.revisionSetSha256.slice(0, 12)}…</code>
         </div>
@@ -191,6 +193,10 @@ export function CanonReviewBoard({
                     </article>
                   ))}
                 </div>
+                <details className="canon-source-details">
+                  <summary>정본 원문 보기</summary>
+                  <ArtifactReader artifact={artifacts.a_rail} />
+                </details>
               </section>
             )}
 
@@ -209,6 +215,10 @@ export function CanonReviewBoard({
                     </article>
                   ))}
                 </div>
+                <details className="canon-source-details">
+                  <summary>정본 원문 보기</summary>
+                  <ArtifactReader artifact={artifacts.b_rail} />
+                </details>
               </section>
             )}
 
