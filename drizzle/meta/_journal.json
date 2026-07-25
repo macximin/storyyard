@@ -50,6 +50,13 @@
       "when": 1784878728601,
       "tag": "0006_massive_arclight",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1784950410799,
+      "tag": "0007_dashing_galactus",
+      "breakpoints": true
     }
   ]
 }

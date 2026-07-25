@@ -750,6 +750,119 @@ a { color: inherit; text-decoration: none; }
 .comment-delete:hover { background: #fff0ec; }
 .blank-state.small { min-height: 120px; border-top: 0; }
 
+/* Human canon review */
+.canon-main { min-width: 0; padding: 48px clamp(24px, 4vw, 68px) 90px; background: #f7f6f1; }
+.canon-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; padding: 0 0 34px; border-bottom: 1px solid var(--ink); }
+.canon-hero > div:first-child { max-width: 860px; }
+.canon-hero h1 { margin: 10px 0 12px; font-size: clamp(3rem, 7vw, 6.6rem); letter-spacing: -.08em; line-height: .9; }
+.canon-hero > div:first-child > p:last-child { max-width: 750px; margin: 0; color: #595959; line-height: 1.65; }
+.canon-lock { flex: 0 0 auto; display: grid; grid-template-columns: 24px auto; align-items: center; gap: 3px 8px; min-width: 190px; padding: 15px; border: 1px solid var(--ink); background: var(--yellow); box-shadow: 5px 5px 0 var(--ink); }
+.canon-lock svg { grid-row: span 2; }
+.canon-lock strong { font-size: .8rem; }
+.canon-lock span { color: #6f610e; font-size: .68rem; }
+.canon-integrity { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 14px 0; border-bottom: 1px solid #c8c7c1; color: #65645f; font-size: .72rem; }
+.canon-integrity span { display: inline-flex; align-items: center; gap: 5px; color: #23633f; font-weight: 800; }
+.canon-integrity code { font-size: .68rem; }
+.canon-tabs { position: sticky; z-index: 9; top: 0; overflow-x: auto; display: flex; gap: 4px; margin: 0 calc(clamp(24px, 4vw, 68px) * -1); padding: 12px clamp(24px, 4vw, 68px); border-bottom: 1px solid #c8c7c1; background: rgba(247, 246, 241, .95); backdrop-filter: blur(10px); }
+.canon-tabs button { flex: 0 0 auto; padding: 8px 10px; border: 1px solid transparent; background: transparent; color: #74736e; font-size: .74rem; font-weight: 800; cursor: pointer; }
+.canon-tabs button:hover { color: var(--ink); }
+.canon-tabs button.active { border-color: var(--ink); background: var(--ink); color: #fff; }
+.canon-workarea { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: clamp(28px, 4vw, 64px); max-width: 1480px; margin-top: 42px; }
+.canon-content { min-width: 0; }
+.canon-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.canon-status-grid article { min-height: 150px; display: flex; flex-direction: column; padding: 20px; border: 1px solid var(--ink); background: #fff; }
+.canon-status-grid article:nth-child(3) { background: var(--yellow); }
+.canon-status-grid span { color: #777; font-size: .67rem; font-weight: 850; }
+.canon-status-grid strong { margin-top: 24px; font-size: 1.35rem; letter-spacing: -.035em; }
+.canon-status-grid small { overflow: hidden; margin-top: auto; padding-top: 14px; color: #777; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+.canon-section { margin-top: 52px; }
+.canon-section.no-top { margin-top: 0; }
+.canon-section-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 26px; margin-bottom: 20px; }
+.canon-section-head > div:first-child { min-width: 0; }
+.canon-section-head h2 { margin: 6px 0 7px; font-size: clamp(1.65rem, 3vw, 2.7rem); letter-spacing: -.055em; }
+.canon-section-head > div:first-child > p:last-child { max-width: 780px; margin: 0; color: #777; font-size: .78rem; line-height: 1.6; }
+.canon-flow { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--ink); background: #fff; }
+.canon-flow article { position: relative; min-height: 180px; padding: 20px; border-right: 1px solid var(--ink); }
+.canon-flow article:last-child { border-right: 0; }
+.canon-flow article:not(:last-child)::after { content: "→"; position: absolute; z-index: 2; top: 50%; right: -11px; width: 21px; height: 21px; display: grid; place-items: center; border: 1px solid var(--ink); border-radius: 50%; background: #fff; font-size: .7rem; }
+.canon-flow article.active { background: var(--yellow); }
+.canon-flow span { color: #aaa; font-size: .66rem; font-weight: 900; }
+.canon-flow strong { display: block; margin-top: 48px; font-size: 1.05rem; }
+.canon-flow p { margin: 7px 0 0; color: #666; font-size: .72rem; line-height: 1.5; }
+.scope-columns { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--ink); background: #fff; }
+.scope-columns > div { display: grid; gap: 8px; padding: 22px; }
+.scope-columns > div + div { border-left: 1px solid var(--ink); background: #f1f0eb; }
+.scope-columns strong { margin-bottom: 5px; font-size: .78rem; }
+.scope-columns span { color: #5e5d59; font-size: .75rem; }
+.anchor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.anchor-grid article { min-width: 0; padding: 20px; border: 1px solid #aaa9a3; background: #fff; }
+.anchor-grid article.complete { border-color: #32704c; box-shadow: inset 4px 0 0 #32704c; }
+.anchor-grid article.active { border-color: #b39300; background: #fffbea; box-shadow: inset 4px 0 0 var(--yellow-strong); }
+.anchor-grid header { display: flex; align-items: center; gap: 8px; }
+.anchor-grid header span { font-weight: 950; }
+.anchor-grid header em { margin-left: auto; padding: 3px 6px; background: #eee; color: #6d6c67; font-size: .62rem; font-style: normal; }
+.anchor-grid h3 { margin: 16px 0 18px; font-size: 1.05rem; }
+.anchor-grid dl { display: grid; grid-template-columns: 78px 1fr; gap: 8px 10px; margin: 0; font-size: .7rem; line-height: 1.5; }
+.anchor-grid dt { color: #8d7300; font-weight: 850; }
+.anchor-grid dd { margin: 0; color: #5e5d59; }
+.rail-counts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.rail-counts span { padding: 4px 6px; border: 1px solid #c4c3bc; background: #fff; color: #6e6d68; font-size: .62rem; }
+.b-rail-list { display: grid; gap: 7px; }
+.b-rail-list article { padding: 15px 17px; border: 1px solid #cfcec8; background: #fff; }
+.b-rail-list article.rail-closed { border-color: #59906e; }
+.b-rail-list article.rail-active { border: 2px solid var(--ink); background: var(--yellow); box-shadow: 5px 5px 0 var(--ink); }
+.b-rail-list article.rail-provisional { border-color: #b39300; background: #fffbea; }
+.b-rail-list header { display: flex; align-items: center; gap: 9px; }
+.b-rail-list header strong { font-size: .85rem; }
+.b-rail-list header span { color: #917800; font-size: .65rem; font-weight: 850; }
+.b-rail-list header em { margin-left: auto; color: #777; font-size: .62rem; font-style: normal; }
+.b-rail-list p { margin: 11px 0; font-size: .78rem; line-height: 1.55; }
+.b-rail-list footer { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; color: #777; font-size: .65rem; line-height: 1.45; }
+.artifact-authority { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 7px 9px; border: 1px solid #aaa; background: #fff; color: #555; font-size: .68rem; }
+.artifact-hash { overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid #ccc; border-bottom: 0; background: #eeede8; font-size: .66rem; }
+.artifact-hash span { font-weight: 900; }
+.artifact-hash code { overflow: hidden; color: #555; text-overflow: ellipsis; white-space: nowrap; }
+.canon-document { overflow: auto; max-height: 72vh; margin: 0; padding: clamp(18px, 3vw, 34px); border: 1px solid #aaa; background: #fff; color: #252525; font-family: Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; font-size: .83rem; line-height: 1.85; white-space: pre-wrap; word-break: keep-all; }
+.episode-switcher { display: flex; gap: 6px; margin-bottom: 10px; }
+.episode-switcher button { min-width: 100px; display: grid; gap: 3px; padding: 10px; border: 1px solid #aaa; background: #fff; font-size: .74rem; font-weight: 850; cursor: pointer; }
+.episode-switcher button.active { border-color: var(--ink); background: var(--yellow); box-shadow: 3px 3px 0 var(--ink); }
+.episode-switcher code { color: #888; font-size: .58rem; }
+.canon-review-panel { min-width: 0; }
+.review-panel-sticky { position: sticky; top: 78px; }
+.review-panel-sticky > h2 { overflow: hidden; margin: 7px 0 6px; font-size: 1.35rem; letter-spacing: -.04em; text-overflow: ellipsis; white-space: nowrap; }
+.review-panel-sticky > code { display: block; margin-bottom: 17px; color: #777; font-size: .64rem; }
+.canon-review-panel form { padding: 14px; border: 1px solid var(--ink); background: #fff; }
+.canon-review-panel fieldset { display: grid; gap: 5px; margin: 0; padding: 0; border: 0; }
+.canon-review-panel legend { margin-bottom: 7px; font-size: .7rem; font-weight: 900; }
+.canon-review-panel fieldset label { display: flex; align-items: center; gap: 9px; padding: 9px; border: 1px solid #ddd; cursor: pointer; }
+.canon-review-panel fieldset label.selected { border-color: var(--ink); background: #f4f4f1; }
+.canon-review-panel fieldset label.selected.approve { background: #edf8f1; }
+.canon-review-panel fieldset label.selected.conditional { background: #fff9dc; }
+.canon-review-panel fieldset label.selected.revise, .canon-review-panel fieldset label.selected.reject { background: #fff1ec; }
+.canon-review-panel fieldset input { accent-color: var(--ink); }
+.canon-review-panel fieldset span { display: grid; gap: 2px; }
+.canon-review-panel fieldset strong { font-size: .75rem; }
+.canon-review-panel fieldset small { color: #777; font-size: .61rem; }
+.review-comment { display: grid; gap: 6px; margin-top: 13px; }
+.review-comment > span { font-size: .7rem; font-weight: 900; }
+.review-comment textarea { min-height: 92px; padding: 9px; border: 1px solid #bbb; resize: vertical; font-size: .74rem; line-height: 1.55; }
+.review-comment small { color: #999; font-size: .6rem; text-align: right; }
+.canon-review-panel form > button { width: 100%; margin-top: 12px; }
+.review-message { margin: 9px 0 0; padding: 9px; background: #fff7cc; color: #665600; font-size: .68rem; line-height: 1.45; }
+.pending-notice { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 11px; border: 1px dashed #a99a49; background: #fffbea; color: #6c5a00; font-size: .67rem; line-height: 1.45; }
+.pending-notice svg { flex: 0 0 auto; }
+.pending-notice span { display: grid; }
+.decision-history { margin-top: 30px; }
+.decision-history h3 { margin: 0 0 10px; font-size: .8rem; }
+.decision-history > p { color: #888; font-size: .7rem; }
+.decision-history article { padding: 11px 0; border-top: 1px solid #ccc; }
+.decision-history article header { display: flex; align-items: center; gap: 5px; }
+.decision-history article header strong { font-size: .7rem; }
+.decision-history article header span { margin-left: auto; padding: 2px 5px; background: #eee; color: #777; font-size: .58rem; }
+.decision-history article > p { margin: 7px 0 0; font-size: .68rem; font-weight: 800; }
+.decision-history blockquote { margin: 7px 0; padding-left: 8px; border-left: 2px solid #c5a600; color: #666; font-size: .66rem; line-height: 1.5; }
+.decision-history time { color: #999; font-size: .57rem; }
+
 .reader-main { min-width: 0; display: grid; grid-template-columns: 250px minmax(0, 800px); gap: clamp(34px, 6vw, 88px); justify-content: start; padding: 0 clamp(28px, 5vw, 78px) 100px 0; }
 .reader-toc { position: sticky; top: 0; overflow: hidden auto; height: 100vh; padding: 34px 18px 50px 24px; border-right: 1px solid var(--line); background: #fafafa; }
 .reader-toc-head { display: flex; align-items: center; justify-content: space-between; }
@@ -912,6 +1025,17 @@ a { color: inherit; text-decoration: none; }
   .global-nav a, .project-nav a { width: 40px; }
   .back-home { margin: 0 auto 0 0; }
   .library-main, .page-wide, .page-narrow, .community-main, .public-work-main, .admin-main { padding: 30px 18px 55px; }
+  .canon-main { padding: 30px 18px 55px; }
+  .canon-hero { align-items: flex-start; flex-direction: column; }
+  .canon-lock { width: 100%; }
+  .canon-tabs { margin: 0 -18px; padding: 10px 18px; }
+  .canon-workarea { grid-template-columns: 1fr; margin-top: 30px; }
+  .canon-status-grid, .canon-flow { grid-template-columns: 1fr 1fr; }
+  .canon-flow article:nth-child(2) { border-right: 0; }
+  .canon-flow article:nth-child(-n + 2) { border-bottom: 1px solid var(--ink); }
+  .canon-flow article:nth-child(2)::after { display: none; }
+  .canon-review-panel { padding-top: 24px; border-top: 1px solid var(--ink); }
+  .review-panel-sticky { position: static; }
   .plot-page { padding-bottom: 55px; }
   .plot-tabs-scroll { padding-left: 10px; padding-right: 10px; }
   .plot-content { padding: 25px 18px 0; }
@@ -968,4 +1092,17 @@ a { color: inherit; text-decoration: none; }
   .character-avatar { width: 64px; height: 64px; }
   .character-detail-section { grid-template-columns: 1fr; gap: 11px; }
   .character-section-label { grid-template-columns: auto 1fr; align-items: baseline; gap: 8px; }
+}
+
+@media (max-width: 620px) {
+  .canon-status-grid, .canon-flow, .scope-columns, .anchor-grid { grid-template-columns: 1fr; }
+  .canon-flow article { border-right: 0; border-bottom: 1px solid var(--ink); }
+  .canon-flow article:last-child { border-bottom: 0; }
+  .canon-flow article::after { display: none !important; }
+  .scope-columns > div + div { border-top: 1px solid var(--ink); border-left: 0; }
+  .b-rail-list footer { grid-template-columns: 1fr; }
+  .canon-section-head { align-items: flex-start; flex-direction: column; }
+  .rail-counts { justify-content: flex-start; }
+  .episode-switcher { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .episode-switcher button { min-width: 0; }
 }

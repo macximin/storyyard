@@ -91,6 +91,32 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm run build`: verify the vinext build output
 - `npm test`: build the starter and verify its rendered loading skeleton
 - `npm run db:generate`: generate Drizzle migrations after schema changes
+- `npm run canon:export`: rebuild the bundled Foundry canon snapshot
+
+## Human Canon Review
+
+`/canon` is an administrator-only review surface. Foundry remains the source of
+truth: Storyyard imports an immutable `firefly_story_package_v1` snapshot and
+stores human decisions as `pending`. It does not edit manuscripts, Story Plan,
+or Narrative State and it never promotes a version automatically.
+
+The first canary package is `afterlife_restaurant`. The export verifies the
+owner-approved episode hashes in the Foundry manuscript manifest before writing
+`data/canon/afterlife_restaurant.json`. By default it reads the sibling
+`company_firefly_studio/edge_repos/company_ff_foundry` checkout. Set
+`FOUNDRY_ROOT` to an explicit Foundry root when the checkout lives elsewhere.
+
+After a Foundry canon change:
+
+```bash
+npm run canon:export
+npm run db:generate # only when db/schema.ts changed
+npm test
+```
+
+Decisions are recorded in `canon_decisions` with the exact bundle and artifact
+SHA-256. An external, separately authorized apply worker may later consume
+pending decisions; that worker is intentionally outside Storyyard.
 
 ## Learn More
 

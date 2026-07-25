@@ -9,6 +9,7 @@ import {
   EyeSlash,
   GearSix,
   House,
+  ShieldCheck,
   SignOut,
   Star,
   UserCircle,
@@ -29,7 +30,7 @@ export function GlobalSidebar({
   setupRequired = false,
 }: {
   user: SidebarUser;
-  active: "community" | "preferred" | "studio" | "studio-favorites" | "admin";
+  active: "community" | "preferred" | "studio" | "studio-favorites" | "canon" | "admin";
   setupRequired?: boolean;
 }) {
   const router = useRouter();
@@ -172,6 +173,9 @@ export function GlobalSidebar({
         {user?.role === "admin" && (
           <>
             <p>관리자</p>
+            <Link className={active === "canon" ? "active" : ""} href="/canon" prefetch={false} aria-label="캐논 확인판">
+              <ShieldCheck size={18} /><span>캐논 확인판</span>
+            </Link>
             <Link className={active === "admin" ? "active" : ""} href="/admin" prefetch={false} aria-label="운영 관리">
               <GearSix size={18} /><span>운영 관리</span>
             </Link>

@@ -151,3 +151,41 @@ export const comments = sqliteTable("comments", {
 }, (table) => [
   index("comments_publication_episode_idx").on(table.publicationId, table.episodeId),
 ]);
+
+// Foundry remains the source of truth. These rows preserve imported snapshots and
+// human decisions; they never mutate a Foundry work directly.
+export const canonSnapshots = sqliteTable("canon_snapshots", {
+  id: text("id").primaryKey(),
+  workSlug: text("work_slug").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  workflowSchema: text("workflow_schema").notNull(),
+  bundleSha256: text("bundle_sha256").notNull(),
+  revisionSetSha256: text("revision_set_sha256").notNull().default(""),
+  title: text("title").notNull(),
+  payload: text("payload").notNull(),
+  sourcePath: text("source_path").notNull(),
+  sourceUpdatedAt: text("source_updated_at").notNull(),
+  importedAt: text("imported_at").notNull(),
+}, (table) => [
+  uniqueIndex("canon_snapshots_bundle_unique").on(table.bundleSha256),
+  index("canon_snapshots_work_imported_idx").on(table.workSlug, table.importedAt),
+]);
+
+export const canonDecisions = sqliteTable("canon_decisions", {
+  id: text("id").primaryKey(),
+  workSlug: text("work_slug").notNull(),
+  bundleSha256: text("bundle_sha256").notNull(),
+  artifactKey: text("artifact_key").notNull(),
+  artifactSha256: text("artifact_sha256").notNull(),
+  decision: text("decision").notNull(),
+  comment: text("comment").notNull().default(""),
+  actorUserId: text("actor_user_id").notNull(),
+  actorEmail: text("actor_email").notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: text("created_at").notNull(),
+  appliedAt: text("applied_at"),
+  applyReceiptPath: text("apply_receipt_path"),
+}, (table) => [
+  index("canon_decisions_work_created_idx").on(table.workSlug, table.createdAt),
+  index("canon_decisions_pending_idx").on(table.status, table.workSlug),
+]);
