@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { Check, Clock, FileText, LockKey, WarningCircle, X } from "@phosphor-icons/react";
 import { GlobalSidebar, SidebarUser } from "@/app/global-sidebar";
 import type { CanonArtifact, CanonDecisionValue, CanonPackage } from "@/app/canon-packages";
+import { formatCanonDecisionTime } from "./decision-time";
 
 type DecisionRow = {
   id: string;
@@ -270,7 +271,7 @@ export function CanonReviewBoard({
                     </header>
                     <p>{row.artifactKey === "__bundle__" ? "전체 패키지" : artifacts[row.artifactKey]?.label ?? row.artifactKey}</p>
                     {row.comment && <blockquote>{row.comment}</blockquote>}
-                    <time>{new Date(row.createdAt).toLocaleString("ko-KR")}</time>
+                    <time>{formatCanonDecisionTime(row.createdAt)}</time>
                   </article>
                 ))}
               </section>

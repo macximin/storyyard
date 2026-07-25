@@ -1,9 +1,29 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
+
+test("formats canon decision timestamps identically across host time zones", () => {
+  const formatterUrl = new URL("../app/canon/decision-time.ts", import.meta.url).href;
+  const timestamp = "2026-07-25T04:26:47.000Z";
+  const script = [
+    `import { formatCanonDecisionTime } from ${JSON.stringify(formatterUrl)};`,
+    `process.stdout.write(formatCanonDecisionTime(${JSON.stringify(timestamp)}));`,
+  ].join("\n");
+  const renderIn = (timeZone) => execFileSync(
+    process.execPath,
+    ["--input-type=module", "--eval", script],
+    { encoding: "utf8", env: { ...process.env, TZ: timeZone } },
+  );
+
+  const expected = "2026. 7. 25. 13:26:47";
+  assert.equal(renderIn("UTC"), expected);
+  assert.equal(renderIn("Asia/Seoul"), expected);
+  assert.equal(renderIn("America/Los_Angeles"), expected);
+});
 
 test("ships the public community and private studio navigation", async () => {
   const [sidebar, community, page] = await Promise.all([
