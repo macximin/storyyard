@@ -29,6 +29,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     genre: string;
     favorite: boolean | number;
   }>;
+  const binding = await env.DB.prepare("SELECT project_id FROM canon_bindings WHERE project_id = ?")
+    .bind(id).first();
+  if (
+    binding
+    && (typeof input.title === "string" || typeof input.logline === "string")
+  ) {
+    return Response.json({
+      error: "Foundry 정본 작품의 제목과 소개는 정본 전체 동기화로만 갱신할 수 있음.",
+    }, { status: 409 });
+  }
   const update: Partial<typeof project> = { updatedAt: new Date().toISOString() };
   if (typeof input.title === "string") update.title = input.title.trim() || project.title;
   if (typeof input.logline === "string") update.logline = input.logline.trim();
@@ -71,6 +81,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     env.DB.prepare("DELETE FROM manuscripts WHERE project_id = ?").bind(id),
     env.DB.prepare("DELETE FROM plot_blocks WHERE project_id = ?").bind(id),
     env.DB.prepare("DELETE FROM project_items WHERE project_id = ?").bind(id),
+    env.DB.prepare("DELETE FROM canon_bindings WHERE project_id = ?").bind(id),
     env.DB.prepare("DELETE FROM projects WHERE id = ? AND owner_email = ?").bind(id, user.email),
   ]);
 

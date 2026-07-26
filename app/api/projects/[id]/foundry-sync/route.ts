@@ -6,6 +6,18 @@ import { plotBlocks, projectItems } from "@/db/schema";
 type JsonObject = Record<string, unknown>;
 type ProjectItemRow = typeof projectItems.$inferSelect;
 type PlotBlockRow = typeof plotBlocks.$inferSelect;
+type ProjectRow = { id: string; title: string; logline: string; genre: string };
+type ManuscriptRow = {
+  id: string; projectId: string; episodeNo: number; title: string; body: string;
+  status: string; meta: string; createdAt: string; updatedAt: string;
+};
+type PublicationRow = {
+  id: string; slug: string; status: string; title: string; logline: string; genre: string;
+};
+type PublicationEpisodeRow = {
+  id: string; publicationId: string; sourceManuscriptId: string; episodeNo: number;
+  title: string; body: string; meta: string;
+};
 type FoundrySyncMeta = {
   mappingVersion: string;
   workSlug: string;
@@ -55,7 +67,7 @@ async function loadAdminOwnerState(projectId: string) {
   const tokenHash = await getSessionTokenHash();
   if (!tokenHash) return { error: "관리자 권한이 필요함.", status: 403 } as const;
   const now = new Date().toISOString();
-  const [userResult, projectResult, itemsResult, blocksResult] = await env.DB.batch([
+  const [userResult, projectResult, itemsResult, blocksResult, manuscriptsResult, publicationResult, publicationEpisodesResult] = await env.DB.batch([
     env.DB.prepare(
       `SELECT u.id, u.role
          FROM sessions s
@@ -64,7 +76,7 @@ async function loadAdminOwnerState(projectId: string) {
         LIMIT 1`,
     ).bind(tokenHash, now),
     env.DB.prepare(
-      `SELECT p.id
+      `SELECT p.id, p.title, p.logline, p.genre
          FROM projects p
          JOIN users u ON u.owner_key = p.owner_email
          JOIN sessions s ON s.user_id = u.id
@@ -96,6 +108,27 @@ async function loadAdminOwnerState(projectId: string) {
           AND s.expires_at > ?
           AND u.role = 'admin'`,
     ).bind(projectId, tokenHash, now),
+    env.DB.prepare(
+      `SELECT m.id, m.project_id AS "projectId", m.episode_no AS "episodeNo",
+              m.title, m.body, m.status, m.meta, m.created_at AS "createdAt",
+              m.updated_at AS "updatedAt"
+         FROM manuscripts m
+        WHERE m.project_id = ?`,
+    ).bind(projectId),
+    env.DB.prepare(
+      `SELECT id, slug, status, title, logline, genre
+         FROM publications
+        WHERE project_id = ?
+        LIMIT 1`,
+    ).bind(projectId),
+    env.DB.prepare(
+      `SELECT pe.id, pe.publication_id AS "publicationId",
+              pe.source_manuscript_id AS "sourceManuscriptId",
+              pe.episode_no AS "episodeNo", pe.title, pe.body, pe.meta
+         FROM publication_episodes pe
+         JOIN publications p ON p.id = pe.publication_id
+        WHERE p.project_id = ?`,
+    ).bind(projectId),
   ]);
   const user = userResult.results?.[0] as { id: string; role: string } | undefined;
   if (!user || user.role !== "admin") {
@@ -105,8 +138,12 @@ async function loadAdminOwnerState(projectId: string) {
     return { error: "작품을 찾을 수 없음.", status: 404 } as const;
   }
   return {
+    project: projectResult.results[0] as ProjectRow,
     items: (itemsResult.results ?? []) as ProjectItemRow[],
     blocks: (blocksResult.results ?? []) as PlotBlockRow[],
+    manuscripts: (manuscriptsResult.results ?? []) as ManuscriptRow[],
+    publication: publicationResult.results?.[0] as PublicationRow | undefined,
+    publicationEpisodes: (publicationEpisodesResult.results ?? []) as PublicationEpisodeRow[],
   } as const;
 }
 
@@ -146,8 +183,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (
     canonPackage.storyyardProjection.mappingVersion !== "foundry_storyyard_arc_episode_v1"
     || canonPackage.storyyardProjection.blockUnit !== "episode"
+    || canonPackage.workspaceProjection.mappingVersion !== "foundry_storyyard_workspace_v1"
+    || canonPackage.workspaceProjection.revisionSetSha256 !== canonPackage.revisionSetSha256
   ) {
-    return Response.json({ error: "Storyyard 아크·화 투영 계약과 맞지 않음." }, { status: 409 });
+    return Response.json({ error: "Storyyard 전체 정본 투영 계약과 맞지 않음." }, { status: 409 });
   }
 
   const existingItems = access.items;
@@ -208,7 +247,221 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     unchanged: 0,
     conflicts: [] as Array<{ entityKey: string; title: string }>,
     retained: 0,
+    workspace: {
+      overview: 0,
+      characters: 0,
+      manuscripts: 0,
+      communityEpisodes: 0,
+      communitySlug: access.publication?.slug ?? null,
+    },
   };
+  const workspaceMappingVersion = canonPackage.workspaceProjection.mappingVersion;
+  const overview = canonPackage.workspaceProjection.overview;
+  if (
+    access.project.title !== overview.title
+    || access.project.logline !== overview.logline
+  ) {
+    writes.push(
+      env.DB.prepare(
+        `UPDATE projects SET title = ?, logline = ?, updated_at = ? WHERE id = ?`,
+      ).bind(overview.title, overview.logline, timestamp, projectId),
+    );
+    report.workspace.overview = 1;
+  }
+
+  const characterIds = new Map<string, string>();
+  for (const character of canonPackage.workspaceProjection.characters) {
+    const entityKey = `character:${character.entityKey}`;
+    const existing = existingItems.find((item) => {
+      const sync = readFoundrySync(item.meta);
+      return item.kind === "character"
+        && sync?.workSlug === canonPackage.workSlug
+        && sync.entityKey === entityKey;
+    });
+    const desired = { title: character.title, body: character.body };
+    const desiredHash = await sha256(desired);
+    const previousSync = existing ? readFoundrySync(existing.meta) : null;
+    const currentHash = existing ? await sha256({ title: existing.title, body: existing.body }) : "";
+    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256) {
+      report.conflicts.push({ entityKey, title: existing.title });
+      continue;
+    }
+    const id = existing?.id ?? crypto.randomUUID();
+    characterIds.set(character.entityKey, id);
+    const meta = syncMeta({
+      ...(existing ? readObject(existing.meta) : {}),
+      tags: character.tags,
+      pinned: false,
+      avatar: "",
+      fields: character.fields,
+      sortOrder: character.sortOrder,
+    }, {
+      mappingVersion: workspaceMappingVersion,
+      workSlug: canonPackage.workSlug,
+      entityKey,
+      sourceCommit: canonPackage.sourceGitCommit,
+      sourceSha256: character.sourceSha256,
+      projectedContentSha256: desiredHash,
+      authority: "derived_narrative_state_projection",
+      status: "active",
+      reverseSync: false,
+    });
+    if (!existing) {
+      writes.push(
+        env.DB.prepare(
+          `INSERT INTO project_items
+            (id, project_id, kind, title, body, meta, updated_at)
+           VALUES (?, ?, 'character', ?, ?, ?, ?)`,
+        ).bind(id, projectId, character.title, character.body, meta, timestamp),
+      );
+      report.workspace.characters += 1;
+    } else if (
+      currentHash !== desiredHash
+      || previousSync.sourceSha256 !== character.sourceSha256
+      || previousSync.sourceCommit !== canonPackage.sourceGitCommit
+    ) {
+      writes.push(
+        env.DB.prepare(
+          `UPDATE project_items SET title = ?, body = ?, meta = ?, updated_at = ? WHERE id = ?`,
+        ).bind(character.title, character.body, meta, timestamp, id),
+      );
+      report.workspace.characters += 1;
+    }
+  }
+
+  const manuscriptIds = new Map<number, string>();
+  for (const manuscript of canonPackage.workspaceProjection.manuscripts) {
+    const entityKey = `manuscript:${manuscript.entityKey}`;
+    const existing = access.manuscripts.find((item) => item.episodeNo === manuscript.episodeNo);
+    const desired = { title: manuscript.title, body: manuscript.body };
+    const desiredHash = await sha256(desired);
+    const previousSync = existing ? readFoundrySync(existing.meta) : null;
+    const currentHash = existing ? await sha256({ title: existing.title, body: existing.body }) : "";
+    if (
+      existing
+      && ((previousSync && currentHash !== previousSync.projectedContentSha256)
+        || (!previousSync && Boolean(existing.body.trim()) && currentHash !== desiredHash))
+    ) {
+      report.conflicts.push({ entityKey, title: existing.title });
+      continue;
+    }
+    const id = existing?.id ?? crypto.randomUUID();
+    manuscriptIds.set(manuscript.episodeNo, id);
+    const meta = syncMeta(existing ? readObject(existing.meta) : {}, {
+      mappingVersion: workspaceMappingVersion,
+      workSlug: canonPackage.workSlug,
+      entityKey,
+      sourceCommit: canonPackage.sourceGitCommit,
+      sourceSha256: manuscript.sourceSha256,
+      projectedContentSha256: desiredHash,
+      authority: "owner_approved_manuscript",
+      status: "committed",
+      reverseSync: false,
+    });
+    if (!existing) {
+      writes.push(
+        env.DB.prepare(
+          `INSERT INTO manuscripts
+            (id, project_id, episode_no, title, body, status, meta, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'published', ?, ?, ?)`,
+        ).bind(id, projectId, manuscript.episodeNo, manuscript.title, manuscript.body, meta, timestamp, timestamp),
+      );
+      report.workspace.manuscripts += 1;
+    } else if (
+      currentHash !== desiredHash
+      || previousSync?.sourceSha256 !== manuscript.sourceSha256
+      || previousSync?.sourceCommit !== canonPackage.sourceGitCommit
+      || existing.status !== "published"
+    ) {
+      writes.push(
+        env.DB.prepare(
+          `UPDATE manuscripts
+              SET title = ?, body = ?, status = 'published', meta = ?, updated_at = ?
+            WHERE id = ?`,
+        ).bind(manuscript.title, manuscript.body, meta, timestamp, id),
+      );
+      report.workspace.manuscripts += 1;
+    }
+  }
+
+  if (access.publication) {
+    writes.push(
+      env.DB.prepare(
+        `UPDATE publications SET title = ?, logline = ?, updated_at = ? WHERE id = ?`,
+      ).bind(overview.title, overview.logline, timestamp, access.publication.id),
+    );
+    for (const manuscript of canonPackage.workspaceProjection.manuscripts) {
+      const sourceManuscriptId = manuscriptIds.get(manuscript.episodeNo);
+      if (!sourceManuscriptId) continue;
+      const entityKey = `publication:${manuscript.entityKey}`;
+      const desiredHash = await sha256({ title: manuscript.title, body: manuscript.body });
+      const existing = access.publicationEpisodes.find((item) => item.episodeNo === manuscript.episodeNo);
+      const meta = syncMeta(existing ? readObject(existing.meta) : {}, {
+        mappingVersion: workspaceMappingVersion,
+        workSlug: canonPackage.workSlug,
+        entityKey,
+        sourceCommit: canonPackage.sourceGitCommit,
+        sourceSha256: manuscript.sourceSha256,
+        projectedContentSha256: desiredHash,
+        authority: "owner_approved_publication_mirror",
+        status: "committed",
+        reverseSync: false,
+      });
+      if (existing) {
+        writes.push(
+          env.DB.prepare(
+            `UPDATE publication_episodes
+                SET source_manuscript_id = ?, title = ?, body = ?, meta = ?, updated_at = ?
+              WHERE id = ?`,
+          ).bind(sourceManuscriptId, manuscript.title, manuscript.body, meta, timestamp, existing.id),
+        );
+      } else {
+        writes.push(
+          env.DB.prepare(
+            `INSERT INTO publication_episodes
+              (id, publication_id, source_manuscript_id, episode_no, title, body, meta, published_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ).bind(
+            crypto.randomUUID(), access.publication.id, sourceManuscriptId, manuscript.episodeNo,
+            manuscript.title, manuscript.body, meta, timestamp, timestamp,
+          ),
+        );
+      }
+      report.workspace.communityEpisodes += 1;
+    }
+    for (const character of canonPackage.workspaceProjection.characters) {
+      const sourceId = characterIds.get(character.entityKey);
+      if (!sourceId) continue;
+      const meta = JSON.stringify({
+        tags: character.tags,
+        fields: character.fields,
+        foundrySync: {
+          mappingVersion: workspaceMappingVersion,
+          workSlug: canonPackage.workSlug,
+          entityKey: `publication-character:${character.entityKey}`,
+          sourceCommit: canonPackage.sourceGitCommit,
+          sourceSha256: character.sourceSha256,
+          authority: "derived_narrative_state_projection",
+          status: "active",
+          reverseSync: false,
+        },
+      });
+      writes.push(
+        env.DB.prepare(
+          `INSERT INTO publication_content
+            (id, publication_id, source_id, kind, parent_source_id, sort_order,
+             title, body, meta, created_at, updated_at)
+           VALUES (?, ?, ?, 'character', '', ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(publication_id, kind, source_id) DO UPDATE SET
+             sort_order = excluded.sort_order, title = excluded.title,
+             body = excluded.body, meta = excluded.meta, updated_at = excluded.updated_at`,
+        ).bind(
+          crypto.randomUUID(), access.publication.id, sourceId, character.sortOrder,
+          character.title, character.body, meta, timestamp, timestamp,
+        ),
+      );
+    }
+  }
   const actByBId = new Map<string, number>();
   const projectedKeys = new Set<string>();
 
@@ -367,6 +620,32 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const sync = readFoundrySync(entity.meta);
     return sync?.workSlug === canonPackage.workSlug && !projectedKeys.has(sync.entityKey);
   }).length;
+  if (report.conflicts.length) {
+    return Response.json({
+      error: "Storyyard에서 수정된 정본 투영이 있어 전체 동기화를 중단했음. Foundry 정본을 덮어쓰지 않도록 충돌을 먼저 확인해 줘.",
+      report,
+    }, { status: 409 });
+  }
+  writes.push(
+    env.DB.prepare(
+      `INSERT INTO canon_bindings
+        (project_id, work_slug, source_commit, bundle_sha256, revision_set_sha256, synced_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(project_id) DO UPDATE SET
+         work_slug = excluded.work_slug,
+         source_commit = excluded.source_commit,
+         bundle_sha256 = excluded.bundle_sha256,
+         revision_set_sha256 = excluded.revision_set_sha256,
+         synced_at = excluded.synced_at`,
+    ).bind(
+      projectId,
+      canonPackage.workSlug,
+      canonPackage.sourceGitCommit,
+      canonPackage.bundleSha256,
+      canonPackage.revisionSetSha256,
+      timestamp,
+    ),
+  );
   if (writes.length) {
     writes.push(
       env.DB.prepare(`UPDATE projects SET updated_at = ? WHERE id = ?`)

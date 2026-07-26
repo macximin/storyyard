@@ -633,10 +633,13 @@ export function ProjectWorkspace({
         window.history.replaceState(window.history.state, "", url);
       }
       const changed = data.report.created + data.report.updated;
+      const workspaceChanged = Object.entries(data.report.workspace ?? {})
+        .filter(([, value]) => typeof value === "number")
+        .reduce((sum, [, value]) => sum + Number(value), 0);
       setFoundrySyncMessage(
         data.report.conflicts.length
-          ? `${changed}개 반영 · 편집 충돌 ${data.report.conflicts.length}개 보존`
-          : `${changed}개 반영 · ${data.report.unchanged}개 최신`,
+          ? `정본 충돌 ${data.report.conflicts.length}개 · 전체 반영 중단`
+          : `작업실·커뮤니티 ${workspaceChanged}개, 플롯 ${changed}개 반영 · 같은 정본으로 잠금`,
       );
     } catch (error) {
       setFoundrySyncMessage(error instanceof Error ? error.message : "Foundry 동기화 실패");
@@ -1144,6 +1147,7 @@ type Manuscript = {
   title: string;
   body: string;
   status: string;
+  meta: string;
   updatedAt: string;
 };
 
@@ -1192,6 +1196,7 @@ function ManuscriptView({ projectId }: { projectId: string }) {
 
   function change(update: Partial<Manuscript>) {
     if (!draft) return;
+    if (readFoundrySyncInfo(draft.meta)?.authority === "owner_approved_manuscript") return;
     const next = { ...draft, ...update };
     setDraft(next);
     setManuscripts((current) => current.map((item) => item.id === next.id ? next : item));
@@ -1240,13 +1245,19 @@ function ManuscriptView({ projectId }: { projectId: string }) {
         </aside>
         {draft ? (
           <section className="manuscript-editor">
+            {readFoundrySyncInfo(draft.meta)?.authority === "owner_approved_manuscript" && (
+              <div className="publication-sync-note">
+                <strong>Foundry 승인 정본</strong>
+                <span>개인 작업실과 커뮤니티가 같은 정본을 사용합니다. 수정은 Foundry에서 승인 후 전체 동기화합니다.</span>
+              </div>
+            )}
             <div className="manuscript-editor-head">
               <span>{draft.episodeNo}화</span>
-              <div className={`save-indicator ${status}`}>{status === "saving" ? "저장 중…" : status === "saved" ? "저장됨" : status === "error" ? "저장 실패" : "자동저장"}</div>
-              <button type="button" onClick={remove}>삭제</button>
+              <div className={`save-indicator ${status}`}>{readFoundrySyncInfo(draft.meta)?.authority === "owner_approved_manuscript" ? "정본 잠금" : status === "saving" ? "저장 중…" : status === "saved" ? "저장됨" : status === "error" ? "저장 실패" : "자동저장"}</div>
+              {!readFoundrySyncInfo(draft.meta) && <button type="button" onClick={remove}>삭제</button>}
             </div>
-            <input className="manuscript-title" value={draft.title} onChange={(event) => change({ title: event.target.value })} aria-label="원고 제목" />
-            <textarea className="manuscript-body" value={draft.body} onChange={(event) => change({ body: event.target.value })} placeholder="이 회차의 원고를 입력하세요." />
+            <input className="manuscript-title" readOnly={Boolean(readFoundrySyncInfo(draft.meta))} value={draft.title} onChange={(event) => change({ title: event.target.value })} aria-label="원고 제목" />
+            <textarea className="manuscript-body" readOnly={Boolean(readFoundrySyncInfo(draft.meta))} value={draft.body} onChange={(event) => change({ body: event.target.value })} placeholder="이 회차의 원고를 입력하세요." />
             <footer><span>공백 포함 {draft.body.length.toLocaleString("ko")}자</span><span>{draft.status === "published" ? "현재 커뮤니티에 공개된 사본이 있음." : "공개 관리에서 공개할 수 있음."}</span></footer>
           </section>
         ) : (
@@ -1266,6 +1277,7 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
   const documents = items.filter((item) => item.kind === "document");
   const plots = items.filter((item) => item.kind === "plot");
   const acts = items.filter((item) => item.kind === "act");
+  const canonBound = manuscripts.some((item) => readFoundrySyncInfo(item.meta)?.authority === "owner_approved_manuscript");
 
   useEffect(() => {
     Promise.all([
@@ -1314,6 +1326,7 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
           {publication?.slug && <Link href={`/works/${publication.slug}`}>공개 페이지 보기 →</Link>}
         </div>
         <div className="publication-sync-note"><strong>작품 기본 정보 자동 동기화</strong><span>제목·소개·장르는 작업실의 작품 개요를 저장하면 공개 페이지에도 바로 반영됨.</span></div>
+        {canonBound && <div className="publication-sync-note"><strong>Foundry 정본 연결됨</strong><span>개인 원고와 커뮤니티 공개본은 정본 전체 동기화로 함께 갱신됩니다.</span></div>}
         <dl className="publication-project-info"><div><dt>제목</dt><dd>{project.title}</dd></div><div><dt>장르</dt><dd>{project.genre}</dd></div><div><dt>소개</dt><dd>{project.logline}</dd></div></dl>
         <label>필명<input name="authorName" defaultValue={publication?.authorName || ""} placeholder="커뮤니티에 표시할 이름" /></label>
         <label>표지 이미지 URL<input name="coverUrl" defaultValue={publication?.coverUrl || "/default-cover.png"} placeholder="https://…" /></label>
@@ -1333,7 +1346,7 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
         {!manuscripts.length && <p className="tree-empty root">원고 메뉴에서 먼저 회차를 작성해 주세요.</p>}
         {message && <p className="inline-message">{message}</p>}
         <div className="publish-actions">
-          <button className="black-button" disabled={pending || !manuscripts.length}>{pending ? "전체 공개 중…" : publication?.status === "published" ? "전체 공개본 갱신" : "전체 공개"}</button>
+          <button className="black-button" disabled={pending || !manuscripts.length || canonBound}>{pending ? "전체 공개 중…" : canonBound ? "정본 전체 동기화에서 갱신" : publication?.status === "published" ? "전체 공개본 갱신" : "전체 공개"}</button>
           {publication?.status === "published" && <button type="button" className="outline-cancel" onClick={unpublish}>공개 중지</button>}
         </div>
       </form>
@@ -1580,7 +1593,7 @@ function Plot(props: {
               <span>FOUNDRY SSOT · {props.foundryPackage.currentBArc} / {props.foundryPackage.currentEpisode}</span>
               <button type="button" disabled={props.foundrySyncing} onClick={props.onSyncFoundry}>
                 <ArrowsClockwise size={16} weight="bold" aria-hidden="true" />
-                {props.foundrySyncing ? "동기화 중…" : "정본 아크·화 동기화"}
+                {props.foundrySyncing ? "동기화 중…" : "정본 전체 동기화"}
               </button>
               {props.foundrySyncMessage && <small>{props.foundrySyncMessage}</small>}
             </div>
@@ -2449,6 +2462,7 @@ function readFoundrySyncInfo(meta: string) {
     workSlug: record.workSlug,
     entityKey: record.entityKey,
     status: typeof record.status === "string" ? record.status : "synced",
+    authority: typeof record.authority === "string" ? record.authority : "",
     sourceCommit: typeof record.sourceCommit === "string" ? record.sourceCommit : "",
   };
 }

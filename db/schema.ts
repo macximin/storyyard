@@ -70,6 +70,7 @@ export const manuscripts = sqliteTable("manuscripts", {
   title: text("title").notNull(),
   body: text("body").notNull().default(""),
   status: text("status").notNull().default("draft"),
+  meta: text("meta").notNull().default("{}"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 }, (table) => [
@@ -101,10 +102,25 @@ export const publicationEpisodes = sqliteTable("publication_episodes", {
   episodeNo: integer("episode_no").notNull(),
   title: text("title").notNull(),
   body: text("body").notNull().default(""),
+  meta: text("meta").notNull().default("{}"),
   publishedAt: text("published_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 }, (table) => [
   uniqueIndex("publication_episodes_publication_episode_unique").on(table.publicationId, table.episodeNo),
+]);
+
+// One project can be bound to one approved Foundry work revision. The binding
+// makes private and public projections independently verifiable without making
+// Storyyard an authority for canon.
+export const canonBindings = sqliteTable("canon_bindings", {
+  projectId: text("project_id").primaryKey(),
+  workSlug: text("work_slug").notNull(),
+  sourceCommit: text("source_commit").notNull(),
+  bundleSha256: text("bundle_sha256").notNull(),
+  revisionSetSha256: text("revision_set_sha256").notNull(),
+  syncedAt: text("synced_at").notNull(),
+}, (table) => [
+  index("canon_bindings_work_slug_idx").on(table.workSlug),
 ]);
 
 // 공개 페이지는 작업실 원본을 직접 읽지 않고, 작가가 고른 정보만 이 스냅샷에 복사한다.

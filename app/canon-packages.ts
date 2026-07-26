@@ -51,6 +51,35 @@ export type CanonConsistencyAudit = {
   note: string;
 };
 
+export type StoryyardWorkspaceProjection = {
+  mappingVersion: "foundry_storyyard_workspace_v1";
+  reverseSync: false;
+  overview: {
+    title: string;
+    logline: string;
+    sourceSha256: string;
+  };
+  characters: Array<{
+    entityKey: string;
+    title: string;
+    body: string;
+    tags: string[];
+    fields: Array<{ id: string; label: string; value: string }>;
+    sortOrder: number;
+    sourceSha256: string;
+  }>;
+  manuscripts: Array<{
+    episodeNo: number;
+    entityKey: string;
+    title: string;
+    body: string;
+    status: "published";
+    sourcePath: string;
+    sourceSha256: string;
+  }>;
+  revisionSetSha256: string;
+};
+
 export type CanonPackage = {
   schemaVersion: "firefly_story_package_v1";
   workSlug: string;
@@ -115,6 +144,7 @@ export type CanonPackage = {
     arcs: StoryyardProjectionArc[];
     episodeBlocks: StoryyardProjectionEpisode[];
   };
+  workspaceProjection: StoryyardWorkspaceProjection;
   consistencyAudit: CanonConsistencyAudit;
   artifacts: CanonArtifact[];
 };

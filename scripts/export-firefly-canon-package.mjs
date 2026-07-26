@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { parse as parseYaml } from "yaml";
 
 const storyyardRoot = process.cwd();
 const foundryRoot = process.env.FOUNDRY_ROOT
@@ -82,6 +83,82 @@ function parseStatus(source) {
     stateThrough: yamlScalar(source, "state_through"),
     nextAction: yamlScalar(source, "next_action"),
     updatedAt: yamlScalar(source, "updated_at"),
+  };
+}
+
+function pitchLogline(source) {
+  return source
+    .split(/^## 한 줄\s*$/m)[1]
+    ?.split(/^## /m)[0]
+    ?.trim() ?? "";
+}
+
+function displayValue(value) {
+  if (Array.isArray(value)) return value.map(displayValue).filter(Boolean).join(", ");
+  if (value && typeof value === "object") {
+    return Object.entries(value)
+      .map(([key, child]) => `${key}: ${displayValue(child)}`)
+      .join(", ");
+  }
+  if (value === null || value === undefined) return "미공개";
+  return String(value);
+}
+
+function buildWorkspaceProjection({ status, artifacts, revisionSetSha256 }) {
+  const artifactByKey = Object.fromEntries(artifacts.map((artifact) => [artifact.key, artifact]));
+  const narrativeState = parseYaml(artifactByKey.narrative_state.body);
+  const characters = narrativeState?.characters && typeof narrativeState.characters === "object"
+    ? Object.entries(narrativeState.characters).map(([entityKey, value], index) => {
+      const fields = value && typeof value === "object" ? value : {};
+      const record = fields;
+      const title = record.name
+        ? String(record.name)
+        : record.role
+          ? displayValue(record.role)
+          : entityKey.replaceAll("_", " ");
+      const characterFields = Object.entries(record)
+        .filter(([key]) => key !== "name")
+        .map(([key, child]) => ({
+          id: `${entityKey}:${key}`,
+          label: key,
+          value: displayValue(child),
+        }));
+      return {
+        entityKey,
+        title,
+        body: characterFields.map((field) => `${field.label}: ${field.value}`).join("\n"),
+        tags: [],
+        fields: characterFields,
+        sortOrder: index,
+        sourceSha256: sha256(JSON.stringify(record)),
+      };
+    })
+    : [];
+  const manuscripts = artifacts
+    .filter((artifact) => artifact.kind === "manuscript")
+    .map((artifact, index) => {
+      const firstLine = artifact.body.split("\n")[0]?.trim() || `${index + 1}화`;
+      return {
+        episodeNo: index + 1,
+        entityKey: artifact.key,
+        title: firstLine,
+        body: artifact.body,
+        status: "published",
+        sourcePath: artifact.sourcePath,
+        sourceSha256: artifact.sha256,
+      };
+    });
+  return {
+    mappingVersion: "foundry_storyyard_workspace_v1",
+    reverseSync: false,
+    overview: {
+      title: status.title,
+      logline: pitchLogline(artifactByKey.frozen_pitch.body),
+      sourceSha256: artifactByKey.frozen_pitch.sha256,
+    },
+    characters,
+    manuscripts,
+    revisionSetSha256,
   };
 }
 
@@ -488,6 +565,11 @@ const packageWithoutHash = {
     arcs: projectedArcs,
     episodeBlocks: [...committedBlocks, ...provisionalBlocks],
   },
+  workspaceProjection: buildWorkspaceProjection({
+    status,
+    artifacts: artifactRows,
+    revisionSetSha256: declaredRevisionSet,
+  }),
   consistencyAudit: buildConsistencyAudit({
     status,
     artifacts: artifactRows,

@@ -254,12 +254,15 @@ test("ships a three-work admin-only Foundry canon review board with pending deci
   }
 });
 
-test("projects Foundry B-Rail arcs into one Storyyard block per episode without reverse sync", async () => {
-  const [canonSource, syncRoute, workspace, exporter] = await Promise.all([
+test("atomically projects the full Foundry canon into private and public Storyyard views", async () => {
+  const [canonSource, syncRoute, workspace, exporter, manuscriptRoute, publicationRoute, migration] = await Promise.all([
     read("data/canon/afterlife_restaurant.json"),
     read("app/api/projects/[id]/foundry-sync/route.ts"),
     read("app/project-workspace.tsx"),
     read("scripts/export-firefly-canon-package.mjs"),
+    read("app/api/manuscripts/[id]/route.ts"),
+    read("app/api/projects/[id]/publication/route.ts"),
+    read("drizzle/0009_yummy_masked_marvel.sql"),
   ]);
   const canonPackage = JSON.parse(canonSource);
   const projection = canonPackage.storyyardProjection;
@@ -286,8 +289,13 @@ test("projects Foundry B-Rail arcs into one Storyyard block per episode without 
     new Set(projection.episodeBlocks.map((item) => item.episode)).size,
     projection.episodeBlocks.length,
   );
+  assert.equal(canonPackage.workspaceProjection.mappingVersion, "foundry_storyyard_workspace_v1");
+  assert.equal(canonPackage.workspaceProjection.reverseSync, false);
+  assert.equal(canonPackage.workspaceProjection.manuscripts.length, 3);
+  assert.equal(canonPackage.workspaceProjection.characters.length, 7);
   assert.match(exporter, /committedEpisodeBets/);
   assert.match(exporter, /parseProvisionalEpisodes/);
+  assert.match(exporter, /buildWorkspaceProjection/);
   assert.match(syncRoute, /loadAdminOwnerState/);
   assert.match(syncRoute, /u\.role = 'admin'/);
   assert.match(syncRoute, /projectedContentSha256/);
@@ -296,7 +304,14 @@ test("projects Foundry B-Rail arcs into one Storyyard block per episode without 
   assert.match(syncRoute, /env\.DB\.batch\(writes\)/);
   assert.match(syncRoute, /if \(writes\.length\)/);
   assert.doesNotMatch(syncRoute, /\.delete\(|DELETE FROM/);
-  assert.match(workspace, /정본 아크·화 동기화/);
+  assert.match(syncRoute, /UPDATE publication_episodes/);
+  assert.match(syncRoute, /ON CONFLICT\(project_id\) DO UPDATE/);
+  assert.match(syncRoute, /canon_bindings/);
+  assert.match(manuscriptRoute, /Foundry 승인 정본은 Storyyard에서 직접 수정할 수 없음/);
+  assert.match(publicationRoute, /정본 전체 동기화로만 갱신/);
+  assert.match(migration, /ALTER TABLE `manuscripts` ADD `meta`/);
+  assert.match(migration, /ALTER TABLE `publication_episodes` ADD `meta`/);
+  assert.match(workspace, /정본 전체 동기화/);
   assert.match(workspace, /blockBodyPreview\(block\.body\)/);
   assert.match(workspace, /\.\.\.\(existingBlock \? readObject\(existingBlock\.meta\) : \{\}\)/);
   assert.match(workspace, /\.\.\.\(existing \? readObject\(existing\.meta\) : \{\}\)/);

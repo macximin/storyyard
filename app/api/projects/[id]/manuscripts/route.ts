@@ -36,6 +36,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     title: input.title?.trim() || `${episodeNo}화`,
     body: "",
     status: "draft",
+    meta: "{}",
     createdAt: timestamp,
     updatedAt: timestamp,
   };

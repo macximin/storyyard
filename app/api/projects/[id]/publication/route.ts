@@ -2,7 +2,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getDb } from "@/db";
-import { manuscripts, plotBlocks, projectItems, publicationContent, publicationEpisodes, publications, projects } from "@/db/schema";
+import { canonBindings, manuscripts, plotBlocks, projectItems, publicationContent, publicationEpisodes, publications, projects } from "@/db/schema";
 
 async function ownedProject(projectId: string, ownerKey: string) {
   const [project] = await getDb().select().from(projects).where(eq(projects.id, projectId));
@@ -45,6 +45,12 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   if (!user) return Response.json({ error: "로그인이 필요함." }, { status: 401 });
   const project = await ownedProject(projectId, user.email);
   if (!project) return Response.json({ error: "Not found" }, { status: 404 });
+  const [canonBinding] = await getDb().select().from(canonBindings).where(eq(canonBindings.projectId, projectId));
+  if (canonBinding) {
+    return Response.json({
+      error: "Foundry 정본 작품의 공개본은 개인 작업실과 함께 정본 전체 동기화로만 갱신할 수 있음.",
+    }, { status: 409 });
+  }
   const input = await request.json() as Partial<{
     publishAll: boolean;
     coverUrl: string;
@@ -129,8 +135,8 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     ...selected.map((item) =>
       env.DB.prepare(
         `INSERT INTO publication_episodes
-          (id, publication_id, source_manuscript_id, episode_no, title, body, published_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, publication_id, source_manuscript_id, episode_no, title, body, meta, published_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, '{}', ?, ?)`,
       ).bind(
         crypto.randomUUID(),
         publicationId,
