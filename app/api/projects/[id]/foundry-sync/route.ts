@@ -243,7 +243,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   // snapshot exists but the private workspace has no manuscripts at all.
   // Once canonical manuscripts are inserted, normal fail-closed drift checks
   // apply on every later sync.
-  const legacySnapshotRepair = access.manuscripts.length === 0;
+  const legacySnapshotRepair = Boolean(access.publication)
+    && access.manuscripts.every((manuscript) => readFoundrySync(manuscript.meta) === null);
   const writes: ReturnType<typeof env.DB.prepare>[] = [];
   const timestamp = new Date().toISOString();
   const plotEntity = existingItems.find((item) => {
