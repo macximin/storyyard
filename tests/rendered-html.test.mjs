@@ -26,10 +26,12 @@ test("formats canon decision timestamps identically across host time zones", () 
 });
 
 test("ships the public community and private studio navigation", async () => {
-  const [sidebar, community, page] = await Promise.all([
+  const [sidebar, community, page, library, styles] = await Promise.all([
     read("app/global-sidebar.tsx"),
     read("app/community-home.tsx"),
     read("app/page.tsx"),
+    read("app/library.tsx"),
+    read("app/globals.css"),
   ]);
   assert.match(sidebar, /커뮤니티/);
   assert.match(sidebar, /전체장르/);
@@ -39,6 +41,9 @@ test("ships the public community and private studio navigation", async () => {
   assert.match(community, /랭킹순/);
   assert.match(community, /신작순/);
   assert.match(page, /CommunityHome/);
+  assert.match(library, /work-card-cover/);
+  assert.match(styles, /\.work-grid \{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.work-card-cover \{[^}]*aspect-ratio: 2 \/ 3/);
   await access(new URL("public/default-cover.png", root));
 });
 

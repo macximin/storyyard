@@ -160,10 +160,15 @@ export function Library({
                     router.push(`/project/${project.id}/plot`);
                   }}
                 >
-                  <span className="work-type">{project.genre}</span>
-                  <h2>{project.title}</h2>
-                  <p>{project.logline}</p>
-                  <span className="edited-at">{formatDate(project.updatedAt)} 편집</span>
+                  <span className="work-card-cover">
+                    <img src="/default-cover.png" alt={`${project.title} 표지`} />
+                    <span className="work-type">{project.genre}</span>
+                  </span>
+                  <span className="work-card-copy">
+                    <h2>{project.title}</h2>
+                    <p>{project.logline}</p>
+                    <span className="edited-at">{formatDate(project.updatedAt)} 편집</span>
+                  </span>
                 </button>
               </article>
             ))}
