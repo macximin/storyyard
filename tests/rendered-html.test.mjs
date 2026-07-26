@@ -154,6 +154,7 @@ test("publishes the entire workspace and renders public planning snapshots immed
   assert.match(projectRoute, /UPDATE publications SET title = \?, logline = \?, genre = \?/);
   assert.match(workspace, /전체 공개본 갱신/);
   assert.match(workspace, /publishAll: true/);
+  assert.match(workspace, /items\.some\(\(item\) => Boolean\(readFoundrySyncInfo\(item\.meta\)\)\)/);
   for (const tab of ["원고", "등장인물", "자료실", "플롯"]) {
     assert.match(publicWork, new RegExp(`>${tab}<`));
   }

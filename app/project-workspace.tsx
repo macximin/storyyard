@@ -1281,7 +1281,9 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
   const documents = items.filter((item) => item.kind === "document");
   const plots = items.filter((item) => item.kind === "plot");
   const acts = items.filter((item) => item.kind === "act");
-  const canonBound = manuscripts.some((item) => readFoundrySyncInfo(item.meta)?.authority === "owner_approved_manuscript");
+  const canonBound = manuscripts.some((item) => Boolean(readFoundrySyncInfo(item.meta)))
+    || items.some((item) => Boolean(readFoundrySyncInfo(item.meta)))
+    || blocks.some((item) => Boolean(readFoundrySyncInfo(item.meta)));
 
   useEffect(() => {
     Promise.all([
