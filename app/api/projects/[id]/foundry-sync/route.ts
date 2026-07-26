@@ -121,15 +121,22 @@ async function loadAdminOwnerState(projectId: string) {
          FROM publications p
         WHERE p.project_id = ?
            OR (
-             p.owner_user_id = (
-               SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
-                WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
+             (
+               p.owner_user_id = (
+                 SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
+                  WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
+               )
+               OR p.author_name = (
+                 SELECT u.display_name FROM sessions s JOIN users u ON u.id = s.user_id
+                  WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
+               )
              )
              AND p.title = (SELECT title FROM projects WHERE id = ?)
+             AND p.status = 'published'
            )
         ORDER BY CASE WHEN p.project_id = ? THEN 0 ELSE 1 END, p.updated_at DESC
         LIMIT 3`,
-    ).bind(projectId, tokenHash, now, projectId, projectId),
+    ).bind(projectId, tokenHash, now, tokenHash, now, projectId, projectId),
     env.DB.prepare(
       `SELECT pe.id, pe.publication_id AS "publicationId",
               pe.source_manuscript_id AS "sourceManuscriptId",
@@ -138,13 +145,20 @@ async function loadAdminOwnerState(projectId: string) {
          JOIN publications p ON p.id = pe.publication_id
         WHERE p.project_id = ?
            OR (
-             p.owner_user_id = (
-               SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
-                WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
+             (
+               p.owner_user_id = (
+                 SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
+                  WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
+               )
+               OR p.author_name = (
+                 SELECT u.display_name FROM sessions s JOIN users u ON u.id = s.user_id
+                  WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
+               )
              )
              AND p.title = (SELECT title FROM projects WHERE id = ?)
+             AND p.status = 'published'
            )`,
-    ).bind(projectId, tokenHash, now, projectId),
+    ).bind(projectId, tokenHash, now, tokenHash, now, projectId),
   ]);
   const user = userResult.results?.[0] as { id: string; role: string } | undefined;
   if (!user || user.role !== "admin") {
