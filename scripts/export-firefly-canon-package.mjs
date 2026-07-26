@@ -37,6 +37,10 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function git(...args) {
   return execFileSync("git", ["-C", foundryRoot, ...args], { encoding: "utf8" }).trim();
 }
@@ -102,7 +106,7 @@ function parseAnchors(source) {
 function parseBRail(source) {
   const slotsSource = source.split(/^slots:\s*$/m)[1] ?? "";
   const chunks = slotsSource.split(/\n(?=\s{2}- b_id:)/);
-  return chunks.flatMap((chunk) => {
+  const multilineRows = chunks.flatMap((chunk) => {
     const id = chunk.match(/^\s{2}- b_id:\s*(B\d+)/m)?.[1];
     if (!id) return [];
     const get = (key) => chunk
@@ -122,6 +126,26 @@ function parseBRail(source) {
       endEpisode: get("end_episode"),
     }];
   });
+  const inlineRows = slotsSource.split("\n").flatMap((line) => {
+    const id = line.match(/^\s{2}- \{\s*b_id:\s*(B\d+)/)?.[1];
+    if (!id) return [];
+    const get = (key) => line.match(
+      new RegExp(`${key}:\\s*(?:"([^"]*)"|'([^']*)'|([^,}]+))`),
+    )?.slice(1).find((value) => value !== undefined)?.trim() ?? "";
+    return [{
+      id,
+      order: Number(get("route_order")) || 0,
+      status: get("status"),
+      targetAnchor: get("target_anchor"),
+      narrativeFunction: get("narrative_function"),
+      payoffAxis: get("payoff_axis"),
+      readerDebt: get("carried_reader_debt"),
+      contrast: get("contrast_requirement"),
+      startEpisode: get("start_episode"),
+      endEpisode: get("end_episode"),
+    }];
+  });
+  return multilineRows.length ? multilineRows : inlineRows;
 }
 
 function episodeNumber(value) {
@@ -152,7 +176,7 @@ function parseProvisionalEpisodes(source) {
     ?.split(/^## 회차 가치 순환\s*$/m)[0]
     ?.trim() ?? "";
   if (!currentBArc || !hypothesisSource) return [];
-  return hypothesisSource.split(/\n(?=###\s+ep\d+\s+—\s+)/).flatMap((chunk) => {
+  const sectionRows = hypothesisSource.split(/\n(?=###\s+ep\d+\s+—\s+)/).flatMap((chunk) => {
     const match = chunk.match(/^###\s+(ep\d+)\s+—\s+(.+)\n+([\s\S]+)$/);
     if (!match) return [];
     const [, episode, title, body] = match;
@@ -169,6 +193,125 @@ function parseProvisionalEpisodes(source) {
       sortOrder: episodeNumber(episode) * 100,
     }];
   });
+  if (sectionRows.length) return sectionRows;
+  return hypothesisSource.split("\n").flatMap((line) => {
+    const match = line.match(/^-\s+(ep\d+):\s+(.+)$/);
+    if (!match) return [];
+    const [, episode, body] = match;
+    const normalizedBody = body.trim();
+    return [{
+      episode,
+      bId: currentBArc,
+      title: `${episode} · 회차 가설`,
+      body: normalizedBody,
+      status: "provisional",
+      authority: "owner_approved_story_plan_hypothesis",
+      sourcePath: `${foundryWorkPath}/02_story/rolling_corridor.md#${episode}`,
+      sourceSha256: sha256(normalizedBody),
+      sortOrder: episodeNumber(episode) * 100,
+    }];
+  });
+}
+
+function buildConsistencyAudit({
+  status,
+  artifacts,
+  anchors,
+  bArcs,
+  committedBlocks,
+  revisionSetSha256,
+  sourceGitCommit,
+}) {
+  const artifactMap = Object.fromEntries(artifacts.map((artifact) => [artifact.key, artifact]));
+  const narrativeState = artifactMap.narrative_state.body;
+  const characterSection = narrativeState.split(/^characters:\s*$/m)[1]?.split(/^assets:\s*$/m)[0] ?? "";
+  const characterNames = [...characterSection.matchAll(/^    name:\s*(.+)$/gm)]
+    .map((match) => match[1].trim().replace(/^["']|["']$/g, ""))
+    .filter((name) => name && name !== "null");
+  const plans = artifacts
+    .filter((artifact) => artifact.kind === "pitch" || artifact.kind === "story_plan")
+    .map((artifact) => artifact.body)
+    .join("\n");
+  const manuscripts = artifacts
+    .filter((artifact) => artifact.kind === "manuscript")
+    .map((artifact) => artifact.body)
+    .join("\n");
+  const appears = (text, name) => [name, name.split(/\s+/)[0]]
+    .filter(Boolean)
+    .some((candidate) => text.includes(candidate));
+  const missingFromPlan = characterNames.filter((name) => !appears(plans, name));
+  const missingFromManuscript = characterNames.filter((name) => !appears(manuscripts, name));
+  const stateRevisionSet = indentedYamlScalar(narrativeState, "repo_revision_set_sha256");
+  const stateThrough = indentedYamlScalar(narrativeState, "state_through");
+  const currentArc = bArcs.find((arc) => arc.id === status.currentBArc);
+  const manuscriptArtifacts = artifacts.filter((artifact) => artifact.kind === "manuscript");
+
+  const checks = [
+    {
+      axis: "overview",
+      label: "작품 개요",
+      verdict: status.title && status.title === yamlScalar(artifactMap.status.body, "title") ? "pass" : "review",
+      summary: "작품명·제작 단계·현재 화·승인 범위를 정본 상태와 대조",
+      evidence: [
+        `title=${status.title}`,
+        `stage=${status.productionStage}`,
+        `current=${status.currentEpisode}`,
+        `approved=${status.approvedThrough}`,
+      ],
+    },
+    {
+      axis: "characters",
+      label: "등장인물",
+      verdict: missingFromPlan.length === 0 && missingFromManuscript.length === 0 ? "pass" : "review",
+      summary: "Narrative State의 실명 인물이 작품 계획과 승인 원고에서 식별되는지 대조",
+      evidence: [
+        `named_characters=${characterNames.length}`,
+        `missing_in_plan=${missingFromPlan.join(",") || "none"}`,
+        `missing_in_manuscript=${missingFromManuscript.join(",") || "none"}`,
+      ],
+    },
+    {
+      axis: "plot",
+      label: "플롯",
+      verdict: anchors.length > 0
+        && currentArc?.status === "active"
+        && committedBlocks.every((block) => bArcs.some((arc) => arc.id === block.bId && arc.status === "closed"))
+        ? "pass"
+        : "review",
+      summary: "A-Rail·현재 B-Rail·승인 회차의 B 소속을 대조",
+      evidence: [
+        `anchors=${anchors.length}`,
+        `current_b=${status.currentBArc}:${currentArc?.status ?? "missing"}`,
+        `committed_episode_blocks=${committedBlocks.length}`,
+      ],
+    },
+    {
+      axis: "manuscript",
+      label: "원고",
+      verdict: manuscriptArtifacts.length === 3
+        && status.approvedThrough === "ep003"
+        && status.reviewedThrough === "ep003"
+        && status.stateThrough === "ep003"
+        && stateThrough === "ep003"
+        && stateRevisionSet === revisionSetSha256
+        ? "pass"
+        : "review",
+      summary: "승인 1~3화·감리 범위·Narrative State 투영·revision-set을 대조",
+      evidence: [
+        `approved_manuscripts=${manuscriptArtifacts.length}`,
+        `reviewed_through=${status.reviewedThrough}`,
+        `state_through=${stateThrough}`,
+        `revision_set=${revisionSetSha256}`,
+      ],
+    },
+  ];
+  return {
+    schemaVersion: "storyyard_canon_consistency_audit_v1",
+    sourceGitCommit,
+    verdict: checks.every((check) => check.verdict === "pass") ? "pass" : "review",
+    checks,
+    note: "구조·참조·승인 범위 정합성 감리. 문학적 품질 판정이나 Foundry 역수정은 포함하지 않음.",
+  };
 }
 
 const sourcePaths = [
@@ -221,11 +364,16 @@ const status = parseStatus(artifactByKey.status.body);
 const adoptionReceipt = artifactByKey.adoption_review.body;
 const adoptionDecisionId = yamlScalar(adoptionReceipt, "decision_id");
 const exactManuscriptRevision = indentedYamlScalar(adoptionReceipt, "exact_manuscript_revision");
+const structuredDecision = yamlScalar(adoptionReceipt, "decision");
+const structuredRevisionSet = yamlScalar(adoptionReceipt, "manifest_revision_set_sha256");
+const legacyScopeApproved = indentedYamlScalar(adoptionReceipt, "frozen_pitch") === "approved"
+  && indentedYamlScalar(adoptionReceipt, "story_plan") === "approved"
+  && Boolean(exactManuscriptRevision);
+const structuredScopeApproved = structuredDecision === "adopt_all_exact_revisions"
+  && Boolean(structuredRevisionSet);
 if (
   !adoptionDecisionId
-  || indentedYamlScalar(adoptionReceipt, "frozen_pitch") !== "approved"
-  || indentedYamlScalar(adoptionReceipt, "story_plan") !== "approved"
-  || !exactManuscriptRevision
+  || (!legacyScopeApproved && !structuredScopeApproved)
 ) {
   throw new Error("Canon export refused: owner adoption receipt does not approve the pitch, Story Plan, and exact manuscript revision.");
 }
@@ -250,7 +398,12 @@ for (const entry of manifestEntries) {
   if (entry.authority !== "owner_approved" || entry.owner_decision !== adoptionDecisionId) {
     throw new Error(`Canon export refused: ${entry.episode} is not tied to owner decision ${adoptionDecisionId}.`);
   }
-  if (!adoptionReceipt.includes(`| ${entry.episode} | \`${entry.sha256}\``)) {
+  const markdownAttestation = adoptionReceipt.includes(`| ${entry.episode} | \`${entry.sha256}\``);
+  const structuredAttestation = new RegExp(
+    `^\\s*- \\{ episode: ${escapeRegex(entry.episode)}, source: [^,}]+, sha256: ${escapeRegex(entry.sha256)} \\}\\s*$`,
+    "m",
+  ).test(adoptionReceipt);
+  if (!markdownAttestation && !structuredAttestation) {
     throw new Error(`Canon export refused: adoption receipt does not attest ${entry.episode} hash ${entry.sha256}.`);
   }
 }
@@ -262,7 +415,10 @@ const computedRevisionSet = sha256(manifestEntries.map(
 if (computedRevisionSet !== declaredRevisionSet) {
   throw new Error(`Canon revision-set mismatch: expected ${declaredRevisionSet}, got ${computedRevisionSet}.`);
 }
-if (!adoptionReceipt.includes(`승인 revision-set SHA-256: \`${declaredRevisionSet}\``)) {
+if (
+  !adoptionReceipt.includes(`승인 revision-set SHA-256: \`${declaredRevisionSet}\``)
+  && structuredRevisionSet !== declaredRevisionSet
+) {
   throw new Error("Canon export refused: adoption receipt does not attest the manifest revision set.");
 }
 
@@ -332,6 +488,15 @@ const packageWithoutHash = {
     arcs: projectedArcs,
     episodeBlocks: [...committedBlocks, ...provisionalBlocks],
   },
+  consistencyAudit: buildConsistencyAudit({
+    status,
+    artifacts: artifactRows,
+    anchors,
+    bArcs,
+    committedBlocks,
+    revisionSetSha256: declaredRevisionSet,
+    sourceGitCommit,
+  }),
   artifacts: artifactRows,
 };
 const output = {

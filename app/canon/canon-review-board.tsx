@@ -21,7 +21,7 @@ type DecisionRow = {
   applyReceiptPath: string | null;
 };
 
-type ViewKey = "overview" | "frozen_pitch" | "living_spine" | "a_rail" | "b_rail" | "rolling_corridor" | "manuscripts" | "adoption_review" | "narrative_state";
+type ViewKey = "overview" | "consistency" | "frozen_pitch" | "living_spine" | "a_rail" | "b_rail" | "rolling_corridor" | "manuscripts" | "adoption_review" | "narrative_state";
 
 const decisionLabels: Record<CanonDecisionValue, string> = {
   approve: "승인",
@@ -39,6 +39,7 @@ const decisionDescriptions: Record<CanonDecisionValue, string> = {
 
 const viewLabels: Array<[ViewKey, string]> = [
   ["overview", "대시보드"],
+  ["consistency", "정합성 감리"],
   ["frozen_pitch", "Frozen Pitch"],
   ["living_spine", "Living Spine"],
   ["a_rail", "A-Rail"],
@@ -84,7 +85,7 @@ export function CanonReviewBoard({
 
   function openView(nextView: ViewKey) {
     setView(nextView);
-    if (nextView === "overview") setSelectedKey("__bundle__");
+    if (nextView === "overview" || nextView === "consistency") setSelectedKey("__bundle__");
     else if (nextView === "manuscripts") setSelectedKey(episode);
     else setSelectedKey(nextView);
     setMessage("");
@@ -197,6 +198,39 @@ export function CanonReviewBoard({
               </>
             )}
 
+            {view === "consistency" && (
+              <section className="canon-section no-top">
+                <div className="canon-section-head">
+                  <div>
+                    <p className="kicker">CANON CONSISTENCY AUDIT</p>
+                    <h2>작품 개요·등장인물·플롯·원고</h2>
+                    <p>{canonPackage.consistencyAudit.note}</p>
+                  </div>
+                  <div className="artifact-authority">
+                    {canonPackage.consistencyAudit.verdict === "pass" ? <Check size={16} /> : <WarningCircle size={16} />}
+                    <span>{canonPackage.consistencyAudit.verdict.toUpperCase()}</span>
+                  </div>
+                </div>
+                <div className="canon-status-grid">
+                  {canonPackage.consistencyAudit.checks.map((check) => (
+                    <article key={check.axis}>
+                      <span>{check.label}</span>
+                      <strong>{check.verdict.toUpperCase()}</strong>
+                      <small>{check.summary}</small>
+                    </article>
+                  ))}
+                </div>
+                <div className="scope-columns">
+                  {canonPackage.consistencyAudit.checks.map((check) => (
+                    <div key={check.axis}>
+                      <strong>{check.label} 근거</strong>
+                      {check.evidence.map((item) => <span key={item}>+ {item}</span>)}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {view === "a_rail" && (
               <section className="canon-section no-top">
                 <div className="canon-section-head">
@@ -256,7 +290,7 @@ export function CanonReviewBoard({
               </section>
             )}
 
-            {view !== "overview" && view !== "a_rail" && view !== "b_rail" && view !== "manuscripts" && (
+            {view !== "overview" && view !== "consistency" && view !== "a_rail" && view !== "b_rail" && view !== "manuscripts" && (
               <section className="canon-section no-top">
                 <ArtifactReader artifact={artifacts[view]} />
               </section>

@@ -1,5 +1,6 @@
 import afterlifeRestaurant from "@/data/canon/afterlife_restaurant.json";
 import knightsRestaurant from "@/data/canon/knights_restaurant.json";
+import romanceFantasyRestaurant from "@/data/canon/romance_fantasy_restaurant.json";
 
 export type CanonDecisionValue = "approve" | "conditional" | "revise" | "reject";
 export type CanonDecisionStatus = "pending" | "applied" | "stale" | "rejected";
@@ -34,6 +35,20 @@ export type StoryyardProjectionEpisode = {
   sourcePath: string;
   sourceSha256: string;
   sortOrder: number;
+};
+
+export type CanonConsistencyAudit = {
+  schemaVersion: "storyyard_canon_consistency_audit_v1";
+  sourceGitCommit: string;
+  verdict: "pass" | "review";
+  checks: Array<{
+    axis: "overview" | "characters" | "plot" | "manuscript";
+    label: string;
+    verdict: "pass" | "review";
+    summary: string;
+    evidence: string[];
+  }>;
+  note: string;
 };
 
 export type CanonPackage = {
@@ -100,12 +115,14 @@ export type CanonPackage = {
     arcs: StoryyardProjectionArc[];
     episodeBlocks: StoryyardProjectionEpisode[];
   };
+  consistencyAudit: CanonConsistencyAudit;
   artifacts: CanonArtifact[];
 };
 
 const registry: Record<string, CanonPackage> = {
   afterlife_restaurant: afterlifeRestaurant as CanonPackage,
   knights_restaurant: knightsRestaurant as CanonPackage,
+  romance_fantasy_restaurant: romanceFantasyRestaurant as CanonPackage,
 };
 
 export function getCanonPackage(workSlug: string): CanonPackage | null {

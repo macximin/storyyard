@@ -186,8 +186,8 @@ test("opens manuscripts as dedicated episode pages with episode comments and del
   assert.match(schema, /episodeId/);
 });
 
-test("ships a multi-work admin-only Foundry canon review board with pending decisions", async () => {
-  const [page, board, route, schema, packages, sidebar, canonPackage, knightPackage, exporter] = await Promise.all([
+test("ships a three-work admin-only Foundry canon review board with pending decisions", async () => {
+  const [page, board, route, schema, packages, sidebar, canonPackage, knightPackage, romancePackage, exporter] = await Promise.all([
     read("app/canon/page.tsx"),
     read("app/canon/canon-review-board.tsx"),
     read("app/api/canon/decisions/route.ts"),
@@ -196,12 +196,15 @@ test("ships a multi-work admin-only Foundry canon review board with pending deci
     read("app/global-sidebar.tsx"),
     read("data/canon/afterlife_restaurant.json"),
     read("data/canon/knights_restaurant.json"),
+    read("data/canon/romance_fantasy_restaurant.json"),
     read("scripts/export-firefly-canon-package.mjs"),
   ]);
   assert.match(page, /user\.role !== "admin"/);
   assert.match(page, /ensureCanonSnapshot/);
   assert.match(sidebar, /캐논 확인판/);
   assert.match(board, /Foundry SSOT/);
+  assert.match(board, /정합성 감리/);
+  assert.match(board, /canonPackage\.consistencyAudit\.checks/);
   assert.match(board, /자동 승격 꺼짐/);
   assert.match(board, /Living Spine/);
   assert.match(board, /A-Rail/);
@@ -214,10 +217,17 @@ test("ships a multi-work admin-only Foundry canon review board with pending deci
   assert.match(board, /pending 판정 기록/);
   assert.match(board, /승격 준비 스냅샷/);
   assert.match(packages, /knights_restaurant/);
+  assert.match(packages, /romance_fantasy_restaurant/);
   assert.match(packages, /listSyncableCanonPackages/);
   assert.match(knightPackage, /"title": "기사식당"/);
   assert.match(knightPackage, /"sourceState": "committed"/);
   assert.match(knightPackage, /"productionSystem": "v3_firefly_studio"/);
+  assert.match(romancePackage, /"title": "로판식당"/);
+  assert.match(romancePackage, /"sourceState": "committed"/);
+  assert.match(romancePackage, /"revisionSetSha256": "23d513fa4eef9796228b6b4d3822767ca21007957010338e8c3ab5d2b5f912b4"/);
+  assert.match(romancePackage, /"sourceGitCommit": "[0-9a-f]{40}"/);
+  assert.match(romancePackage, /"schemaVersion": "storyyard_canon_consistency_audit_v1"/);
+  assert.match(romancePackage, /"verdict": "pass"/);
   assert.match(board, /canonPackage\.ownership\.ownerId/);
   assert.match(route, /user\?\.role === "admin"/);
   assert.match(route, /artifact\.sha256 !== input\.artifactSha256/);
@@ -229,6 +239,9 @@ test("ships a multi-work admin-only Foundry canon review board with pending deci
   assert.match(exporter, /ls-files/);
   assert.match(exporter, /included Foundry sources have uncommitted changes/);
   assert.match(exporter, /owner adoption receipt/);
+  assert.match(exporter, /adopt_all_exact_revisions/);
+  assert.match(exporter, /inlineRows/);
+  assert.match(exporter, /buildConsistencyAudit/);
   assert.match(exporter, /computedRevisionSet/);
   assert.match(canonPackage, /"revisionSetSha256": "4aa9de3ba689973cd86ba45377387024ca6d09ed2ac4e52eb6e22aa7a3483ea6"/);
   assert.match(canonPackage, /"sourceGitCommit": "[0-9a-f]{40}"/);
