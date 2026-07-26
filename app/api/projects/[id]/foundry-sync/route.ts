@@ -169,14 +169,24 @@ async function loadAdminOwnerState(projectId: string) {
   }
   const publicationRows = (publicationResult.results ?? []) as PublicationRow[];
   const exactPublication = publicationRows.find((item) => item.projectId === projectId);
-  const orphanCandidates = publicationRows.filter((item) => item.projectId !== projectId);
-  const publication = exactPublication ?? (orphanCandidates.length === 1 ? orphanCandidates[0] : undefined);
+  const publishedOrphanCandidates = publicationRows.filter(
+    (item) => item.projectId !== projectId && item.status === "published",
+  );
+  const publication = exactPublication?.status === "published"
+    ? exactPublication
+    : publishedOrphanCandidates.length === 1
+      ? publishedOrphanCandidates[0]
+      : exactPublication;
+  const shadowPublication = publication?.id !== exactPublication?.id
+    ? exactPublication
+    : undefined;
   return {
     project: projectResult.results[0] as ProjectRow,
     items: (itemsResult.results ?? []) as ProjectItemRow[],
     blocks: (blocksResult.results ?? []) as PlotBlockRow[],
     manuscripts: (manuscriptsResult.results ?? []) as ManuscriptRow[],
     publication,
+    shadowPublication,
     publicationEpisodes: ((publicationEpisodesResult.results ?? []) as PublicationEpisodeRow[])
       .filter((item) => item.publicationId === publication?.id),
   } as const;
@@ -212,7 +222,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const access = await loadAdminOwnerState(projectId);
   if ("error" in access) return Response.json({ error: access.error }, { status: access.status });
 
-  const input = await request.json().catch(() => null) as { workSlug?: string } | null;
+  const input = await request.json().catch(() => null) as {
+    workSlug?: string;
+    repairLegacySnapshot?: boolean;
+  } | null;
   const canonPackage = getSyncableCanonPackage(input?.workSlug?.trim() ?? "");
   if (!canonPackage) return Response.json({ error: "커밋된 정본만 Storyyard 플롯으로 동기화할 수 있음." }, { status: 409 });
   if (
@@ -230,7 +243,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   // snapshot exists but the private workspace has no manuscripts at all.
   // Once canonical manuscripts are inserted, normal fail-closed drift checks
   // apply on every later sync.
-  const legacySnapshotRepair = access.manuscripts.length === 0 && Boolean(access.publication);
+  const legacySnapshotRepair = access.manuscripts.length === 0
+    && input?.repairLegacySnapshot === true;
   const writes: ReturnType<typeof env.DB.prepare>[] = [];
   const timestamp = new Date().toISOString();
   const plotEntity = existingItems.find((item) => {
@@ -426,6 +440,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   if (access.publication) {
+    if (access.shadowPublication) {
+      writes.push(
+        env.DB.prepare(
+          `UPDATE publications SET project_id = ?, updated_at = ? WHERE id = ?`,
+        ).bind(`detached-${access.shadowPublication.id}`, timestamp, access.shadowPublication.id),
+      );
+    }
     writes.push(
       env.DB.prepare(
         `UPDATE publications

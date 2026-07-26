@@ -615,7 +615,7 @@ export function ProjectWorkspace({
       const response = await fetch(`/api/projects/${projectId}/foundry-sync`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workSlug: canonPackage.workSlug }),
+        body: JSON.stringify({ workSlug: canonPackage.workSlug, repairLegacySnapshot: true }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Foundry 동기화 실패");
