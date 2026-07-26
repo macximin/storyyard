@@ -4,7 +4,7 @@
   "title": "천마식당",
   "workflowSchema": "anchored_story_loop_v3",
   "sourcePath": "40_works/cheongma_restaurant",
-  "sourceGitCommit": "c46e2c9ecae3ff41f6ec1cc1b152dab1490dfb99",
+  "sourceGitCommit": "3f080774807197ce58ceb6a1d04c30abc364725d",
   "sourceState": "committed",
   "sourceUpdatedAt": "2026-07-26",
   "ownership": {
@@ -485,7 +485,7 @@
   },
   "consistencyAudit": {
     "schemaVersion": "storyyard_canon_consistency_audit_v1",
-    "sourceGitCommit": "c46e2c9ecae3ff41f6ec1cc1b152dab1490dfb99",
+    "sourceGitCommit": "3f080774807197ce58ceb6a1d04c30abc364725d",
     "verdict": "pass",
     "checks": [
       {
@@ -638,5 +638,5 @@
       "body": "schema_version: firefly_narrative_state_v1\nwork_slug: cheongma_restaurant\nprojection_of:\n  state_through: ep003\n  manuscript_manifest: ../04_manuscript/manifest.yaml\n  repo_revision_set_sha256: fe88f1f2672da3027998c4f99a8aa0272fb5fe32aff6003530f9023382a132e3\nrebuildable: true\nfacts:\n  story_time:\n    latest_event: \"첫 대량 영업을 마친 밤, 강인호가 검은 웍과 태윤의 손목 동작을 확인함\"\n  protagonist:\n    current_body: \"갈비뼈 세 대 손상, 왼쪽 어깨 탈구 후 회복 중\"\n    ability: \"천마신교 수석 주방장의 기억과 조리 감각\"\n    inner_method: \"염화심법은 통증을 잠시 미룰 뿐 치료하지 않음\"\n  restaurant:\n    name: 천하반점 청량리 1호점\n    current_menu: [짜장면, 볶음밥, 해장짬뽕]\n    trial_days: 30\n    latest_service:\n      paid_customers: 43\n      complimentary_customers: 3\n      total_customers: 46\n      hangover_jjamppong_sold: 33\n      revenue_krw: 527000\n      prior_day_revenue_krw: 114000\n    baseline:\n      monthly_sales_krw: 23000000\n      monthly_food_cost_krw: 12000000\n      monthly_loss_krw: 20000000\n      estimated_monthly_break_even_sales_krw: 64800000\n      daily_average_target_krw: 2160000\n      approximate_paid_customers_needed_per_day: 176\ncontracts:\n  thirty_day_turnaround:\n    judge: 강인호\n    success: \"인수일부터 30일 누적 매장 손익 흑자와 청량리 1호점 영구 독립 운영권\"\n    failure: \"그룹 지분 2퍼센트 처분과 그룹 퇴출\"\n    temporary_authority: [메뉴, 가격, 매입, 근무 편성]\ncharacters:\n  kang_taeyun:\n    name: 강태윤\n    role: \"천하외식그룹 회장 막내아들, 천하반점 청량리 1호점 시험 운영자\"\n    goal: \"30일 흑자와 영구 독립 운영권\"\n    current_position: 천하반점 청량리 1호점\n  park_chunsik:\n    name: 박춘식\n    role: \"17년 경력 주방장\"\n    status: \"화구 차이를 읽고 마지막 추가 짬뽕과 무료 볶음밥을 완주함\"\n    current_position: 천하반점 청량리 1호점\n  choi_mina:\n    name: 최민아\n    role: 홀 담당\n    status: \"주문 시각·저염 손님·장부를 기록하고 한 달 시험에 잔류\"\n    current_position: 천하반점 청량리 1호점\n  kim_seongho:\n    name: 김성호\n    role: 배달 직원\n    status: \"잔반을 면·건더기·국물로 분리해 운영 기록에 편입\"\n    current_position: 천하반점 청량리 1호점\n  kang_inho:\n    name: 강인호\n    role: 천하외식그룹 회장\n    status: \"30일 계약 판정자; 과거 자신이 쓰던 검은 웍과 손목 동작을 알아봄\"\n    current_position: 천하외식그룹 회장실\n  kang_taeseok:\n    name: 강태석\n    role: 강태윤의 큰형\n    status: \"브랜드 관리와 본사 납품을 근거로 독립 운영을 견제\"\n    current_position: 천하외식그룹 본사\nassets:\n  tools:\n    - \"강인호가 창업 시절 사용했던 낡은 검은 철웍\"\n  operational:\n    - \"메뉴 48개를 3개로 축소\"\n    - \"웍당 3그릇, 두 화구 합계 6그릇의 품질 상한\"\n    - \"주문 시각·저염 손님·잔반 분리 기록\"\nopen_reader_debts:\n  - { id: thirty_day_profit, debt: \"강태윤은 30일 누적 손익을 흑자로 만들 수 있는가.\" }\n  - { id: dawn_market_supply, debt: \"본사 납품만으로 모자란 다음 영업 재료를 어떤 기준으로 확보할 것인가.\" }\n  - { id: black_wok_origin, debt: \"누구에게도 가르치지 않은 강인호의 불 동작을 태윤이 어떻게 아는가.\" }\n  - { id: injury_limit, debt: \"다친 몸으로 하루 176명 규모에 접근하려면 누구에게 무엇을 맡길 것인가.\" }\nopen_foreshadow:\n  - { id: father_wok_recognition, seeded_in: ep003, promise: \"강인호가 검은 웍과 태윤의 손목을 직접 확인한다.\" }\n  - { id: headquarters_supply_pressure, seeded_in: ep003, promise: \"강태석의 납품·브랜드 통제가 현장 선택과 충돌한다.\" }\ngenre_state:\n  native:\n    last_csu_receipts:\n      - { episode: ep001, receipt: \"30일 계약과 첫 불\" }\n      - { episode: ep002, receipt: \"9천 원 결제와 택시 주문 행렬\" }\n      - { episode: ep003, receipt: \"33그릇·52만7천 원·팀 잔류·검은 웍 인식\" }\n    current_status_floor:\n      approved_through: ep003\n      restaurant_right: temporary\n      publication: false\nlast_rebuilt_at: \"2026-07-26T19:28:59+09:00\"\n"
     }
   ],
-  "bundleSha256": "6b5c9a6b0d7b235f0882d4be8bb10acb2eb5d03a5a7423a422598e9392d4c3b7"
+  "bundleSha256": "4859b30b30aefa470fc5ceedaa132cdaf6adbee1d5de6c9aa25e39716364b5b5"
 }
