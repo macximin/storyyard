@@ -100,10 +100,10 @@ truth: Storyyard imports an immutable `firefly_story_package_v1` snapshot and
 stores human decisions as `pending`. It does not edit manuscripts, Story Plan,
 or Narrative State and it never promotes a version automatically.
 
-The bundled packages are `afterlife_restaurant`, `knights_restaurant`,
-`romance_fantasy_restaurant`, and `tyrant_restaurant`. The export verifies the
-owner-approved episode hashes in each Foundry manuscript manifest before writing
-`data/canon/<work_slug>.json`. By default it reads the sibling
+The bundled packages are `afterlife_restaurant`, `cheongma_restaurant`,
+`knights_restaurant`, `romance_fantasy_restaurant`, and `tyrant_restaurant`.
+The export verifies the owner-approved episode hashes in each Foundry manuscript
+manifest before writing `data/canon/<work_slug>.json`. By default it reads the sibling
 `v3_firefly_studio/edge_repos/v3_ff_foundry` checkout. Set `FOUNDRY_ROOT` to an
 explicit Foundry root when the checkout lives elsewhere, and set `WORK_SLUG` for
 the package to rebuild.

@@ -1,4 +1,5 @@
 import afterlifeRestaurant from "@/data/canon/afterlife_restaurant.json";
+import cheongmaRestaurant from "@/data/canon/cheongma_restaurant.json";
 import knightsRestaurant from "@/data/canon/knights_restaurant.json";
 import romanceFantasyRestaurant from "@/data/canon/romance_fantasy_restaurant.json";
 import tyrantRestaurant from "@/data/canon/tyrant_restaurant.json";
@@ -152,6 +153,7 @@ export type CanonPackage = {
 
 const registry: Record<string, CanonPackage> = {
   afterlife_restaurant: afterlifeRestaurant as CanonPackage,
+  cheongma_restaurant: cheongmaRestaurant as CanonPackage,
   knights_restaurant: knightsRestaurant as CanonPackage,
   romance_fantasy_restaurant: romanceFantasyRestaurant as CanonPackage,
   tyrant_restaurant: tyrantRestaurant as CanonPackage,
