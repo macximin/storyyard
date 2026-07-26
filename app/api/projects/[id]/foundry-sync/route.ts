@@ -229,7 +229,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const canonPackage = getSyncableCanonPackage(input?.workSlug?.trim() ?? "");
   if (!canonPackage) return Response.json({ error: "커밋된 정본만 Storyyard 플롯으로 동기화할 수 있음." }, { status: 409 });
   if (
-    canonPackage.storyyardProjection.mappingVersion !== "foundry_storyyard_arc_episode_v1"
+    !["foundry_storyyard_arc_episode_v1", "foundry_storyyard_arc_episode_v2"].includes(
+      canonPackage.storyyardProjection.mappingVersion,
+    )
     || canonPackage.storyyardProjection.blockUnit !== "episode"
     || canonPackage.workspaceProjection.mappingVersion !== "foundry_storyyard_workspace_v1"
     || canonPackage.workspaceProjection.revisionSetSha256 !== canonPackage.revisionSetSha256

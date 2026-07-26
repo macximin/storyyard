@@ -146,6 +146,8 @@ test("publishes the entire workspace and renders public planning snapshots immed
   assert.match(publicationRoute, /INSERT INTO publication_content/);
   assert.match(publicationRoute, /characterFieldIds/);
   assert.match(publicationRoute, /publishAll/);
+  assert.match(publicationRoute, /publishCanon/);
+  assert.match(publicationRoute, /readFoundryWorkSlug/);
   assert.match(publicationRoute, /validItemKinds/);
   assert.match(contentRoute, /p\.status = 'published'/);
   assert.match(projectRoute, /UPDATE publications SET title = \?, logline = \?, genre = \?/);
@@ -327,6 +329,7 @@ test("atomically projects the full Foundry canon into private and public Storyya
   assert.match(syncRoute, /projectedContentSha256/);
   assert.match(syncRoute, /report\.conflicts\.push/);
   assert.match(syncRoute, /reverseSync: false/);
+  assert.match(syncRoute, /foundry_storyyard_arc_episode_v2/);
   assert.match(syncRoute, /env\.DB\.batch\(writes\)/);
   assert.match(syncRoute, /if \(writes\.length\)/);
   assert.doesNotMatch(syncRoute, /\.delete\(|DELETE FROM/);

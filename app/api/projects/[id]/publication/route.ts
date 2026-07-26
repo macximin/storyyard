@@ -46,13 +46,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const project = await ownedProject(projectId, user.email);
   if (!project) return Response.json({ error: "Not found" }, { status: 404 });
   const [canonBinding] = await getDb().select().from(canonBindings).where(eq(canonBindings.projectId, projectId));
-  if (canonBinding) {
-    return Response.json({
-      error: "Foundry 정본 작품의 공개본은 개인 작업실과 함께 정본 전체 동기화로만 갱신할 수 있음.",
-    }, { status: 409 });
-  }
   const input = await request.json() as Partial<{
     publishAll: boolean;
+    publishCanon: boolean;
     coverUrl: string;
     authorName: string;
     episodeIds: string[];
@@ -63,13 +59,22 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     actIds: string[];
     blockIds: string[];
   }>;
+  const publishCanon = Boolean(canonBinding) && input.publishCanon === true && user.role === "admin";
+  if (canonBinding && !publishCanon) {
+    return Response.json({
+      error: "Foundry 정본 작품의 공개본은 개인 작업실과 함께 정본 전체 동기화로만 갱신할 수 있음.",
+    }, { status: 409 });
+  }
   const db = getDb();
   const publishAll = input.publishAll === true;
-  const allManuscripts = publishAll
+  const manuscriptRows = publishAll
     ? await db.select().from(manuscripts)
       .where(eq(manuscripts.projectId, projectId))
       .orderBy(asc(manuscripts.episodeNo))
     : [];
+  const allManuscripts = publishCanon
+    ? manuscriptRows.filter((item) => readFoundryWorkSlug(item.meta) === canonBinding.workSlug)
+    : manuscriptRows;
   const episodeIds = publishAll
     ? allManuscripts.map((item) => item.id)
     : Array.isArray(input.episodeIds) ? input.episodeIds.filter(Boolean) : [];
@@ -83,10 +88,16 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     return Response.json({ error: "공개 원고 선택이 올바르지 않음." }, { status: 400 });
   }
 
-  const [allItems, allBlocks] = await Promise.all([
+  const [itemRows, blockRows] = await Promise.all([
     db.select().from(projectItems).where(eq(projectItems.projectId, projectId)),
     db.select().from(plotBlocks).where(eq(plotBlocks.projectId, projectId)).orderBy(asc(plotBlocks.act), asc(plotBlocks.sortOrder)),
   ]);
+  const allItems = publishCanon
+    ? itemRows.filter((item) => readFoundryWorkSlug(item.meta) === canonBinding.workSlug)
+    : itemRows;
+  const allBlocks = publishCanon
+    ? blockRows.filter((item) => readFoundryWorkSlug(item.meta) === canonBinding.workSlug)
+    : blockRows;
   const itemById = new Map(allItems.map((item) => [item.id, item]));
   const blockById = new Map(allBlocks.map((block) => [block.id, block]));
   const requested = {
@@ -240,6 +251,19 @@ function readMeta(value: string): { plotId: string; act: number; status: string;
     };
   } catch {
     return { plotId: "", act: 0, status: "", tags: [], fields: [] };
+  }
+}
+
+function readFoundryWorkSlug(value: string): string {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const foundrySync = parsed.foundrySync;
+    return foundrySync && typeof foundrySync === "object"
+      && typeof (foundrySync as Record<string, unknown>).workSlug === "string"
+      ? String((foundrySync as Record<string, unknown>).workSlug)
+      : "";
+  } catch {
+    return "";
   }
 }
 

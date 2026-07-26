@@ -1302,6 +1302,7 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
         authorName: form.get("authorName"),
         coverUrl: form.get("coverUrl"),
         publishAll: true,
+        publishCanon: canonBound,
       }),
     });
     const data = await response.json();
@@ -1346,7 +1347,7 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
         {!manuscripts.length && <p className="tree-empty root">원고 메뉴에서 먼저 회차를 작성해 주세요.</p>}
         {message && <p className="inline-message">{message}</p>}
         <div className="publish-actions">
-          <button className="black-button" disabled={pending || !manuscripts.length || canonBound}>{pending ? "전체 공개 중…" : canonBound ? "정본 전체 동기화에서 갱신" : publication?.status === "published" ? "전체 공개본 갱신" : "전체 공개"}</button>
+          <button className="black-button" disabled={pending || !manuscripts.length}>{pending ? "전체 공개 중…" : canonBound ? publication?.status === "published" ? "정본 공개본 갱신" : "정본 전체 공개" : publication?.status === "published" ? "전체 공개본 갱신" : "전체 공개"}</button>
           {publication?.status === "published" && <button type="button" className="outline-cancel" onClick={unpublish}>공개 중지</button>}
         </div>
       </form>
