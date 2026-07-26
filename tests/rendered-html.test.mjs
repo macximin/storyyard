@@ -155,7 +155,10 @@ test("publishes the entire workspace and renders public planning snapshots immed
     assert.match(publicWork, new RegExp(`>${tab}<`));
   }
   assert.doesNotMatch(publicWork, /\/content\?type=/);
+  assert.match(publicWork, /className="plot-board-scroll public-plot-board-scroll"/);
   assert.match(publicWork, /className="plot-board"/);
+  assert.match(publicWork, /오른쪽으로 계속 이어지는 보드/);
+  assert.match(publicWork, /scrollBy\(\{ left:/);
   assert.match(publicWork, /className="plot-card public"/);
 });
 

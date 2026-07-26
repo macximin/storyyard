@@ -1038,9 +1038,16 @@ a { color: inherit; text-decoration: none; }
 .public-plot h4 { margin: 0; font-size: 1rem; }
 .public-plot-block { margin-top: 8px; padding: 13px; border: 1px solid #d7d1bf; background: #fff; }
 .public-plot-block p { margin: 7px 0 0; color: #555; line-height: 1.6; white-space: pre-wrap; }
-.public-plot-board { overflow: hidden; }
+.public-plot-board { min-width: 0; overflow: visible; }
 .public-plot-board .plot-tabs-bar { margin: 0 0 28px; }
-.public-plot-board .plot-board { padding-bottom: 16px; overflow-x: auto; }
+.public-plot-board-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 10px; color: var(--muted); font-size: .7rem; }
+.public-plot-board-controls strong { color: var(--ink); }
+.public-plot-board-controls > div { display: flex; gap: 5px; }
+.public-plot-board-controls button { width: 34px; height: 30px; border: 1px solid var(--ink); background: #fff; color: var(--ink); font-size: 1rem; cursor: pointer; }
+.public-plot-board-controls button:hover { background: var(--yellow); }
+.public-plot-board-scroll { width: 100%; padding-bottom: 16px; }
+.public-plot-board-scroll:focus-visible { outline: 2px solid var(--yellow-strong); outline-offset: 4px; }
+.public-plot-board .plot-board { padding-bottom: 0; }
 .public-plot-board .plot-card { cursor: pointer; }
 .public-plot-board .plot-card p { white-space: pre-wrap; }
 .public-plot-board .act-heading > span { color: var(--muted); font-size: .7rem; }
@@ -1138,6 +1145,7 @@ a { color: inherit; text-decoration: none; }
   .community-toolbar { margin-top: 34px; }
   .work-hero { grid-template-columns: 120px 1fr; gap: 22px; }
   .work-hero h1 { margin-top: 10px; font-size: 2rem; }
+  .public-plot-board-controls { align-items: flex-start; }
   .work-logline { margin: 15px 0; font-size: .83rem; line-height: 1.6; }
   .work-stats { flex-wrap: wrap; gap: 8px 14px; }
   .work-actions, .rating-picker > span { display: none; }

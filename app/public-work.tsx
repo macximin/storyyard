@@ -2,7 +2,7 @@
 
 import { BookmarkSimple, Star } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CommentThread } from "./comment-thread";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
 import type { PublicWorkSnapshot } from "./public-work-data";
@@ -106,35 +106,52 @@ function PublicPlots({ content }: { content: PublicContent[] }) {
   const [activePlotId, setActivePlotId] = useState(plots[0]?.sourceId ?? "");
   const [collapsedActs, setCollapsedActs] = useState<number[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<PublicContent | null>(null);
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
   if (!plots.length) return <PublicContentState label="공개된 플롯이 아직 없음." />;
   const activePlot = plots.find((plot) => plot.sourceId === activePlotId) ?? plots[0];
   const acts = content.filter((item) => item.kind === "act" && item.parentSourceId === activePlot.sourceId).sort((left, right) => parseMeta(left.meta).act - parseMeta(right.meta).act);
   const blocks = content.filter((item) => item.kind === "block" && item.parentSourceId === activePlot.sourceId);
   const actNumbers = [...new Set([...acts.map((act) => parseMeta(act.meta).act), ...blocks.map((block) => parseMeta(block.meta).act)])].filter(Boolean).sort((a, b) => a - b);
+
+  function scrollBoard(direction: -1 | 1) {
+    const board = boardScrollRef.current;
+    if (!board) return;
+    board.scrollBy({ left: direction * Math.max(320, board.clientWidth * 0.82), behavior: "smooth" });
+  }
+
   return <section className="public-content-section public-plot-board">
     <div className="plot-tabs-bar" role="tablist" aria-label="공개 플롯">
       {plots.map((plot) => <button key={plot.sourceId} role="tab" aria-selected={plot.sourceId === activePlot.sourceId} className={plot.sourceId === activePlot.sourceId ? "active" : ""} onClick={() => setActivePlotId(plot.sourceId)}>{plot.title}</button>)}
     </div>
     <div className="section-title"><div><p className="kicker">PLOT BOARD</p><h2>{activePlot.title}</h2>{activePlot.body && <p>{activePlot.body}</p>}</div><span>{blocks.length}개 블록</span></div>
-    <div className="plot-board">
-      {actNumbers.map((actNumber) => {
-        const act = acts.find((item) => parseMeta(item.meta).act === actNumber);
-        const collapsed = collapsedActs.includes(actNumber);
-        return <section className={`act-column ${collapsed ? "collapsed" : ""}`} key={actNumber}>
-          <header className="act-heading">
-            <button type="button" className="act-title-button" onClick={() => setCollapsedActs((current) => current.includes(actNumber) ? current.filter((value) => value !== actNumber) : [...current, actNumber])}>{act?.title || `${actNumber}아크`}</button>
-            <span>{blocks.filter((block) => parseMeta(block.meta).act === actNumber).length}</span>
-          </header>
-          {!collapsed && <div className="plot-card-list">{blocks.filter((block) => parseMeta(block.meta).act === actNumber).sort((left, right) => left.sortOrder - right.sortOrder).map((block) => {
-            const meta = parseMeta(block.meta);
-            return <button type="button" className="plot-card public" key={block.sourceId} onClick={() => setSelectedBlock(block)}>
-              <strong>{block.title}</strong>
-              {meta.status && <span className={`sync-status ${meta.status}`}>{meta.status}</span>}
-              {block.body && <p>{preview(block.body)}</p>}
-            </button>;
-          })}</div>}
-        </section>;
-      })}
+    <div className="public-plot-board-controls">
+      <span><strong>{actNumbers.length}개 아크</strong> · 오른쪽으로 계속 이어지는 보드</span>
+      <div>
+        <button type="button" aria-label="이전 아크 보기" onClick={() => scrollBoard(-1)}>←</button>
+        <button type="button" aria-label="다음 아크 보기" onClick={() => scrollBoard(1)}>→</button>
+      </div>
+    </div>
+    <div className="plot-board-scroll public-plot-board-scroll" ref={boardScrollRef} tabIndex={0} aria-label="공개 B-Rail 아크 보드">
+      <div className="plot-board">
+        {actNumbers.map((actNumber) => {
+          const act = acts.find((item) => parseMeta(item.meta).act === actNumber);
+          const collapsed = collapsedActs.includes(actNumber);
+          return <section className={`act-column ${collapsed ? "collapsed" : ""}`} key={actNumber}>
+            <header className="act-heading">
+              <button type="button" className="act-title-button" onClick={() => setCollapsedActs((current) => current.includes(actNumber) ? current.filter((value) => value !== actNumber) : [...current, actNumber])}>{act?.title || `${actNumber}아크`}</button>
+              <span>{blocks.filter((block) => parseMeta(block.meta).act === actNumber).length}</span>
+            </header>
+            {!collapsed && <div className="plot-card-list">{blocks.filter((block) => parseMeta(block.meta).act === actNumber).sort((left, right) => left.sortOrder - right.sortOrder).map((block) => {
+              const meta = parseMeta(block.meta);
+              return <button type="button" className="plot-card public" key={block.sourceId} onClick={() => setSelectedBlock(block)}>
+                <strong>{block.title}</strong>
+                {meta.status && <span className={`sync-status ${meta.status}`}>{meta.status}</span>}
+                {block.body && <p>{preview(block.body)}</p>}
+              </button>;
+            })}</div>}
+          </section>;
+        })}
+      </div>
     </div>
     {selectedBlock && <div className="public-plot-detail-backdrop" role="presentation" onClick={() => setSelectedBlock(null)}><article className="public-plot-detail" role="dialog" aria-modal="true" aria-label={selectedBlock.title} onClick={(event) => event.stopPropagation()}><button type="button" className="public-plot-detail-close" onClick={() => setSelectedBlock(null)}>닫기</button><p className="kicker">PLOT BLOCK</p><h2>{selectedBlock.title}</h2><div>{selectedBlock.body || "내용 없음."}</div></article></div>}
   </section>;
