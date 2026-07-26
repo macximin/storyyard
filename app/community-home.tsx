@@ -72,9 +72,12 @@ export function CommunityHome({
                 <Link className="cover-link" href={`/works/${work.slug}`} prefetch>
                   <div className="cover-frame">
                     <img
-                      src={work.coverUrl || "/default-cover.png"}
+                      src={!work.coverUrl || work.coverUrl === "/default-cover.png" ? "/default-cover-card.webp" : work.coverUrl}
                       alt={`${work.title} 표지`}
-                      loading="lazy"
+                      width={480}
+                      height={720}
+                      loading={index === 0 ? "eager" : "lazy"}
+                      fetchPriority={index === 0 ? "high" : "auto"}
                       decoding="async"
                     />
                     <strong className="rank-badge">{sort === "rating" ? index + 1 : "NEW"}</strong>

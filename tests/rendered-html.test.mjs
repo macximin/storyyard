@@ -40,11 +40,17 @@ test("ships the public community and private studio navigation", async () => {
   assert.match(sidebar, /내 작품/);
   assert.match(community, /랭킹순/);
   assert.match(community, /신작순/);
+  assert.match(community, /default-cover-card\.webp/);
+  assert.match(community, /loading=\{index === 0 \? "eager" : "lazy"\}/);
   assert.match(page, /CommunityHome/);
   assert.match(library, /work-card-cover/);
+  assert.match(library, /default-cover-card\.webp/);
+  assert.match(library, /loading=\{index === 0 \? "eager" : "lazy"\}/);
+  assert.match(library, /fetchPriority=\{index === 0 \? "high" : "auto"\}/);
   assert.match(styles, /\.work-grid \{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(styles, /\.work-card-cover \{[^}]*aspect-ratio: 2 \/ 3/);
   await access(new URL("public/default-cover.png", root));
+  await access(new URL("public/default-cover-card.webp", root));
 });
 
 test("primes navigation data on the server and sorts community works locally", async () => {

@@ -129,7 +129,7 @@ export function Library({
 
         {visible.length ? (
           <div className="work-grid">
-            {visible.map((project) => (
+            {visible.map((project, index) => (
               <article className="work-card" key={project.id}>
                 <div className="work-card-actions">
                   <button
@@ -161,7 +161,15 @@ export function Library({
                   }}
                 >
                   <span className="work-card-cover">
-                    <img src="/default-cover.png" alt={`${project.title} 표지`} />
+                    <img
+                      src="/default-cover-card.webp"
+                      alt={`${project.title} 표지`}
+                      width={480}
+                      height={720}
+                      loading={index === 0 ? "eager" : "lazy"}
+                      fetchPriority={index === 0 ? "high" : "auto"}
+                      decoding="async"
+                    />
                     <span className="work-type">{project.genre}</span>
                   </span>
                   <span className="work-card-copy">
