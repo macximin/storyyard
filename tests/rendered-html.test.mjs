@@ -318,6 +318,8 @@ test("atomically projects the full Foundry canon into private and public Storyya
       ["ep002", "B001", "committed"],
       ["ep003", "B001", "committed"],
       ["ep004", "B002", "committed"],
+      ["ep005", "B002", "provisional"],
+      ["ep006", "B002", "provisional"],
     ],
   );
   assert.equal(

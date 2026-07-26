@@ -4,7 +4,7 @@
   "title": "저승식당",
   "workflowSchema": "anchored_story_loop_v3",
   "sourcePath": "40_works/afterlife_restaurant",
-  "sourceGitCommit": "51ba1878fe0f011e5f6354aaa344e61eaa60cd48",
+  "sourceGitCommit": "c74e151c05c2475b4e7bcb3f9a2b90767474a0fa",
   "sourceState": "committed",
   "sourceUpdatedAt": "2026-07-27",
   "ownership": {
@@ -235,6 +235,28 @@
         "sourcePath": "40_works/afterlife_restaurant/03_episode_bet/ep004_episode_bet.md",
         "sourceSha256": "8318b4ec31971bc76bbded4f6ffd18a56df63d4ce7d4a0b930684d173d136939",
         "sortOrder": 400
+      },
+      {
+        "episode": "ep005",
+        "bId": "B002",
+        "title": "ep005 · 혀 밖의 한 끼",
+        "body": "- 도윤은 실패 장면을 다시 보고 맛을 온도 하나로 환원한 자기 과신을 인정한다.\n- 향, 치아·턱의 진동, 식감, 삼킨 뒤 열처럼 여러 감각을 조리 구조로 묶는다.\n- 공주는 손님을 왕명으로 붙잡지 않고, 식당 안에서 지켜질 대기·선택 규칙을 설명해 재착석을 얻는다.\n- 한빙과 손실은 복구하지 않는다. 노잣돈은 김문성과 다른 액수 또는 0닢으로 남아 개인별 변동 대가임을 보여 준다.",
+        "status": "provisional",
+        "authority": "owner_approved_story_plan_hypothesis",
+        "sourcePath": "40_works/afterlife_restaurant/02_story/rolling_corridor.md#ep005",
+        "sourceSha256": "586b04afb087f053534a0f1bd1eeb4b182d41664341106d09836a039ef3e4b44",
+        "sortOrder": 500
+      },
+      {
+        "episode": "ep006",
+        "bId": "B002",
+        "title": "ep006 · 하루와 식대는 다르다",
+        "body": "- 도윤은 주문·현금·재고를 따로 장부화한다. 검은 장부가 새 UI를 띄우는 것이 아니라 도윤이 종이 운영장부를 만든다.\n- 곽진복의 첫 정기 납품에서 품질·수량·지급 시점을 검수해 계약이 장식이 아님을 증명한다.\n- 공주는 궁을 나온 이유의 일부만 공개하고 본명과 신분은 숨긴다.\n- 하진은 생환 계약 위반 비용 또는 손님을 망령으로 만든 경우의 책임을 한 문장 규칙과 실제 흔적으로 제시한다.\n- 다음 압력은 손님 수 증가가 아니라, 같은 시간에 서로 다른 주문을 가진 두 망자가 문을 보는 운영 병목이다.",
+        "status": "provisional",
+        "authority": "owner_approved_story_plan_hypothesis",
+        "sourcePath": "40_works/afterlife_restaurant/02_story/rolling_corridor.md#ep006",
+        "sourceSha256": "07131e61bd224aaa17f9a49dd7c30ed6293784c81df0d7d3ade42501eb3ae083",
+        "sortOrder": 600
       }
     ]
   },
@@ -440,7 +462,7 @@
   },
   "consistencyAudit": {
     "schemaVersion": "storyyard_canon_consistency_audit_v1",
-    "sourceGitCommit": "51ba1878fe0f011e5f6354aaa344e61eaa60cd48",
+    "sourceGitCommit": "c74e151c05c2475b4e7bcb3f9a2b90767474a0fa",
     "verdict": "pass",
     "checks": [
       {
@@ -544,8 +566,8 @@
       "kind": "story_plan",
       "authority": "owner_approved",
       "sourcePath": "40_works/afterlife_restaurant/02_story/rolling_corridor.md",
-      "sha256": "1be3891d888e6999ee78c4338650e18ac6bbba97f6bc64741cf8f25179d9f165",
-      "body": "# 저승식당 Rolling Corridor\n\n상태: active\n\n```yaml\nschema_version: firefly_rolling_corridor_v3\nstarts_from: owner_approved_ep004\nactive_b_arc: B002\nepisode_cursor: ep005_episode_bet\ncommitted:\n  - ep004\nprovisional:\n  - ep005\n  - ep006\nhard_stop: []\n```\n\n## 다음 발주가 이어받을 것\n\n- 식당에는 황천장에서 사 온 기본 재료와 박명조 날개의 반복 공급 약속이 있다. 장보기 뒤 최종 현금은 확정하지 않는다.\n- 공주는 시식·계산·줄 관리·운반에 이어 목패 선택지로 손님의 의사를 받았다.\n- 혀 없는 손님은 감각을 되살린 시험 음식을 먹었지만 마지막 식사로는 거절했다.\n- 손님이 찾는 것은 혀를 잃은 뒤 누군가와 함께 먹은 뜨겁고 부드러운 음식이다. 그 사람은 매번 맛을 물었고, 손님은 끝내 대답하지 못했다.\n- 삼 년 계약은 실제 시간 경과이며 손님 수나 완식 수로 환산하지 않는다.\n\n정확한 음식, 그 사람의 정체, 혀를 잃은 이유는 ep005 Episode Bet 전까지 열어 둔다.\n\n## 가까운 경로\n\n- B002 `ep004~006`: 혀 없는 손님\n- B003 `ep007~009`: 식당다운 첫 영업\n- B004 `ep010~012`: 버려진 재료의 대가\n- B005 `ep013~015`: 공주는 식당에 남는다\n\n아크 기능과 종료 상태는 `early_five_arc_plan.md`를 따른다. 이 목록은 원고 발주가 아니라 가까운 Story Plan이다.\n"
+      "sha256": "c27072fa87b490bd464be8ddd8965cbe0794f90e4cfb11931a3f11ae4ce47b03",
+      "body": "# 저승식당 Rolling Corridor\n\n상태: active\n\n```yaml\nschema_version: firefly_rolling_corridor_v3\nstarts_from: owner_approved_ep004\nactive_b_arc: B002\ncurrent_b_arc:\n  b_id: B002\nepisode_cursor: ep005_episode_bet\ncommitted:\n  - ep004\nprovisional:\n  - ep005\n  - ep006\nhard_stop: []\n```\n\n## 다음 발주가 이어받을 것\n\n- 식당에는 황천장에서 사 온 기본 재료와 박명조 날개의 반복 공급 약속이 있다. 장보기 뒤 최종 현금은 확정하지 않는다.\n- 공주는 시식·계산·줄 관리·운반에 이어 목패 선택지로 손님의 의사를 받았다.\n- 혀 없는 손님은 감각을 되살린 시험 음식을 먹었지만 마지막 식사로는 거절했다.\n- 손님이 찾는 것은 혀를 잃은 뒤 누군가와 함께 먹은 뜨겁고 부드러운 음식이다. 그 사람은 매번 맛을 물었고, 손님은 끝내 대답하지 못했다.\n- 삼 년 계약은 실제 시간 경과이며 손님 수나 완식 수로 환산하지 않는다.\n\n정확한 음식, 그 사람의 정체, 혀를 잃은 이유는 ep005 Episode Bet 전까지 열어 둔다.\n\n## 가까운 경로\n\n- B002 `ep004~006`: 혀 없는 손님\n- B003 `ep007~009`: 식당다운 첫 영업\n- B004 `ep010~012`: 버려진 재료의 대가\n- B005 `ep013~015`: 공주는 식당에 남는다\n\n아크 기능과 종료 상태는 `early_five_arc_plan.md`를 따른다. 이 목록은 원고 발주가 아니라 가까운 Story Plan이다.\n\n## 현재 B 회차 가설\n\n아래는 Episode Bet이 committed되기 전까지 수정 가능한 가설이다.\n\n### ep005 — 혀 밖의 한 끼\n\n- 도윤은 실패 장면을 다시 보고 맛을 온도 하나로 환원한 자기 과신을 인정한다.\n- 향, 치아·턱의 진동, 식감, 삼킨 뒤 열처럼 여러 감각을 조리 구조로 묶는다.\n- 공주는 손님을 왕명으로 붙잡지 않고, 식당 안에서 지켜질 대기·선택 규칙을 설명해 재착석을 얻는다.\n- 한빙과 손실은 복구하지 않는다. 노잣돈은 김문성과 다른 액수 또는 0닢으로 남아 개인별 변동 대가임을 보여 준다.\n\n### ep006 — 하루와 식대는 다르다\n\n- 도윤은 주문·현금·재고를 따로 장부화한다. 검은 장부가 새 UI를 띄우는 것이 아니라 도윤이 종이 운영장부를 만든다.\n- 곽진복의 첫 정기 납품에서 품질·수량·지급 시점을 검수해 계약이 장식이 아님을 증명한다.\n- 공주는 궁을 나온 이유의 일부만 공개하고 본명과 신분은 숨긴다.\n- 하진은 생환 계약 위반 비용 또는 손님을 망령으로 만든 경우의 책임을 한 문장 규칙과 실제 흔적으로 제시한다.\n- 다음 압력은 손님 수 증가가 아니라, 같은 시간에 서로 다른 주문을 가진 두 망자가 문을 보는 운영 병목이다.\n"
     },
     {
       "key": "ep001",
@@ -602,5 +624,5 @@
       "body": "schema_version: firefly_narrative_state_v2\nwork_slug: afterlife_restaurant\nprojection_of:\n  state_through: ep004\n  canonical_baseline: ../06_canon_note/canon_note_003_three_year_return_contract.md\n  manuscript_manifest: ../04_manuscript/manifest.yaml\n  revision_set_sha256: 2fb3648e1c57ab5f5a1e55a86e61edc150e118bd37e774be5615a4bcd97b02a7\nauthority: owner_approved\nrebuildable: true\nsource_manuscript_hashes:\n  ep001: 23a22f298b4ea37499b80ec55c0e86b3816604328255aee3529e7013a0712244\n  ep002: 01802d4862a5b607f42b335c7a3126c0418a3ac2a2a406199f090d046d45595a\n  ep003: 7138bace3e357d2e6369cdf27445c6c92e0a70bbf429632b88c7d4982ceb3f5a\n  ep004: f5ec74b51a97e76d2accf20a1b39bf00dc57d525df917876f35eae9c04b40dcc\nfacts:\n  return_contract:\n    term: \"삼도식당에서 체감상 삼 년\"\n    result: guaranteed_return_to_living_world\n    living_world_time: stopped_during_afterlife_term\n    guest_or_meal_accumulation: prohibited\n  afterlife:\n    nature: \"이승의 시간축과 분리된 시공간 초월적·개념적 공간\"\n    detailed_cosmology: open\n  restaurant:\n    name: 삼도식당\ncharacters:\n  kang_doyun:\n    name: 강도윤\n    age: 34\n    vocation: 요리사\n    status: \"죽음 직전, 삼도식당 삼 년 계약 수행 중\"\n    initial_drive: \"딸 강소율에게 생환\"\n  kang_soyul:\n    name: 강소율\n    age: 11\n    role: \"도윤이 돌아가려는 딸\"\n  seo_hajin:\n    name: 서하진\n    role: \"삼도식당 삼 년 계약을 제시한 저승사자\"\n  princess:\n    public_name_through_ep004: 공주\n    hidden_name: 연화\n    role: \"삼도식당 현장 동료\"\n    identity_boundary: \"서하진과 별개 인물\"\n    demonstrated_functions:\n      - 시식\n      - 계산과 줄 관리\n      - 운반\n      - 선택 목패를 통한 손님 의사 확인\n  kim_munseong:\n    name: 김문성\n    status: \"귀항탕을 완식하고 떠난 첫 손님\"\n  tongueless_guest:\n    name: unknown\n    status: \"삼도식당에 머물며 마지막 식사를 찾는 중\"\n    sensory_facts:\n      - \"혀는 없지만 냄새를 맡고 씹고 삼킬 수 있다.\"\n      - \"입천장과 목으로 뜨거움·부드러움·자극을 느낄 수 있다.\"\n    chosen_conditions:\n      temperature: hot\n      texture: soft\n      aroma_importance: low\n    memory_clues:\n      - \"혀를 잃은 뒤 먹은 음식\"\n      - \"혼자가 아니라 누군가와 먹은 음식\"\n      - \"그 사람은 매일 맛을 물었다.\"\n      - \"손님은 한 번도 대답하지 못했다.\"\n    rejected_solution: \"남은 감각을 자극한 시험 음식은 좋은 음식이지만 마지막 식사는 아님\"\nassets:\n  cash_before_market: 6\n  scrap_purchase_cost: 1\n  cash_before_grocery_shopping: 18\n  closing_cash: unspecified\n  basic_ingredient_count: unspecified\n  market_sale_count: unspecified\n  market_split: \"도윤 6 : 상인 4\"\n  recurring_supply_arrangement: \"박명조 날개를 모아 두고 오늘 가격으로 넘기기로 한 구두 약속\"\nopen_reader_debts:\n  - { id: tongueless_guest_meal, debt: \"매일 맛을 물어 준 사람과 그 음식은 무엇이며, 손님은 어떻게 대답할 것인가.\" }\n  - { id: princess_identity, debt: \"공주의 본명과 식당에 머무는 이유.\" }\n  - { id: seo_hajin_role, debt: \"서하진이 도윤을 계약자로 고른 이유.\" }\nstate_boundaries:\n  - \"손님당 하루, 1,095일, 수명 적립, 점수, 게이지를 현재 계약으로 사용하지 않는다.\"\n  - \"박만석·한명옥·예약 25건·우선 손님 세 명을 현재 사실로 기록하지 않는다.\"\n  - \"삼 년의 세부 계산과 저승 우주론을 확정하지 않는다.\"\n  - \"혀 없는 손님의 음식, 관계 상대, 혀를 잃은 이유를 아직 확정하지 않는다.\"\nlast_rebuilt_at: \"2026-07-27\"\n"
     }
   ],
-  "bundleSha256": "44513555ae0f81943b218ee849e833cc25f67f83ac2ae6baf1914b695d130699"
+  "bundleSha256": "abb8ffb8e5d519f34fa33dee7c49a6ef5779a1dab783469b07549e15f9ce0a31"
 }
