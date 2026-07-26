@@ -12,7 +12,7 @@ type ManuscriptRow = {
   status: string; meta: string; createdAt: string; updatedAt: string;
 };
 type PublicationRow = {
-  id: string; slug: string; status: string; title: string; logline: string; genre: string;
+  id: string; projectId: string; slug: string; status: string; title: string; logline: string; genre: string;
 };
 type PublicationEpisodeRow = {
   id: string; publicationId: string; sourceManuscriptId: string; episodeNo: number;
@@ -116,19 +116,35 @@ async function loadAdminOwnerState(projectId: string) {
         WHERE m.project_id = ?`,
     ).bind(projectId),
     env.DB.prepare(
-      `SELECT id, slug, status, title, logline, genre
-         FROM publications
-        WHERE project_id = ?
-        LIMIT 1`,
-    ).bind(projectId),
+      `SELECT p.id, p.project_id AS "projectId", p.slug, p.status,
+              p.title, p.logline, p.genre
+         FROM publications p
+        WHERE p.project_id = ?
+           OR (
+             p.owner_user_id = (
+               SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
+                WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
+             )
+             AND p.title = (SELECT title FROM projects WHERE id = ?)
+           )
+        ORDER BY CASE WHEN p.project_id = ? THEN 0 ELSE 1 END, p.updated_at DESC
+        LIMIT 3`,
+    ).bind(projectId, tokenHash, now, projectId, projectId),
     env.DB.prepare(
       `SELECT pe.id, pe.publication_id AS "publicationId",
               pe.source_manuscript_id AS "sourceManuscriptId",
               pe.episode_no AS "episodeNo", pe.title, pe.body, pe.meta
          FROM publication_episodes pe
          JOIN publications p ON p.id = pe.publication_id
-        WHERE p.project_id = ?`,
-    ).bind(projectId),
+        WHERE p.project_id = ?
+           OR (
+             p.owner_user_id = (
+               SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
+                WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
+             )
+             AND p.title = (SELECT title FROM projects WHERE id = ?)
+           )`,
+    ).bind(projectId, tokenHash, now, projectId),
   ]);
   const user = userResult.results?.[0] as { id: string; role: string } | undefined;
   if (!user || user.role !== "admin") {
@@ -137,13 +153,18 @@ async function loadAdminOwnerState(projectId: string) {
   if (!projectResult.results?.length) {
     return { error: "작품을 찾을 수 없음.", status: 404 } as const;
   }
+  const publicationRows = (publicationResult.results ?? []) as PublicationRow[];
+  const exactPublication = publicationRows.find((item) => item.projectId === projectId);
+  const orphanCandidates = publicationRows.filter((item) => item.projectId !== projectId);
+  const publication = exactPublication ?? (orphanCandidates.length === 1 ? orphanCandidates[0] : undefined);
   return {
     project: projectResult.results[0] as ProjectRow,
     items: (itemsResult.results ?? []) as ProjectItemRow[],
     blocks: (blocksResult.results ?? []) as PlotBlockRow[],
     manuscripts: (manuscriptsResult.results ?? []) as ManuscriptRow[],
-    publication: publicationResult.results?.[0] as PublicationRow | undefined,
-    publicationEpisodes: (publicationEpisodesResult.results ?? []) as PublicationEpisodeRow[],
+    publication,
+    publicationEpisodes: ((publicationEpisodesResult.results ?? []) as PublicationEpisodeRow[])
+      .filter((item) => item.publicationId === publication?.id),
   } as const;
 }
 
@@ -393,8 +414,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (access.publication) {
     writes.push(
       env.DB.prepare(
-        `UPDATE publications SET title = ?, logline = ?, updated_at = ? WHERE id = ?`,
-      ).bind(overview.title, overview.logline, timestamp, access.publication.id),
+        `UPDATE publications
+            SET project_id = ?, title = ?, logline = ?, updated_at = ?
+          WHERE id = ?`,
+      ).bind(projectId, overview.title, overview.logline, timestamp, access.publication.id),
     );
     for (const manuscript of canonPackage.workspaceProjection.manuscripts) {
       const sourceManuscriptId = manuscriptIds.get(manuscript.episodeNo);
