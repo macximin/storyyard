@@ -45,6 +45,11 @@ export type CanonPackage = {
   sourceGitCommit: string;
   sourceState?: "committed" | "working_tree";
   sourceUpdatedAt: string;
+  ownership: {
+    ownerId: string;
+    scope: string;
+    productionSystem: string;
+  };
   revisionSetSha256: string;
   bundleSha256: string;
   scope: {
@@ -54,6 +59,9 @@ export type CanonPackage = {
   status: {
     workflowSchema: string;
     title: string;
+    ownerId: string;
+    ownershipScope: string;
+    productionSystem: string;
     productionStage: string;
     currentEpisode: string;
     currentBArc: string;

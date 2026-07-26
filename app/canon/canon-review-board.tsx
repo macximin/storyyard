@@ -159,6 +159,7 @@ export function CanonReviewBoard({
           <code>{canonPackage.sourceState === "working_tree" ? "base" : "source"} {canonPackage.sourceGitCommit.slice(0, 12)}…</code>
           <code>bundle {canonPackage.bundleSha256.slice(0, 12)}…</code>
           <code>revision {canonPackage.revisionSetSha256.slice(0, 12)}…</code>
+          <code>owner {canonPackage.ownership.ownerId} · {canonPackage.ownership.productionSystem}</code>
         </div>
 
         <nav className="canon-tabs" aria-label="캐논 확인 영역">

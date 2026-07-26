@@ -103,7 +103,7 @@ or Narrative State and it never promotes a version automatically.
 The first canary package is `afterlife_restaurant`. The export verifies the
 owner-approved episode hashes in the Foundry manuscript manifest before writing
 `data/canon/afterlife_restaurant.json`. By default it reads the sibling
-`company_firefly_studio/edge_repos/company_ff_foundry` checkout. Set
+`v3_firefly_studio/edge_repos/v3_ff_foundry` checkout. Set
 `FOUNDRY_ROOT` to an explicit Foundry root when the checkout lives elsewhere.
 
 After a Foundry canon change:

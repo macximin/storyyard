@@ -216,7 +216,9 @@ test("ships a multi-work admin-only Foundry canon review board with pending deci
   assert.match(packages, /knights_restaurant/);
   assert.match(packages, /listSyncableCanonPackages/);
   assert.match(knightPackage, /"title": "기사식당"/);
-  assert.match(knightPackage, /"sourceState": "working_tree"/);
+  assert.match(knightPackage, /"sourceState": "committed"/);
+  assert.match(knightPackage, /"productionSystem": "v3_firefly_studio"/);
+  assert.match(board, /canonPackage\.ownership\.ownerId/);
   assert.match(route, /user\?\.role === "admin"/);
   assert.match(route, /artifact\.sha256 !== input\.artifactSha256/);
   assert.match(route, /status: "pending"/);

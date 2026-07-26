@@ -7,7 +7,7 @@ import process from "node:process";
 const storyyardRoot = process.cwd();
 const foundryRoot = process.env.FOUNDRY_ROOT
   ? path.resolve(process.env.FOUNDRY_ROOT)
-  : path.resolve(storyyardRoot, "../company_firefly_studio/edge_repos/company_ff_foundry");
+  : path.resolve(storyyardRoot, "../v3_firefly_studio/edge_repos/v3_ff_foundry");
 const workSlug = process.env.WORK_SLUG || "afterlife_restaurant";
 const allowWorkingTree = process.env.CANON_ALLOW_WORKTREE === "1";
 const workRoot = path.join(foundryRoot, "40_works", workSlug);
@@ -66,6 +66,9 @@ function parseStatus(source) {
   return {
     workflowSchema: yamlScalar(source, "workflow_schema"),
     title: yamlScalar(source, "title"),
+    ownerId: yamlScalar(source, "owner_id"),
+    ownershipScope: yamlScalar(source, "ownership_scope"),
+    productionSystem: yamlScalar(source, "production_system"),
     productionStage: yamlScalar(source, "production_stage"),
     currentEpisode: yamlScalar(source, "current_episode"),
     currentBArc: yamlScalar(source, "current_b_arc"),
@@ -308,6 +311,11 @@ const packageWithoutHash = {
   sourceGitCommit,
   sourceState,
   sourceUpdatedAt: status.updatedAt,
+  ownership: {
+    ownerId: status.ownerId,
+    scope: status.ownershipScope,
+    productionSystem: status.productionSystem,
+  },
   revisionSetSha256: declaredRevisionSet,
   scope: {
     includes: ["Frozen Pitch", "Story Plan 4 surfaces", "owner-approved ep001~ep003", "adoption review", "Narrative State"],
