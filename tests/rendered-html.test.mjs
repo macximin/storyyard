@@ -197,8 +197,8 @@ test("opens manuscripts as dedicated episode pages with episode comments and del
   assert.match(schema, /episodeId/);
 });
 
-test("ships a three-work admin-only Foundry canon review board with pending decisions", async () => {
-  const [page, board, route, schema, packages, sidebar, canonPackage, knightPackage, romancePackage, exporter] = await Promise.all([
+test("ships a four-work admin-only Foundry canon review board with pending decisions", async () => {
+  const [page, board, route, schema, packages, sidebar, canonPackage, knightPackage, romancePackage, tyrantPackage, exporter] = await Promise.all([
     read("app/canon/page.tsx"),
     read("app/canon/canon-review-board.tsx"),
     read("app/api/canon/decisions/route.ts"),
@@ -208,6 +208,7 @@ test("ships a three-work admin-only Foundry canon review board with pending deci
     read("data/canon/afterlife_restaurant.json"),
     read("data/canon/knights_restaurant.json"),
     read("data/canon/romance_fantasy_restaurant.json"),
+    read("data/canon/tyrant_restaurant.json"),
     read("scripts/export-firefly-canon-package.mjs"),
   ]);
   assert.match(page, /user\.role !== "admin"/);
@@ -229,6 +230,7 @@ test("ships a three-work admin-only Foundry canon review board with pending deci
   assert.match(board, /승격 준비 스냅샷/);
   assert.match(packages, /knights_restaurant/);
   assert.match(packages, /romance_fantasy_restaurant/);
+  assert.match(packages, /tyrant_restaurant/);
   assert.match(packages, /listSyncableCanonPackages/);
   assert.match(knightPackage, /"title": "기사식당"/);
   assert.match(knightPackage, /"sourceState": "committed"/);
@@ -239,6 +241,10 @@ test("ships a three-work admin-only Foundry canon review board with pending deci
   assert.match(romancePackage, /"sourceGitCommit": "[0-9a-f]{40}"/);
   assert.match(romancePackage, /"schemaVersion": "storyyard_canon_consistency_audit_v1"/);
   assert.match(romancePackage, /"verdict": "pass"/);
+  assert.match(tyrantPackage, /"title": "폭군식당"/);
+  assert.match(tyrantPackage, /"sourceState": "committed"/);
+  assert.match(tyrantPackage, /"mappingVersion": "foundry_storyyard_arc_episode_v2"/);
+  assert.match(tyrantPackage, /"bId": "APPROVED_OPENING_HISTORY"/);
   assert.match(board, /canonPackage\.ownership\.ownerId/);
   assert.match(route, /user\?\.role === "admin"/);
   assert.match(route, /artifact\.sha256 !== input\.artifactSha256/);

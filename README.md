@@ -100,9 +100,9 @@ truth: Storyyard imports an immutable `firefly_story_package_v1` snapshot and
 stores human decisions as `pending`. It does not edit manuscripts, Story Plan,
 or Narrative State and it never promotes a version automatically.
 
-The bundled packages are `afterlife_restaurant`, `knights_restaurant`, and
-`romance_fantasy_restaurant`. The export verifies the owner-approved episode
-hashes in each Foundry manuscript manifest before writing
+The bundled packages are `afterlife_restaurant`, `knights_restaurant`,
+`romance_fantasy_restaurant`, and `tyrant_restaurant`. The export verifies the
+owner-approved episode hashes in each Foundry manuscript manifest before writing
 `data/canon/<work_slug>.json`. By default it reads the sibling
 `v3_firefly_studio/edge_repos/v3_ff_foundry` checkout. Set `FOUNDRY_ROOT` to an
 explicit Foundry root when the checkout lives elsewhere, and set `WORK_SLUG` for
@@ -129,6 +129,11 @@ creates a separate `Foundry · <title>` plot and maps:
 - one closed, active, or provisional B-Rail entry to one Storyyard arc;
 - one committed or current-corridor episode to one Storyyard block;
 - `work_slug + B ID + episode ID` to stable upstream identities in metadata.
+
+If owner-approved opening episodes precede the first formal B-Rail arc,
+Storyyard groups them under a projection-only `승인 오프닝 이력` arc. This does
+not create or rename a Foundry B-Rail entry and never writes the grouping back
+to Foundry.
 
 The projection never deletes Storyyard content and never writes back to
 Foundry. Source commit and hashes are retained. If a projected arc or episode

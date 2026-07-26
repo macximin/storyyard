@@ -15,6 +15,7 @@ const workRoot = path.join(foundryRoot, "40_works", workSlug);
 const outputPath = path.join(storyyardRoot, "data", "canon", `${workSlug}.json`);
 const foundryWorkPath = `40_works/${workSlug}`;
 const manifestRelativePath = `${foundryWorkPath}/04_manuscript/manifest.yaml`;
+const approvedOpeningHistoryId = "APPROVED_OPENING_HISTORY";
 
 const definitions = [
   ["status", "운영 상태", "status", "00_status.md", "work_status"],
@@ -222,7 +223,32 @@ function parseBRail(source) {
       endEpisode: get("end_episode"),
     }];
   });
-  return multilineRows.length ? multilineRows : inlineRows;
+  const tableRows = source.split("\n").flatMap((line) => {
+    if (!/^\|\s*B\d{3}\s*\|/.test(line)) return [];
+    const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
+    const id = cells[0]?.match(/^B\d{3}/)?.[0] ?? "";
+    const span = cells[2] ?? "";
+    const episodes = [...span.matchAll(/ep\d+/g)].map((match) => match[0]);
+    const rawStatus = (cells[6] ?? "").toLowerCase();
+    const status = rawStatus.includes("closed")
+      ? "closed"
+      : rawStatus.includes("active")
+        ? "active"
+        : "provisional";
+    return [{
+      id,
+      order: Number(id.replace(/^B/, "")) || 0,
+      status,
+      targetAnchor: cells[1] ?? "",
+      narrativeFunction: cells[3] ?? "",
+      payoffAxis: cells[4] ?? "",
+      readerDebt: cells[5] ?? "",
+      contrast: "",
+      startEpisode: episodes[0] ?? "",
+      endEpisode: episodes[1] ?? episodes[0] ?? "",
+    }];
+  });
+  return multilineRows.length ? multilineRows : inlineRows.length ? inlineRows : tableRows;
 }
 
 function episodeNumber(value) {
@@ -295,6 +321,7 @@ function buildConsistencyAudit({
   artifacts,
   anchors,
   bArcs,
+  projectedArcs,
   committedBlocks,
   revisionSetSha256,
   sourceGitCommit,
@@ -352,7 +379,7 @@ function buildConsistencyAudit({
       label: "플롯",
       verdict: anchors.length > 0
         && currentArc?.status === "active"
-        && committedBlocks.every((block) => bArcs.some((arc) => arc.id === block.bId && arc.status === "closed"))
+        && committedBlocks.every((block) => projectedArcs.some((arc) => arc.bId === block.bId && arc.status === "closed"))
         ? "pass"
         : "review",
       summary: "A-Rail·현재 B-Rail·승인 회차의 B 소속을 대조",
@@ -501,7 +528,7 @@ if (
 
 const anchors = parseAnchors(artifactByKey.a_rail.body);
 const bArcs = parseBRail(artifactByKey.b_rail.body);
-const projectedArcs = bArcs
+const canonicalProjectedArcs = bArcs
   .filter((bArc) => ["closed", "active", "provisional"].includes(bArc.status))
   .map((bArc) => ({
     bId: bArc.id,
@@ -519,7 +546,7 @@ const projectedArcs = bArcs
     ].join("\n"),
     sourceSha256: sha256(JSON.stringify(bArc)),
   }));
-const committedBlocks = episodeBetRows.map((row) => ({
+let committedBlocks = episodeBetRows.map((row) => ({
   episode: row.episode,
   bId: episodeArcId(row.episode, bArcs),
   title: `${row.episode} · 화별 약속`,
@@ -530,9 +557,46 @@ const committedBlocks = episodeBetRows.map((row) => ({
   sourceSha256: row.sourceSha256,
   sortOrder: episodeNumber(row.episode) * 100,
 }));
-if (committedBlocks.some((block) => !block.bId)) {
-  throw new Error("Canon export refused: every committed Episode Bet must belong to a closed B-Rail arc.");
+const unassignedCommittedBlocks = committedBlocks.filter((block) => !block.bId);
+const firstBRailEpisode = Math.min(
+  ...bArcs.map((arc) => episodeNumber(arc.startEpisode)).filter((episode) => episode > 0),
+);
+const canProjectApprovedOpeningHistory = unassignedCommittedBlocks.length > 0
+  && Number.isFinite(firstBRailEpisode)
+  && unassignedCommittedBlocks.every((block) => episodeNumber(block.episode) < firstBRailEpisode);
+if (unassignedCommittedBlocks.length > 0 && !canProjectApprovedOpeningHistory) {
+  throw new Error("Canon export refused: an unassigned committed Episode Bet is not approved opening history before the first B-Rail arc.");
 }
+const approvedOpeningHistoryArc = canProjectApprovedOpeningHistory
+  ? {
+      bId: approvedOpeningHistoryId,
+      routeOrder: 0,
+      status: "closed",
+      targetAnchor: "pre_b_rail_history",
+      title: "승인 오프닝 이력",
+      body: [
+        "상태: closed",
+        "유형: Storyyard projection-only history group",
+        `승인 회차: ${unassignedCommittedBlocks.map((block) => block.episode).join(", ")}`,
+        `첫 정식 B-Rail 시작: ep${String(firstBRailEpisode).padStart(3, "0")}`,
+        "Foundry의 B-Rail ID나 원고는 변경하지 않는다.",
+      ].join("\n"),
+      sourceSha256: sha256(JSON.stringify({
+        type: "approved_opening_history",
+        episodes: unassignedCommittedBlocks.map((block) => block.episode),
+        firstBRailEpisode,
+      })),
+    }
+  : null;
+if (approvedOpeningHistoryArc) {
+  committedBlocks = committedBlocks.map((block) => (
+    block.bId ? block : { ...block, bId: approvedOpeningHistoryId }
+  ));
+}
+const projectedArcs = [
+  ...(approvedOpeningHistoryArc ? [approvedOpeningHistoryArc] : []),
+  ...canonicalProjectedArcs,
+];
 const provisionalBlocks = parseProvisionalEpisodes(artifactByKey.rolling_corridor.body);
 
 const packageWithoutHash = {
@@ -558,7 +622,7 @@ const packageWithoutHash = {
   anchors,
   bArcs,
   storyyardProjection: {
-    mappingVersion: "foundry_storyyard_arc_episode_v1",
+    mappingVersion: "foundry_storyyard_arc_episode_v2",
     arcUnit: "b_rail_arc",
     blockUnit: "episode",
     reverseSync: false,
@@ -575,6 +639,7 @@ const packageWithoutHash = {
     artifacts: artifactRows,
     anchors,
     bArcs,
+    projectedArcs,
     committedBlocks,
     revisionSetSha256: declaredRevisionSet,
     sourceGitCommit,
