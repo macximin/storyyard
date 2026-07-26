@@ -283,7 +283,7 @@ test("atomically projects the full Foundry canon into private and public Storyya
   ]);
   const canonPackage = JSON.parse(canonSource);
   const projection = canonPackage.storyyardProjection;
-  assert.equal(projection.mappingVersion, "foundry_storyyard_arc_episode_v1");
+  assert.equal(projection.mappingVersion, "foundry_storyyard_arc_episode_v2");
   assert.equal(projection.arcUnit, "b_rail_arc");
   assert.equal(projection.blockUnit, "episode");
   assert.equal(projection.reverseSync, false);
