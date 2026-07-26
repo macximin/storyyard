@@ -21,7 +21,7 @@ const manuscriptDefinitions = workSlug === "afterlife_restaurant"
   ? [
       ["ep001", "1화 승인 원고", "manuscript", "04_manuscript/ep001_v2_manuscript.md", "owner_approved"],
       ["ep002", "2화 승인 원고", "manuscript", "04_manuscript/ep002_v2_manuscript.md", "owner_approved"],
-      ["ep003", "3화 승인 원고", "manuscript", "04_manuscript/ep003_v2_manuscript.md", "owner_approved"],
+      ["ep003", "3화 승인 원고", "manuscript", "04_manuscript/ep003_v3_manuscript.md", "owner_approved"],
       ["ep004", "4화 승인 원고", "manuscript", "04_manuscript/ep004_manuscript.md", "owner_approved"],
     ]
   : [
