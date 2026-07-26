@@ -17,6 +17,21 @@ const foundryWorkPath = `40_works/${workSlug}`;
 const manifestRelativePath = `${foundryWorkPath}/04_manuscript/manifest.yaml`;
 const approvedOpeningHistoryId = "APPROVED_OPENING_HISTORY";
 
+const manuscriptDefinitions = workSlug === "afterlife_restaurant"
+  ? [
+      ["ep001", "1화 승인 원고", "manuscript", "04_manuscript/ep001_v2_manuscript.md", "owner_approved"],
+      ["ep002", "2화 승인 원고", "manuscript", "04_manuscript/ep002_v2_manuscript.md", "owner_approved"],
+      ["ep003", "3화 승인 원고", "manuscript", "04_manuscript/ep003_v2_manuscript.md", "owner_approved"],
+      ["ep004", "4화 승인 원고", "manuscript", "04_manuscript/ep004_manuscript.md", "owner_approved"],
+    ]
+  : [
+      ["ep001", "1화 승인 원고", "manuscript", "04_manuscript/ep001_manuscript.md", "owner_approved"],
+      ["ep002", "2화 승인 원고", "manuscript", "04_manuscript/ep002_manuscript.md", "owner_approved"],
+      ["ep003", "3화 승인 원고", "manuscript", "04_manuscript/ep003_manuscript.md", "owner_approved"],
+    ];
+const adoptionReviewDefinition = workSlug === "afterlife_restaurant"
+  ? ["adoption_review", "1~4화 승격 영수증", "review", "05_review/ep001-004_owner_direct_adoption_20260727.md", "owner_approved"]
+  : ["adoption_review", "1~3화 승격 영수증", "review", "05_review/ep001-003_adoption_review.md", "owner_approved"];
 const definitions = [
   ["status", "운영 상태", "status", "00_status.md", "work_status"],
   ["frozen_pitch", "Frozen Pitch", "pitch", "01_pitch/pitch.md", "owner_approved"],
@@ -24,13 +39,14 @@ const definitions = [
   ["a_rail", "A-Rail · 장기 앵커", "story_plan", "02_story/anchor_rail.md", "owner_approved"],
   ["b_rail", "B-Rail · 1~5화 아크 경로", "story_plan", "02_story/arc_route_rail.md", "owner_approved"],
   ["rolling_corridor", "Rolling Corridor", "story_plan", "02_story/rolling_corridor.md", "owner_approved"],
-  ["ep001", "1화 승인 원고", "manuscript", "04_manuscript/ep001_manuscript.md", "owner_approved"],
-  ["ep002", "2화 승인 원고", "manuscript", "04_manuscript/ep002_manuscript.md", "owner_approved"],
-  ["ep003", "3화 승인 원고", "manuscript", "04_manuscript/ep003_manuscript.md", "owner_approved"],
-  ["adoption_review", "1~3화 승격 영수증", "review", "05_review/ep001-003_adoption_review.md", "owner_approved"],
+  ...manuscriptDefinitions,
+  adoptionReviewDefinition,
   ["narrative_state", "Narrative State", "state", "08_state/narrative_state.yaml", "derived_projection"],
 ];
-const committedEpisodeBets = ["ep001", "ep002", "ep003"].map((episode) => ({
+const committedEpisodeIds = workSlug === "afterlife_restaurant"
+  ? ["ep001", "ep002", "ep003", "ep004"]
+  : ["ep001", "ep002", "ep003"];
+const committedEpisodeBets = committedEpisodeIds.map((episode) => ({
   episode,
   relativePath: `03_episode_bet/${episode}_episode_bet.md`,
 }));
@@ -224,12 +240,16 @@ function parseBRail(source) {
     }];
   });
   const tableRows = source.split("\n").flatMap((line) => {
-    if (!/^\|\s*B\d{3}\s*\|/.test(line)) return [];
+    if (!/^\|\s*B\d{3}\b/.test(line)) return [];
     const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
     const id = cells[0]?.match(/^B\d{3}/)?.[0] ?? "";
-    const span = cells[2] ?? "";
-    const episodes = [...span.matchAll(/ep\d+/g)].map((match) => match[0]);
-    const rawStatus = (cells[6] ?? "").toLowerCase();
+    const compactTable = cells.length === 5;
+    const span = compactTable ? cells[1] ?? "" : cells[2] ?? "";
+    const compactRange = span.match(/ep(\d+)~(?:ep)?(\d+)/);
+    const episodes = compactRange
+      ? [`ep${compactRange[1]}`, `ep${compactRange[2]}`]
+      : [...span.matchAll(/ep\d+/g)].map((match) => match[0]);
+    const rawStatus = (compactTable ? cells[2] : cells[6] ?? "").toLowerCase();
     const status = rawStatus.includes("closed")
       ? "closed"
       : rawStatus.includes("active")
@@ -239,10 +259,10 @@ function parseBRail(source) {
       id,
       order: Number(id.replace(/^B/, "")) || 0,
       status,
-      targetAnchor: cells[1] ?? "",
+      targetAnchor: compactTable ? "" : cells[1] ?? "",
       narrativeFunction: cells[3] ?? "",
       payoffAxis: cells[4] ?? "",
-      readerDebt: cells[5] ?? "",
+      readerDebt: compactTable ? cells[4] ?? "" : cells[5] ?? "",
       contrast: "",
       startEpisode: episodes[0] ?? "",
       endEpisode: episodes[1] ?? episodes[0] ?? "",
@@ -331,7 +351,7 @@ function buildConsistencyAudit({
   const characterSection = narrativeState.split(/^characters:\s*$/m)[1]?.split(/^assets:\s*$/m)[0] ?? "";
   const characterNames = [...characterSection.matchAll(/^    name:\s*(.+)$/gm)]
     .map((match) => match[1].trim().replace(/^["']|["']$/g, ""))
-    .filter((name) => name && name !== "null");
+    .filter((name) => name && !["null", "unknown", "unspecified"].includes(name.toLowerCase()));
   const plans = artifacts
     .filter((artifact) => artifact.kind === "pitch" || artifact.kind === "story_plan")
     .map((artifact) => artifact.body)
@@ -345,7 +365,8 @@ function buildConsistencyAudit({
     .some((candidate) => text.includes(candidate));
   const missingFromPlan = characterNames.filter((name) => !appears(plans, name));
   const missingFromManuscript = characterNames.filter((name) => !appears(manuscripts, name));
-  const stateRevisionSet = indentedYamlScalar(narrativeState, "repo_revision_set_sha256");
+  const stateRevisionSet = indentedYamlScalar(narrativeState, "repo_revision_set_sha256")
+    || indentedYamlScalar(narrativeState, "revision_set_sha256");
   const stateThrough = indentedYamlScalar(narrativeState, "state_through");
   const currentArc = bArcs.find((arc) => arc.id === status.currentBArc);
   const manuscriptArtifacts = artifacts.filter((artifact) => artifact.kind === "manuscript");
@@ -379,7 +400,9 @@ function buildConsistencyAudit({
       label: "플롯",
       verdict: anchors.length > 0
         && currentArc?.status === "active"
-        && committedBlocks.every((block) => projectedArcs.some((arc) => arc.bId === block.bId && arc.status === "closed"))
+        && committedBlocks.every((block) => projectedArcs.some(
+          (arc) => arc.bId === block.bId && ["closed", "active"].includes(arc.status),
+        ))
         ? "pass"
         : "review",
       summary: "A-Rail·현재 B-Rail·승인 회차의 B 소속을 대조",
@@ -392,15 +415,15 @@ function buildConsistencyAudit({
     {
       axis: "manuscript",
       label: "원고",
-      verdict: manuscriptArtifacts.length === 3
-        && status.approvedThrough === "ep003"
-        && status.reviewedThrough === "ep003"
-        && status.stateThrough === "ep003"
-        && stateThrough === "ep003"
+      verdict: manuscriptArtifacts.length === committedEpisodeIds.length
+        && status.approvedThrough === committedEpisodeIds.at(-1)
+        && status.reviewedThrough === committedEpisodeIds.at(-1)
+        && status.stateThrough === committedEpisodeIds.at(-1)
+        && stateThrough === committedEpisodeIds.at(-1)
         && stateRevisionSet === revisionSetSha256
         ? "pass"
         : "review",
-      summary: "승인 1~3화·감리 범위·Narrative State 투영·revision-set을 대조",
+      summary: `승인 1~${committedEpisodeIds.length}화·감리 범위·Narrative State 투영·revision-set을 대조`,
       evidence: [
         `approved_manuscripts=${manuscriptArtifacts.length}`,
         `reviewed_through=${status.reviewedThrough}`,
@@ -473,11 +496,13 @@ const structuredRevisionSet = yamlScalar(adoptionReceipt, "manifest_revision_set
 const legacyScopeApproved = indentedYamlScalar(adoptionReceipt, "frozen_pitch") === "approved"
   && indentedYamlScalar(adoptionReceipt, "story_plan") === "approved"
   && Boolean(exactManuscriptRevision);
-const structuredScopeApproved = structuredDecision === "adopt_all_exact_revisions"
+const structuredScopeApproved = ["adopt_all_exact_revisions", "ADOPT"].includes(structuredDecision)
   && Boolean(structuredRevisionSet);
+const ownerDirectScopeApproved = structuredDecision === "ADOPT"
+  && adoptionReceipt.includes("exact_manuscript_revision");
 if (
   !adoptionDecisionId
-  || (!legacyScopeApproved && !structuredScopeApproved)
+  || (!legacyScopeApproved && !structuredScopeApproved && !ownerDirectScopeApproved)
 ) {
   throw new Error("Canon export refused: owner adoption receipt does not approve the pitch, Story Plan, and exact manuscript revision.");
 }
@@ -485,13 +510,13 @@ if (!artifactByKey.status.body.includes(`  - ${adoptionDecisionId}`)) {
   throw new Error(`Canon export refused: status does not reference owner decision ${adoptionDecisionId}.`);
 }
 
-const expectedEpisodes = ["ep001", "ep002", "ep003"];
+const expectedEpisodes = committedEpisodeIds;
 const manifestEntries = parseManifestEntries(manifest);
 if (
   manifestEntries.length !== expectedEpisodes.length
   || manifestEntries.some((entry, index) => entry.episode !== expectedEpisodes[index])
 ) {
-  throw new Error("Canon export refused: manuscript manifest must contain ep001~ep003 in canonical order.");
+  throw new Error(`Canon export refused: manuscript manifest must contain ${expectedEpisodes.join("~")} in canonical order.`);
 }
 
 for (const entry of manifestEntries) {
@@ -502,7 +527,10 @@ for (const entry of manifestEntries) {
   if (entry.authority !== "owner_approved" || entry.owner_decision !== adoptionDecisionId) {
     throw new Error(`Canon export refused: ${entry.episode} is not tied to owner decision ${adoptionDecisionId}.`);
   }
-  const markdownAttestation = adoptionReceipt.includes(`| ${entry.episode} | \`${entry.sha256}\``);
+  const markdownAttestation = new RegExp(
+    `^\\|\\s*${escapeRegex(entry.episode)}\\s*\\|.*\\x60${escapeRegex(entry.sha256)}\\x60.*\\|\\s*$`,
+    "m",
+  ).test(adoptionReceipt);
   const structuredAttestation = new RegExp(
     `^\\s*- \\{ episode: ${escapeRegex(entry.episode)}, source: [^,}]+, sha256: ${escapeRegex(entry.sha256)} \\}\\s*$`,
     "m",
@@ -520,7 +548,7 @@ if (computedRevisionSet !== declaredRevisionSet) {
   throw new Error(`Canon revision-set mismatch: expected ${declaredRevisionSet}, got ${computedRevisionSet}.`);
 }
 if (
-  !adoptionReceipt.includes(`승인 revision-set SHA-256: \`${declaredRevisionSet}\``)
+  !adoptionReceipt.includes(`revision-set SHA-256: \`${declaredRevisionSet}\``)
   && structuredRevisionSet !== declaredRevisionSet
 ) {
   throw new Error("Canon export refused: adoption receipt does not attest the manifest revision set.");
@@ -615,8 +643,8 @@ const packageWithoutHash = {
   },
   revisionSetSha256: declaredRevisionSet,
   scope: {
-    includes: ["Frozen Pitch", "Story Plan 4 surfaces", "owner-approved ep001~ep003", "adoption review", "Narrative State"],
-    excludes: ["30_materials", "unapproved ep004+", "automatic Foundry mutation"],
+    includes: ["Frozen Pitch", "Story Plan 4 surfaces", `owner-approved ep001~${expectedEpisodes.at(-1)}`, "adoption review", "Narrative State"],
+    excludes: ["30_materials", `unapproved ep${String(expectedEpisodes.length + 1).padStart(3, "0")}+`, "automatic Foundry mutation"],
   },
   status,
   anchors,

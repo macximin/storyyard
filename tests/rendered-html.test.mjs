@@ -273,12 +273,13 @@ test("ships a five-work admin-only Foundry canon review board with pending decis
   assert.match(exporter, /inlineRows/);
   assert.match(exporter, /buildConsistencyAudit/);
   assert.match(exporter, /computedRevisionSet/);
-  assert.match(canonPackage, /"revisionSetSha256": "4aa9de3ba689973cd86ba45377387024ca6d09ed2ac4e52eb6e22aa7a3483ea6"/);
+  assert.match(canonPackage, /"revisionSetSha256": "88dbe9194db3d9fb03a732528ee15e5a6262dd68c532f17672f387b71e1a344d"/);
   assert.match(canonPackage, /"sourceGitCommit": "[0-9a-f]{40}"/);
   for (const hash of [
-    "2b8d1bca981c1c7b0731c918e581b36ce7d4d1dc169bec4571311eab72eb241a",
-    "6baec3ac49cc771f6e9be445347bfda6faa5dea0de9281d6e1dbf33b8aebb94c",
-    "65ab2508218b7dfb1b462f2daa37d96712e307d9cc4ce554575675eca320d6ad",
+    "23a22f298b4ea37499b80ec55c0e86b3816604328255aee3529e7013a0712244",
+    "01802d4862a5b607f42b335c7a3126c0418a3ac2a2a406199f090d046d45595a",
+    "7bba444b4e437402ea7191c7e97e233a831030c1f8f2ef188c278bc6f63b88b3",
+    "f5ec74b51a97e76d2accf20a1b39bf00dc57d525df917876f35eae9c04b40dcc",
   ]) {
     assert.match(canonPackage, new RegExp(hash));
   }
@@ -302,7 +303,13 @@ test("atomically projects the full Foundry canon into private and public Storyya
   assert.equal(projection.reverseSync, false);
   assert.deepEqual(
     projection.arcs.map((item) => [item.bId, item.status]),
-    [["B001", "closed"], ["B002", "active"], ["B003", "provisional"]],
+    [
+      ["B001", "closed"],
+      ["B002", "active"],
+      ["B003", "provisional"],
+      ["B004", "provisional"],
+      ["B005", "provisional"],
+    ],
   );
   assert.deepEqual(
     projection.episodeBlocks.map((item) => [item.episode, item.bId, item.status]),
@@ -310,9 +317,7 @@ test("atomically projects the full Foundry canon into private and public Storyya
       ["ep001", "B001", "committed"],
       ["ep002", "B001", "committed"],
       ["ep003", "B001", "committed"],
-      ["ep004", "B002", "provisional"],
-      ["ep005", "B002", "provisional"],
-      ["ep006", "B002", "provisional"],
+      ["ep004", "B002", "committed"],
     ],
   );
   assert.equal(
@@ -321,8 +326,8 @@ test("atomically projects the full Foundry canon into private and public Storyya
   );
   assert.equal(canonPackage.workspaceProjection.mappingVersion, "foundry_storyyard_workspace_v1");
   assert.equal(canonPackage.workspaceProjection.reverseSync, false);
-  assert.equal(canonPackage.workspaceProjection.manuscripts.length, 3);
-  assert.equal(canonPackage.workspaceProjection.characters.length, 7);
+  assert.equal(canonPackage.workspaceProjection.manuscripts.length, 4);
+  assert.equal(canonPackage.workspaceProjection.characters.length, 6);
   assert.match(exporter, /committedEpisodeBets/);
   assert.match(exporter, /parseProvisionalEpisodes/);
   assert.match(exporter, /buildWorkspaceProjection/);
