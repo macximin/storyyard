@@ -225,6 +225,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const input = await request.json().catch(() => null) as {
     workSlug?: string;
     repairLegacySnapshot?: boolean;
+    preserveConflicts?: boolean;
   } | null;
   const canonPackage = getSyncableCanonPackage(input?.workSlug?.trim() ?? "");
   if (!canonPackage) return Response.json({ error: "커밋된 정본만 Storyyard 플롯으로 동기화할 수 있음." }, { status: 409 });
@@ -340,6 +341,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const currentHash = existing ? await sha256({ title: existing.title, body: existing.body }) : "";
     if (existing && previousSync && currentHash !== previousSync.projectedContentSha256 && !legacySnapshotRepair) {
       report.conflicts.push({ entityKey, title: existing.title });
+      characterIds.set(character.entityKey, existing.id);
       continue;
     }
     const id = existing?.id ?? crypto.randomUUID();
@@ -400,6 +402,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       && !legacySnapshotRepair
     ) {
       report.conflicts.push({ entityKey, title: existing.title });
+      manuscriptIds.set(manuscript.episodeNo, existing.id);
       continue;
     }
     const id = existing?.id ?? crypto.randomUUID();
@@ -686,7 +689,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const sync = readFoundrySync(entity.meta);
     return sync?.workSlug === canonPackage.workSlug && !projectedKeys.has(sync.entityKey);
   }).length;
-  if (report.conflicts.length) {
+  if (report.conflicts.length && input?.preserveConflicts !== true) {
     return Response.json({
       error: "Storyyard에서 수정된 정본 투영이 있어 전체 동기화를 중단했음. Foundry 정본을 덮어쓰지 않도록 충돌을 먼저 확인해 줘.",
       report,

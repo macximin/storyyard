@@ -1,6 +1,7 @@
 import { asc, eq, inArray } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { getSyncableCanonPackage } from "@/app/canon-packages";
 import { getDb } from "@/db";
 import { canonBindings, manuscripts, plotBlocks, projectItems, publicationContent, publicationEpisodes, publications, projects } from "@/db/schema";
 
@@ -72,8 +73,17 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       .where(eq(manuscripts.projectId, projectId))
       .orderBy(asc(manuscripts.episodeNo))
     : [];
+  const canonEpisodeNos = publishCanon
+    ? new Set(
+      getSyncableCanonPackage(canonBinding.workSlug)
+        ?.workspaceProjection.manuscripts.map((item) => item.episodeNo) ?? [],
+    )
+    : new Set<number>();
   const allManuscripts = publishCanon
-    ? manuscriptRows.filter((item) => readFoundryWorkSlug(item.meta) === canonBinding.workSlug)
+    ? manuscriptRows.filter((item) =>
+      readFoundryWorkSlug(item.meta) === canonBinding.workSlug
+      || canonEpisodeNos.has(item.episodeNo),
+    )
     : manuscriptRows;
   const episodeIds = publishAll
     ? allManuscripts.map((item) => item.id)

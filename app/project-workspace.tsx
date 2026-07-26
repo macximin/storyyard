@@ -615,7 +615,11 @@ export function ProjectWorkspace({
       const response = await fetch(`/api/projects/${projectId}/foundry-sync`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ workSlug: canonPackage.workSlug, repairLegacySnapshot: true }),
+        body: JSON.stringify({
+          workSlug: canonPackage.workSlug,
+          repairLegacySnapshot: true,
+          preserveConflicts: true,
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Foundry 동기화 실패");
@@ -638,7 +642,7 @@ export function ProjectWorkspace({
         .reduce((sum, [, value]) => sum + Number(value), 0);
       setFoundrySyncMessage(
         data.report.conflicts.length
-          ? `정본 충돌 ${data.report.conflicts.length}개 · 전체 반영 중단`
+          ? `Storyyard 수정본 ${data.report.conflicts.length}개 보존 · 나머지 정본 반영`
           : `작업실·커뮤니티 ${workspaceChanged}개, 플롯 ${changed}개 반영 · 같은 정본으로 잠금`,
       );
     } catch (error) {
