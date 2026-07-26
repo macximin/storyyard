@@ -191,6 +191,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const existingItems = access.items;
   const existingBlocks = access.blocks;
+  // One-time migration path for the legacy split-brain state: an old public
+  // snapshot exists but the private workspace has no manuscripts at all.
+  // Once canonical manuscripts are inserted, normal fail-closed drift checks
+  // apply on every later sync.
+  const legacySnapshotRepair = access.manuscripts.length === 0 && Boolean(access.publication);
   const writes: ReturnType<typeof env.DB.prepare>[] = [];
   const timestamp = new Date().toISOString();
   const plotEntity = existingItems.find((item) => {
@@ -282,7 +287,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const desiredHash = await sha256(desired);
     const previousSync = existing ? readFoundrySync(existing.meta) : null;
     const currentHash = existing ? await sha256({ title: existing.title, body: existing.body }) : "";
-    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256) {
+    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256 && !legacySnapshotRepair) {
       report.conflicts.push({ entityKey, title: existing.title });
       continue;
     }
@@ -341,6 +346,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       existing
       && ((previousSync && currentHash !== previousSync.projectedContentSha256)
         || (!previousSync && Boolean(existing.body.trim()) && currentHash !== desiredHash))
+      && !legacySnapshotRepair
     ) {
       report.conflicts.push({ entityKey, title: existing.title });
       continue;
@@ -482,7 +488,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const currentHash = existing
       ? await sha256({ title: existing.title, body: existing.body, act: Number(readObject(existing.meta).act ?? 0) })
       : "";
-    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256) {
+    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256 && !legacySnapshotRepair) {
       report.conflicts.push({ entityKey, title: existing.title });
       continue;
     }
@@ -544,7 +550,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const currentHash = existing
       ? await sha256({ title: existing.title, body: existing.body, act: existing.act })
       : "";
-    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256) {
+    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256 && !legacySnapshotRepair) {
       report.conflicts.push({ entityKey, title: existing.title });
       continue;
     }
