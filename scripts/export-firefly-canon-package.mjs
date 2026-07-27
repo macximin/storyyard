@@ -32,6 +32,14 @@ const manuscriptDefinitions = workSlug === "afterlife_restaurant"
 const adoptionReviewDefinition = workSlug === "afterlife_restaurant"
   ? ["adoption_review", "1~4화 승격 영수증", "review", "05_review/ep001-004_owner_direct_adoption_20260727.md", "owner_approved"]
   : ["adoption_review", "1~3화 승격 영수증", "review", "05_review/ep001-003_adoption_review.md", "owner_approved"];
+const supplementalReviewDefinitions = workSlug === "afterlife_restaurant"
+  ? [
+      ["continuity_touch_review", "1~3화 연속성 국소 보정", "review", "05_review/ep001-003_continuity_touch_20260727.md", "owner_approved"],
+      ["continuity_audit_review", "1~4화 연속성 감리", "review", "05_review/ep001-004_continuity_audit_20260727.md", "owner_approved"],
+      ["cooking_detail_touch_review", "2~3화 조리 디테일 보강", "review", "05_review/ep002-003_cooking_detail_touch_20260727.md", "owner_approved"],
+      ["duplicate_removal_review", "4화 중복 삽입 복구", "review", "05_review/ep004_duplicate_removal_20260727.md", "owner_approved"],
+    ]
+  : [];
 const definitions = [
   ["status", "운영 상태", "status", "00_status.md", "work_status"],
   ["frozen_pitch", "Frozen Pitch", "pitch", "01_pitch/pitch.md", "owner_approved"],
@@ -41,6 +49,7 @@ const definitions = [
   ["rolling_corridor", "Rolling Corridor", "story_plan", "02_story/rolling_corridor.md", "owner_approved"],
   ...manuscriptDefinitions,
   adoptionReviewDefinition,
+  ...supplementalReviewDefinitions,
   ["narrative_state", "Narrative State", "state", "08_state/narrative_state.yaml", "derived_projection"],
 ];
 const committedEpisodeIds = workSlug === "afterlife_restaurant"
@@ -500,6 +509,13 @@ const episodeBetRows = await Promise.all(committedEpisodeBets.map(async ({ episo
 const manifest = await readFile(path.join(workRoot, "04_manuscript/manifest.yaml"), "utf8");
 const status = parseStatus(artifactByKey.status.body);
 const adoptionReceipt = artifactByKey.adoption_review.body;
+const reviewReceipts = artifactRows
+  .filter((artifact) => artifact.kind === "review")
+  .map((artifact) => artifact.body);
+const decisionReviewById = new Map(reviewReceipts.flatMap((receipt) => {
+  const decisionId = yamlScalar(receipt, "decision_id");
+  return decisionId ? [[decisionId, receipt]] : [];
+}));
 const adoptionDecisionId = yamlScalar(adoptionReceipt, "decision_id");
 const exactManuscriptRevision = indentedYamlScalar(adoptionReceipt, "exact_manuscript_revision");
 const structuredDecision = yamlScalar(adoptionReceipt, "decision");
@@ -535,19 +551,28 @@ for (const entry of manifestEntries) {
   if (!artifact || entry.sha256 !== artifact.sha256) {
     throw new Error(`${entry.episode} canonical hash mismatch: expected ${entry.sha256}, got ${artifact?.sha256}`);
   }
-  if (entry.authority !== "owner_approved" || entry.owner_decision !== adoptionDecisionId) {
-    throw new Error(`Canon export refused: ${entry.episode} is not tied to owner decision ${adoptionDecisionId}.`);
+  const ownerDecisionId = entry.owner_decision;
+  const decisionReceipt = decisionReviewById.get(ownerDecisionId);
+  if (entry.authority !== "owner_approved" || !ownerDecisionId || !decisionReceipt) {
+    throw new Error(`Canon export refused: ${entry.episode} has no tracked owner decision receipt.`);
+  }
+  if (!artifactByKey.status.body.includes(`  - ${ownerDecisionId}`)) {
+    throw new Error(`Canon export refused: status does not reference owner decision ${ownerDecisionId}.`);
   }
   const markdownAttestation = new RegExp(
     `^\\|\\s*${escapeRegex(entry.episode)}\\s*\\|.*(?:\\x60)?${escapeRegex(entry.sha256)}(?:\\x60)?.*\\|\\s*$`,
     "m",
-  ).test(adoptionReceipt);
+  ).test(decisionReceipt);
   const structuredAttestation = new RegExp(
     `^\\s*- \\{ episode: ${escapeRegex(entry.episode)}, source: [^,}]+, sha256: ${escapeRegex(entry.sha256)} \\}\\s*$`,
     "m",
-  ).test(adoptionReceipt);
-  if (!markdownAttestation && !structuredAttestation) {
-    throw new Error(`Canon export refused: adoption receipt does not attest ${entry.episode} hash ${entry.sha256}.`);
+  ).test(decisionReceipt);
+  const bulletAttestation = new RegExp(
+    `^-\\s+${escapeRegex(entry.episode)} SHA-256:\\s*(?:\\x60)?${escapeRegex(entry.sha256)}(?:\\x60)?\\s*$`,
+    "m",
+  ).test(decisionReceipt);
+  if (!markdownAttestation && !structuredAttestation && !bulletAttestation) {
+    throw new Error(`Canon export refused: owner decision ${ownerDecisionId} does not attest ${entry.episode} hash ${entry.sha256}.`);
   }
 }
 
@@ -564,8 +589,10 @@ if (!computedRevisionSets.includes(declaredRevisionSet)) {
   throw new Error(`Canon revision-set mismatch: expected ${declaredRevisionSet}, got ${computedRevisionSets.join(" or ")}.`);
 }
 if (
-  !adoptionReceipt.includes(`revision-set SHA-256: \`${declaredRevisionSet}\``)
-  && !adoptionReceipt.includes(`revision-set SHA-256: ${declaredRevisionSet}`)
+  !reviewReceipts.some((receipt) => (
+    receipt.includes(`revision-set SHA-256: \`${declaredRevisionSet}\``)
+    || receipt.includes(`revision-set SHA-256: ${declaredRevisionSet}`)
+  ))
   && structuredRevisionSet !== declaredRevisionSet
 ) {
   throw new Error("Canon export refused: adoption receipt does not attest the manifest revision set.");
