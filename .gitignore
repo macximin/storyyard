@@ -42,3 +42,6 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# temporary Sites deployment archives
+.tmp-storyyard-site*.tar.gz
