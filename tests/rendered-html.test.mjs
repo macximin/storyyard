@@ -40,7 +40,7 @@ test("ships the public community and private studio navigation", async () => {
   assert.match(sidebar, /내 작품/);
   assert.match(community, /랭킹순/);
   assert.match(community, /최신순/);
-  assert.match(community, /default-cover-card\.webp/);
+  assert.match(community, /covers\/overall-revision\.png/);
   assert.match(community, /loading=\{index === 0 \? "eager" : "lazy"\}/);
   assert.match(page, /CommunityHome/);
   assert.match(library, /work-card-cover/);
@@ -50,6 +50,15 @@ test("ships the public community and private studio navigation", async () => {
   assert.match(styles, /\.work-grid \{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(styles, /\.work-card-cover \{[^}]*aspect-ratio: 2 \/ 3/);
   await access(new URL("public/default-cover.png", root));
+  for (const cover of [
+    "first-confirmed.png",
+    "launch-complete.png",
+    "unlimited-contest-expected-pass.png",
+    "market-testing.png",
+    "overall-revision.png",
+    "kakao-expected-pass.png",
+    "submission-complete.png",
+  ]) await access(new URL(`public/covers/${cover}`, root));
   await access(new URL("public/default-cover-card.webp", root));
 });
 

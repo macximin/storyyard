@@ -72,7 +72,7 @@ export function CommunityHome({
                 <Link className="cover-link" href={`/works/${work.slug}`} prefetch>
                   <div className="cover-frame">
                     <img
-                      src={!work.coverUrl || work.coverUrl === "/default-cover.png" ? "/default-cover-card.webp" : work.coverUrl}
+                      src={!work.coverUrl || work.coverUrl === "/default-cover.png" ? "/covers/overall-revision.png" : work.coverUrl}
                       alt={`${work.title} 표지`}
                       width={480}
                       height={720}
