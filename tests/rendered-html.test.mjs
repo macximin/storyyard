@@ -397,7 +397,13 @@ test("atomically projects the full Foundry canon into private and public Storyya
   assert.match(syncRoute, /manuscriptIds\.set\(manuscript\.episodeNo, existing\.id\)/);
   assert.match(syncRoute, /env\.DB\.batch\(writes\)/);
   assert.match(syncRoute, /if \(writes\.length\)/);
-  assert.doesNotMatch(syncRoute, /\.delete\(|DELETE FROM/);
+  assert.doesNotMatch(syncRoute, /\.delete\(/);
+  assert.match(syncRoute, /item\.title !== `\$\{canonPackage\.title\} — 아크 로드맵`/);
+  assert.match(syncRoute, /DELETE FROM publication_content/);
+  assert.match(syncRoute, /kind IN \('plot', 'act', 'block'\)/);
+  assert.match(syncRoute, /VALUES \(\?, \?, \?, 'plot'/);
+  assert.match(syncRoute, /VALUES \(\?, \?, \?, 'act'/);
+  assert.match(syncRoute, /VALUES \(\?, \?, \?, 'block'/);
   assert.match(syncRoute, /UPDATE publication_episodes/);
   assert.match(syncRoute, /ON CONFLICT\(project_id\) DO UPDATE/);
   assert.match(syncRoute, /canon_bindings/);

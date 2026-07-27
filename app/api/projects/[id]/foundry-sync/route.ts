@@ -296,6 +296,31 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       ),
     );
   }
+  if (input?.repairLegacySnapshot === true) {
+    const legacyEmptyPlots = existingItems.filter((item) => {
+      if (
+        item.kind !== "plot"
+        || item.id === plotId
+        || item.title !== `${canonPackage.title} — 아크 로드맵`
+        || readFoundrySync(item.meta)
+      ) {
+        return false;
+      }
+      const hasActs = existingItems.some((candidate) =>
+        candidate.kind === "act" && readObject(candidate.meta).plotId === item.id
+      );
+      const hasBlocks = existingBlocks.some((candidate) =>
+        readObject(candidate.meta).plotId === item.id
+      );
+      return !hasActs && !hasBlocks;
+    });
+    for (const legacyPlot of legacyEmptyPlots) {
+      writes.push(
+        env.DB.prepare(`DELETE FROM project_items WHERE id = ? AND project_id = ?`)
+          .bind(legacyPlot.id, projectId),
+      );
+    }
+  }
 
   const report = {
     plotId,
@@ -459,6 +484,25 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
            WHERE id = ?`,
       ).bind(projectId, overview.title, overview.logline, timestamp, timestamp, access.publication.id),
     );
+    writes.push(
+      env.DB.prepare(
+        `DELETE FROM publication_content
+          WHERE publication_id = ? AND kind IN ('plot', 'act', 'block')`,
+      ).bind(access.publication.id),
+    );
+    writes.push(
+      env.DB.prepare(
+        `INSERT INTO publication_content
+          (id, publication_id, source_id, kind, parent_source_id, sort_order,
+           title, body, meta, created_at, updated_at)
+         VALUES (?, ?, ?, 'plot', '', 0, ?, ?, '{}', ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), access.publication.id, plotId,
+        `Foundry · ${canonPackage.title}`,
+        `B-Rail을 아크로, 한 화를 블록 하나로 비추는 읽기 투영 · source ${canonPackage.sourceGitCommit.slice(0, 12)}`,
+        timestamp, timestamp,
+      ),
+    );
     for (const manuscript of canonPackage.workspaceProjection.manuscripts) {
       const sourceManuscriptId = manuscriptIds.get(manuscript.episodeNo);
       if (!sourceManuscriptId) continue;
@@ -569,13 +613,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         reverseSync: false,
       },
     );
+    const id = existing?.id ?? crypto.randomUUID();
     if (!existing) {
       writes.push(
         env.DB.prepare(
           `INSERT INTO project_items
             (id, project_id, kind, title, body, meta, updated_at)
            VALUES (?, ?, 'act', ?, ?, ?, ?)`,
-        ).bind(crypto.randomUUID(), projectId, arc.title, arc.body, meta, timestamp),
+        ).bind(id, projectId, arc.title, arc.body, meta, timestamp),
       );
       report.created += 1;
     } else if (
@@ -593,6 +638,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         ).bind(arc.title, arc.body, meta, timestamp, existing.id),
       );
       report.updated += 1;
+    }
+    if (access.publication) {
+      writes.push(
+        env.DB.prepare(
+          `INSERT INTO publication_content
+            (id, publication_id, source_id, kind, parent_source_id, sort_order,
+             title, body, meta, created_at, updated_at)
+           VALUES (?, ?, ?, 'act', ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(), access.publication.id, id, plotId, act,
+          arc.title, arc.body, JSON.stringify({ act, status: arc.status }),
+          timestamp, timestamp,
+        ),
+      );
     }
   }
 
@@ -637,6 +696,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         reverseSync: false,
       },
     );
+    const id = existing?.id ?? crypto.randomUUID();
     if (!existing) {
       writes.push(
         env.DB.prepare(
@@ -644,7 +704,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
             (id, project_id, act, kind, title, body, meta, sort_order, updated_at)
            VALUES (?, ?, ?, 'episode', ?, ?, ?, ?, ?)`,
         ).bind(
-          crypto.randomUUID(),
+          id,
           projectId,
           act,
           episode.title,
@@ -679,6 +739,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         ),
       );
       report.updated += 1;
+    }
+    if (access.publication) {
+      writes.push(
+        env.DB.prepare(
+          `INSERT INTO publication_content
+            (id, publication_id, source_id, kind, parent_source_id, sort_order,
+             title, body, meta, created_at, updated_at)
+           VALUES (?, ?, ?, 'block', ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(), access.publication.id, id, plotId,
+          episode.sortOrder, episode.title, episode.body,
+          JSON.stringify({ act, status: episode.status }), timestamp, timestamp,
+        ),
+      );
     }
   }
 
