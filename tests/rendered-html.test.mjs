@@ -251,8 +251,8 @@ test("opens manuscripts as dedicated episode pages with episode comments and del
   assert.match(schema, /episodeId/);
 });
 
-test("ships a five-work admin-only Foundry canon review board with pending decisions", async () => {
-  const [page, board, route, schema, packages, sidebar, canonPackage, cheongmaPackage, knightPackage, romancePackage, tyrantPackage, exporter] = await Promise.all([
+test("ships a six-work admin-only Foundry canon review board with pending decisions", async () => {
+  const [page, board, route, schema, packages, sidebar, canonPackage, cheongmaPackage, isekaiPackage, knightPackage, romancePackage, tyrantPackage, exporter] = await Promise.all([
     read("app/canon/page.tsx"),
     read("app/canon/canon-review-board.tsx"),
     read("app/api/canon/decisions/route.ts"),
@@ -261,6 +261,7 @@ test("ships a five-work admin-only Foundry canon review board with pending decis
     read("app/global-sidebar.tsx"),
     read("data/canon/afterlife_restaurant.json"),
     read("data/canon/cheongma_restaurant.json"),
+    read("data/canon/isekai_restaurant.json"),
     read("data/canon/knights_restaurant.json"),
     read("data/canon/romance_fantasy_restaurant.json"),
     read("data/canon/tyrant_restaurant.json"),
@@ -285,6 +286,7 @@ test("ships a five-work admin-only Foundry canon review board with pending decis
   assert.match(board, /승격 준비 스냅샷/);
   assert.match(packages, /knights_restaurant/);
   assert.match(packages, /cheongma_restaurant/);
+  assert.match(packages, /isekai_restaurant/);
   assert.match(packages, /romance_fantasy_restaurant/);
   assert.match(packages, /tyrant_restaurant/);
   assert.match(packages, /listSyncableCanonPackages/);
@@ -293,6 +295,10 @@ test("ships a five-work admin-only Foundry canon review board with pending decis
   assert.match(cheongmaPackage, /"sourceState": "committed"/);
   assert.match(cheongmaPackage, /"revisionSetSha256": "fe88f1f2672da3027998c4f99a8aa0272fb5fe32aff6003530f9023382a132e3"/);
   assert.match(cheongmaPackage, /"verdict": "pass"/);
+  assert.match(isekaiPackage, /"title": "이계식당"/);
+  assert.match(isekaiPackage, /"revisionSetSha256": "5118946b0745debd337e640725e8685c4ec3dc1bdd48617c8645e2a3b6f93dc5"/);
+  assert.match(isekaiPackage, /"entityKey": "seo_jeongwoo"/);
+  assert.match(isekaiPackage, /"bId": "B001"/);
   assert.match(knightPackage, /"sourceState": "committed"/);
   assert.match(knightPackage, /"productionSystem": "v3_firefly_studio"/);
   assert.match(romancePackage, /"title": "로판식당"/);

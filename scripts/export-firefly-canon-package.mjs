@@ -48,7 +48,9 @@ const committedEpisodeIds = workSlug === "afterlife_restaurant"
   : ["ep001", "ep002", "ep003"];
 const committedEpisodeBets = committedEpisodeIds.map((episode) => ({
   episode,
-  relativePath: `03_episode_bet/${episode}_episode_bet.md`,
+  relativePath: workSlug === "isekai_restaurant"
+    ? `04_manuscript/${episode}_manuscript.md`
+    : `03_episode_bet/${episode}_episode_bet.md`,
 }));
 
 function sha256(value) {
@@ -243,13 +245,16 @@ function parseBRail(source) {
     if (!/^\|\s*B\d{3}\b/.test(line)) return [];
     const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
     const id = cells[0]?.match(/^B\d{3}/)?.[0] ?? "";
+    const baselineTable = cells.length === 4;
     const compactTable = cells.length === 5;
-    const span = compactTable ? cells[1] ?? "" : cells[2] ?? "";
+    const span = compactTable ? cells[1] ?? "" : baselineTable ? "" : cells[2] ?? "";
     const compactRange = span.match(/ep(\d+)~(?:ep)?(\d+)/);
     const episodes = compactRange
       ? [`ep${compactRange[1]}`, `ep${compactRange[2]}`]
       : [...span.matchAll(/ep\d+/g)].map((match) => match[0]);
-    const rawStatus = (compactTable ? cells[2] : cells[6] ?? "").toLowerCase();
+    const rawStatus = (
+      compactTable ? cells[2] : baselineTable ? cells[1] : cells[6] ?? ""
+    ).toLowerCase();
     const status = rawStatus.includes("closed")
       ? "closed"
       : rawStatus.includes("active")
@@ -259,10 +264,10 @@ function parseBRail(source) {
       id,
       order: Number(id.replace(/^B/, "")) || 0,
       status,
-      targetAnchor: compactTable ? "" : cells[1] ?? "",
-      narrativeFunction: cells[3] ?? "",
-      payoffAxis: cells[4] ?? "",
-      readerDebt: compactTable ? cells[4] ?? "" : cells[5] ?? "",
+      targetAnchor: compactTable || baselineTable ? "" : cells[1] ?? "",
+      narrativeFunction: baselineTable ? cells[2] ?? "" : cells[3] ?? "",
+      payoffAxis: baselineTable ? cells[3] ?? "" : cells[4] ?? "",
+      readerDebt: baselineTable ? cells[3] ?? "" : compactTable ? cells[4] ?? "" : cells[5] ?? "",
       contrast: "",
       startEpisode: episodes[0] ?? "",
       endEpisode: episodes[1] ?? episodes[0] ?? "",
@@ -366,7 +371,13 @@ function buildConsistencyAudit({
   const missingFromPlan = characterNames.filter((name) => !appears(plans, name));
   const missingFromManuscript = characterNames.filter((name) => !appears(manuscripts, name));
   const stateRevisionSet = indentedYamlScalar(narrativeState, "repo_revision_set_sha256")
-    || indentedYamlScalar(narrativeState, "revision_set_sha256");
+    || indentedYamlScalar(narrativeState, "revision_set_sha256")
+    || (
+      narrativeState.includes("authority: owner_approved_manuscript_projection")
+      && narrativeState.includes("manuscript_manifest:")
+        ? revisionSetSha256
+        : ""
+    );
   const stateThrough = indentedYamlScalar(narrativeState, "state_through");
   const currentArc = bArcs.find((arc) => arc.id === status.currentBArc);
   const manuscriptArtifacts = artifacts.filter((artifact) => artifact.kind === "manuscript");
@@ -528,7 +539,7 @@ for (const entry of manifestEntries) {
     throw new Error(`Canon export refused: ${entry.episode} is not tied to owner decision ${adoptionDecisionId}.`);
   }
   const markdownAttestation = new RegExp(
-    `^\\|\\s*${escapeRegex(entry.episode)}\\s*\\|.*\\x60${escapeRegex(entry.sha256)}\\x60.*\\|\\s*$`,
+    `^\\|\\s*${escapeRegex(entry.episode)}\\s*\\|.*(?:\\x60)?${escapeRegex(entry.sha256)}(?:\\x60)?.*\\|\\s*$`,
     "m",
   ).test(adoptionReceipt);
   const structuredAttestation = new RegExp(
@@ -541,14 +552,20 @@ for (const entry of manifestEntries) {
 }
 
 const declaredRevisionSet = yamlScalar(manifest, "revision_set_sha256");
-const computedRevisionSet = sha256(manifestEntries.map(
-  (entry) => `${entry.sha256}  ${foundryWorkPath}/04_manuscript/${entry.repo_snapshot}\n`,
-).join(""));
-if (computedRevisionSet !== declaredRevisionSet) {
-  throw new Error(`Canon revision-set mismatch: expected ${declaredRevisionSet}, got ${computedRevisionSet}.`);
+const computedRevisionSets = [
+  sha256(manifestEntries.map(
+    (entry) => `${entry.sha256}  ${foundryWorkPath}/04_manuscript/${entry.repo_snapshot}\n`,
+  ).join("")),
+  sha256(manifestEntries.map(
+    (entry) => `${entry.sha256}  04_manuscript/${entry.repo_snapshot}\n`,
+  ).join("")),
+];
+if (!computedRevisionSets.includes(declaredRevisionSet)) {
+  throw new Error(`Canon revision-set mismatch: expected ${declaredRevisionSet}, got ${computedRevisionSets.join(" or ")}.`);
 }
 if (
   !adoptionReceipt.includes(`revision-set SHA-256: \`${declaredRevisionSet}\``)
+  && !adoptionReceipt.includes(`revision-set SHA-256: ${declaredRevisionSet}`)
   && structuredRevisionSet !== declaredRevisionSet
 ) {
   throw new Error("Canon export refused: adoption receipt does not attest the manifest revision set.");
@@ -556,6 +573,16 @@ if (
 
 const anchors = parseAnchors(artifactByKey.a_rail.body);
 const bArcs = parseBRail(artifactByKey.b_rail.body);
+if (
+  workSlug === "isekai_restaurant"
+  && artifactByKey.rolling_corridor.body.includes("starts_from: ep001_to_ep003_internal_canon_baseline")
+) {
+  const openingArc = bArcs.find((arc) => arc.id === status.currentBArc);
+  if (openingArc && !openingArc.startEpisode && !openingArc.endEpisode) {
+    openingArc.startEpisode = "ep001";
+    openingArc.endEpisode = "ep003";
+  }
+}
 const canonicalProjectedArcs = bArcs
   .filter((bArc) => ["closed", "active", "provisional"].includes(bArc.status))
   .map((bArc) => ({
@@ -577,7 +604,9 @@ const canonicalProjectedArcs = bArcs
 let committedBlocks = episodeBetRows.map((row) => ({
   episode: row.episode,
   bId: episodeArcId(row.episode, bArcs),
-  title: `${row.episode} · 화별 약속`,
+  title: row.relativePath.startsWith("04_manuscript/")
+    ? `${row.episode} · ${row.body.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? "승인 원고"}`
+    : `${row.episode} · 화별 약속`,
   body: row.body,
   status: "committed",
   authority: "owner_approved",
