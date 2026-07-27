@@ -168,7 +168,7 @@ function buildWorkspaceProjection({ status, artifacts, revisionSetSha256 }) {
   const manuscripts = artifacts
     .filter((artifact) => artifact.kind === "manuscript")
     .map((artifact, index) => {
-      const firstLine = artifact.body.split("\n")[0]?.trim() || `${index + 1}화`;
+      const firstLine = artifact.body.split("\n").map((line) => line.trim()).find(Boolean) || `${index + 1}화`;
       return {
         episodeNo: index + 1,
         entityKey: artifact.key,
