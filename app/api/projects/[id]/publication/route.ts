@@ -2,6 +2,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { getSyncableCanonPackage } from "@/app/canon-packages";
+import { getCoverOption } from "@/app/cover-options";
 import { getDb } from "@/db";
 import { canonBindings, manuscripts, plotBlocks, projectItems, publicationContent, publicationEpisodes, publications, projects } from "@/db/schema";
 
@@ -14,7 +15,8 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   const user = await getChatGPTUser();
   const { id } = await context.params;
   if (!user) return Response.json({ error: "로그인이 필요함." }, { status: 401 });
-  if (!(await ownedProject(id, user.email))) return Response.json({ error: "Not found" }, { status: 404 });
+  const project = await ownedProject(id, user.email);
+  if (!project) return Response.json({ error: "Not found" }, { status: 404 });
   const [publication] = await getDb().select().from(publications).where(eq(publications.projectId, id));
   const episodeRows = publication
     ? await getDb().select().from(publicationEpisodes)
@@ -27,7 +29,11 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
       .orderBy(asc(publicationContent.kind), asc(publicationContent.sortOrder))
     : [];
   return Response.json({
-    publication: publication ?? null,
+    publication: publication ? {
+      ...publication,
+      revision: publication.updatedAt,
+      needsUpdate: publication.publishedRevision !== project.contentRevision,
+    } : null,
     episodes: episodeRows,
     content: {
       characterIds: contentRows.filter((item) => item.kind === "character").map((item) => item.sourceId),
@@ -50,7 +56,6 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const input = await request.json() as Partial<{
     publishAll: boolean;
     publishCanon: boolean;
-    coverUrl: string;
     authorName: string;
     episodeIds: string[];
     characterIds: string[];
@@ -129,6 +134,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const [existing] = await db.select().from(publications).where(eq(publications.projectId, projectId));
   const timestamp = new Date().toISOString();
   const publicationId = existing?.id ?? crypto.randomUUID();
+  const cover = getCoverOption(project.coverKey);
   const publication = {
     id: publicationId,
     projectId,
@@ -138,19 +144,39 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     title: project.title,
     logline: project.logline,
     genre: project.genre,
-    coverUrl: safeCoverUrl(input.coverUrl || existing?.coverUrl),
+    coverKey: cover.key,
+    coverUrl: cover.src,
     authorName: input.authorName?.trim() || user.displayName,
     status: "published",
+    publishedRevision: project.contentRevision,
     publishedAt: existing?.publishedAt ?? timestamp,
     updatedAt: timestamp,
   };
-  if (existing) {
-    await db.update(publications).set(publication).where(eq(publications.id, publicationId));
-  } else {
-    await db.insert(publications).values(publication);
-  }
 
   const batch = [
+    existing
+      ? env.DB.prepare(
+        `UPDATE publications
+            SET owner_user_id = ?, title = ?, logline = ?, genre = ?, cover_key = ?,
+                cover_url = ?, author_name = ?, status = 'published',
+                published_revision = ?, updated_at = ?
+          WHERE id = ?`,
+      ).bind(
+        user.id, publication.title, publication.logline, publication.genre,
+        publication.coverKey, publication.coverUrl, publication.authorName,
+        publication.publishedRevision, timestamp, publicationId,
+      )
+      : env.DB.prepare(
+        `INSERT INTO publications
+          (id, project_id, owner_user_id, slug, title, logline, genre, cover_key,
+           cover_url, author_name, status, published_revision, published_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)`,
+      ).bind(
+        publicationId, projectId, user.id, publication.slug, publication.title,
+        publication.logline, publication.genre, publication.coverKey,
+        publication.coverUrl, publication.authorName, publication.publishedRevision,
+        publication.publishedAt, timestamp,
+      ),
     env.DB.prepare("DELETE FROM publication_episodes WHERE publication_id = ?").bind(publicationId),
     env.DB.prepare("DELETE FROM publication_content WHERE publication_id = ?").bind(publicationId),
     ...selected.map((item) =>
@@ -185,11 +211,14 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         item.sortOrder, item.title, item.body, item.meta, timestamp, timestamp,
       ),
     ),
+    env.DB.prepare("UPDATE manuscripts SET status = 'draft' WHERE project_id = ?").bind(projectId),
+    env.DB.prepare(
+      `UPDATE manuscripts SET status = 'published'
+        WHERE id IN (${episodeIds.map(() => "?").join(", ")})`,
+    ).bind(...episodeIds),
   ];
   await env.DB.batch(batch);
-  await db.update(manuscripts).set({ status: "draft" }).where(eq(manuscripts.projectId, projectId));
-  await db.update(manuscripts).set({ status: "published" }).where(inArray(manuscripts.id, episodeIds));
-  return Response.json({ publication });
+  return Response.json({ publication, revision: timestamp, updatedAt: timestamp });
 }
 
 export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -197,23 +226,14 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   const { id } = await context.params;
   if (!user) return Response.json({ error: "로그인이 필요함." }, { status: 401 });
   if (!(await ownedProject(id, user.email))) return Response.json({ error: "Not found" }, { status: 404 });
-  await getDb().update(publications).set({
-    status: "draft",
-    updatedAt: new Date().toISOString(),
-  }).where(eq(publications.projectId, id));
-  return Response.json({ ok: true });
-}
-
-function safeCoverUrl(value: string | undefined): string {
-  const trimmed = value?.trim() ?? "";
-  if (!trimmed) return "/default-cover.png";
-  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) return trimmed;
-  try {
-    const url = new URL(trimmed);
-    return url.protocol === "https:" ? url.toString() : "/default-cover.png";
-  } catch {
-    return "/default-cover.png";
+  const timestamp = new Date().toISOString();
+  const result = await env.DB.prepare(
+    "UPDATE publications SET status = 'draft', updated_at = ? WHERE project_id = ?",
+  ).bind(timestamp, id).run();
+  if (!result.success) {
+    return Response.json({ error: "공개를 중지하지 못했음." }, { status: 500 });
   }
+  return Response.json({ ok: true, revision: timestamp, updatedAt: timestamp });
 }
 
 type ContentRow = {

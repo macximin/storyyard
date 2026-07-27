@@ -41,5 +41,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     updatedAt: timestamp,
   };
   await getDb().insert(manuscripts).values(manuscript);
+  await getDb().update(projects).set({ contentRevision: timestamp, updatedAt: timestamp }).where(eq(projects.id, id));
   return Response.json({ manuscript }, { status: 201 });
 }

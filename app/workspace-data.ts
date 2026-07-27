@@ -5,6 +5,7 @@ import {
   getSessionTokenHash,
   type ChatGPTUser,
 } from "@/app/chatgpt-auth";
+import type { CoverKey } from "@/app/cover-options";
 
 export type WorkspaceSnapshot = {
   project: {
@@ -12,7 +13,9 @@ export type WorkspaceSnapshot = {
     title: string;
     logline: string;
     genre: string;
+    coverKey: CoverKey;
     favorite: number;
+    contentRevision: string;
     updatedAt: string;
   };
   blocks: Array<{
@@ -73,7 +76,8 @@ export async function getAuthenticatedWorkspace(
         LIMIT 1`,
     ).bind(tokenHash, now),
     env.DB.prepare(
-      `SELECT id, title, logline, genre, favorite, updated_at AS "updatedAt"
+      `SELECT id, title, logline, genre, cover_key AS "coverKey", favorite,
+              content_revision AS "contentRevision", updated_at AS "updatedAt"
          FROM projects
         WHERE id = ? AND ${authorizedSession}`,
     ).bind(projectId, tokenHash, now),
@@ -135,7 +139,8 @@ export async function getOwnedWorkspace(
 ): Promise<WorkspaceSnapshot | null> {
   const [projectResult, blocksResult, itemsResult] = await env.DB.batch([
     env.DB.prepare(
-      `SELECT id, title, logline, genre, favorite, updated_at AS "updatedAt"
+      `SELECT id, title, logline, genre, cover_key AS "coverKey", favorite,
+              content_revision AS "contentRevision", updated_at AS "updatedAt"
          FROM projects
         WHERE id = ? AND owner_email = ?`,
     ).bind(projectId, ownerKey),

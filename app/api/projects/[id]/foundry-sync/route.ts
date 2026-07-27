@@ -453,11 +453,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       );
     }
     writes.push(
-      env.DB.prepare(
-        `UPDATE publications
-            SET project_id = ?, title = ?, logline = ?, updated_at = ?
-          WHERE id = ?`,
-      ).bind(projectId, overview.title, overview.logline, timestamp, access.publication.id),
+        env.DB.prepare(
+          `UPDATE publications
+             SET project_id = ?, title = ?, logline = ?, published_revision = ?, updated_at = ?
+           WHERE id = ?`,
+      ).bind(projectId, overview.title, overview.logline, timestamp, timestamp, access.publication.id),
     );
     for (const manuscript of canonPackage.workspaceProjection.manuscripts) {
       const sourceManuscriptId = manuscriptIds.get(manuscript.episodeNo);
@@ -717,14 +717,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   );
   if (writes.length) {
     writes.push(
-      env.DB.prepare(`UPDATE projects SET updated_at = ? WHERE id = ?`)
-        .bind(timestamp, projectId),
+      env.DB.prepare(`UPDATE projects SET content_revision = ?, updated_at = ? WHERE id = ?`)
+        .bind(timestamp, timestamp, projectId),
     );
     await env.DB.batch(writes);
   }
 
   return Response.json({
     report,
+    revision: timestamp,
+    updatedAt: timestamp,
     source: {
       workSlug: canonPackage.workSlug,
       commit: canonPackage.sourceGitCommit,

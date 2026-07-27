@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import type { CoverKey } from "@/app/cover-options";
 
 export type PublicWorkSnapshot = {
   work: {
@@ -7,6 +8,7 @@ export type PublicWorkSnapshot = {
     title: string;
     logline: string;
     genre: string;
+    coverKey: CoverKey;
     coverUrl: string;
     authorName: string;
     publishedAt: string;
@@ -101,6 +103,7 @@ export async function getPublicWork(
       title: String(publication.title),
       logline: String(publication.logline),
       genre: String(publication.genre),
+      coverKey: String(publication.cover_key) as CoverKey,
       coverUrl: String(publication.cover_url),
       authorName: String(publication.author_name),
       publishedAt: String(publication.published_at),

@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import type { CoverKey } from "@/app/cover-options";
 
 export type CommunityWork = {
   id: string;
@@ -6,6 +7,7 @@ export type CommunityWork = {
   title: string;
   logline: string;
   genre: string;
+  coverKey: CoverKey;
   coverUrl: string;
   authorName: string;
   publishedAt: string;
@@ -24,6 +26,7 @@ type CommunityRow = {
   title: string;
   logline: string;
   genre: string;
+  cover_key: CoverKey;
   cover_url: string;
   author_name: string;
   published_at: string;
@@ -84,7 +87,7 @@ function communityQuery({
   if (favoritesOnly) params.push(userId);
 
   return env.DB.prepare(
-    `SELECT p.id, p.slug, p.title, p.logline, p.genre, p.cover_url, p.author_name,
+    `SELECT p.id, p.slug, p.title, p.logline, p.genre, p.cover_key, p.cover_url, p.author_name,
             p.published_at, p.updated_at,
             COALESCE((SELECT AVG(r.value) FROM ratings r WHERE r.publication_id = p.id), 0) AS rating_average,
             (SELECT COUNT(*) FROM ratings r WHERE r.publication_id = p.id) AS rating_count,
@@ -106,6 +109,7 @@ function mapCommunityRows(rows: CommunityRow[]): CommunityWork[] {
     title: row.title,
     logline: row.logline,
     genre: row.genre,
+    coverKey: row.cover_key,
     coverUrl: row.cover_url,
     authorName: row.author_name,
     publishedAt: row.published_at,

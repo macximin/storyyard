@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Fragment, useState } from "react";
 import { CommentThread } from "./comment-thread";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
+import { usePublicationRefresh } from "./publication-events";
 import type { PublicEpisodeSnapshot } from "./public-episode-data";
 
 export function PublicEpisodeReader({
@@ -17,6 +18,7 @@ export function PublicEpisodeReader({
   snapshot: PublicEpisodeSnapshot | null;
 }) {
   const [tocOpen, setTocOpen] = useState(false);
+  usePublicationRefresh();
 
   if (!snapshot) {
     return (

@@ -26,6 +26,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const payload = (await request.json()) as { act?: number; title?: string; body?: string; kind?: string; meta?: string; sortOrder?: number };
   const block = { id: crypto.randomUUID(), projectId: id, act: payload.act ?? 1, kind: payload.kind ?? "scene", title: payload.title?.trim() || "새 블록", body: payload.body?.trim() || "", meta: payload.meta ?? "{}", sortOrder: payload.sortOrder ?? Date.now(), updatedAt: new Date().toISOString() };
   await getDb().insert(plotBlocks).values(block);
-  await getDb().update(projects).set({ updatedAt: block.updatedAt }).where(eq(projects.id, id));
+  await getDb().update(projects).set({ contentRevision: block.updatedAt, updatedAt: block.updatedAt }).where(eq(projects.id, id));
   return Response.json({ block }, { status: 201 });
 }

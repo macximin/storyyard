@@ -34,6 +34,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (typeof input.body === "string") update.body = input.body;
   if (input.status === "draft" || input.status === "published") update.status = input.status;
   await getDb().update(manuscripts).set(update).where(eq(manuscripts.id, id));
+  await getDb().update(projects).set({ contentRevision: update.updatedAt, updatedAt: update.updatedAt }).where(eq(projects.id, manuscript.projectId));
   return Response.json({ manuscript: { ...manuscript, ...update } });
 }
 
@@ -46,6 +47,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   if (isFoundryCanon(manuscript.meta)) {
     return Response.json({ error: "Foundry 승인 정본은 Storyyard에서 삭제할 수 없음." }, { status: 409 });
   }
+  const updatedAt = new Date().toISOString();
   await getDb().delete(manuscripts).where(eq(manuscripts.id, id));
+  await getDb().update(projects).set({ contentRevision: updatedAt, updatedAt }).where(eq(projects.id, manuscript.projectId));
   return Response.json({ ok: true });
 }

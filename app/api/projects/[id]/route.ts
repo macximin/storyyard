@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { getCoverOption, isCoverKey } from "@/app/cover-options";
 import { getDb } from "@/db";
 import { projects } from "@/db/schema";
 
@@ -27,8 +28,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     title: string;
     logline: string;
     genre: string;
+    coverKey: string;
     favorite: boolean | number;
   }>;
+  if (input.coverKey !== undefined && !isCoverKey(input.coverKey)) {
+    return Response.json({ error: "허용되지 않은 표지임." }, { status: 400 });
+  }
   const binding = await env.DB.prepare("SELECT project_id FROM canon_bindings WHERE project_id = ?")
     .bind(id).first();
   if (
@@ -39,24 +44,49 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       error: "Foundry 정본 작품의 제목과 소개는 정본 전체 동기화로만 갱신할 수 있음.",
     }, { status: 409 });
   }
-  const update: Partial<typeof project> = { updatedAt: new Date().toISOString() };
-  if (typeof input.title === "string") update.title = input.title.trim() || project.title;
-  if (typeof input.logline === "string") update.logline = input.logline.trim();
-  if (typeof input.genre === "string") update.genre = input.genre.trim() || "웹소설";
-  if (typeof input.favorite === "boolean") update.favorite = input.favorite ? 1 : 0;
-  if (typeof input.favorite === "number") update.favorite = input.favorite ? 1 : 0;
-  await getDb().update(projects).set(update).where(eq(projects.id, id));
-  // 공개본의 기본 정보는 별도 갱신 버튼 없이 작업실 원본을 즉시 따라간다.
-  await env.DB.prepare(
-    "UPDATE publications SET title = ?, logline = ?, genre = ?, updated_at = ? WHERE project_id = ?",
-  ).bind(
-    update.title ?? project.title,
-    update.logline ?? project.logline,
-    update.genre ?? project.genre,
-    update.updatedAt,
-    id,
-  ).run();
-  return Response.json({ project: { ...project, ...update } });
+  const timestamp = new Date().toISOString();
+  const next = {
+    ...project,
+    title: typeof input.title === "string" ? input.title.trim() || project.title : project.title,
+    logline: typeof input.logline === "string" ? input.logline.trim() : project.logline,
+    genre: typeof input.genre === "string" ? input.genre.trim() || "웹소설" : project.genre,
+    coverKey: isCoverKey(input.coverKey) ? input.coverKey : project.coverKey,
+    favorite: typeof input.favorite === "boolean" || typeof input.favorite === "number"
+      ? input.favorite ? 1 : 0
+      : project.favorite,
+    updatedAt: timestamp,
+  };
+  const cover = getCoverOption(next.coverKey);
+  const syncPublication = typeof input.title === "string"
+    || typeof input.logline === "string"
+    || typeof input.genre === "string"
+    || input.coverKey !== undefined;
+  const statements = [
+    env.DB.prepare(
+      `UPDATE projects
+          SET title = ?, logline = ?, genre = ?, cover_key = ?, favorite = ?, updated_at = ?
+        WHERE id = ? AND owner_email = ?`,
+    ).bind(next.title, next.logline, next.genre, next.coverKey, next.favorite, timestamp, id, user.email),
+  ];
+  if (syncPublication) {
+    statements.push(
+      env.DB.prepare(
+        `UPDATE publications
+            SET title = ?, logline = ?, genre = ?, cover_key = ?, cover_url = ?, updated_at = ?
+          WHERE project_id = ?`,
+      ).bind(next.title, next.logline, next.genre, next.coverKey, cover.src, timestamp, id),
+    );
+  }
+  await env.DB.batch(statements);
+  const publication = syncPublication
+    ? await env.DB.prepare(
+      "SELECT slug, status, updated_at AS updatedAt FROM publications WHERE project_id = ?",
+    ).bind(id).first<{ slug: string; status: string; updatedAt: string }>()
+    : null;
+  return Response.json({
+    project: next,
+    publication: publication ? { ...publication, revision: publication.updatedAt } : null,
+  });
 }
 
 export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {

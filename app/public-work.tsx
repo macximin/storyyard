@@ -2,9 +2,11 @@
 
 import { BookmarkSimple, Star } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CommentThread } from "./comment-thread";
+import { resolveCoverSrc } from "./cover-options";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
+import { usePublicationRefresh } from "./publication-events";
 import type { PublicWorkSnapshot } from "./public-work-data";
 
 type Work = PublicWorkSnapshot["work"];
@@ -26,6 +28,11 @@ export function PublicWork({
   const content = initialSnapshot?.content ?? [];
   const [message, setMessage] = useState(initialSnapshot ? "" : "작품을 찾지 못했음.");
   const [activeTab, setActiveTab] = useState<PublicTab>("manuscript");
+  usePublicationRefresh();
+  useEffect(() => {
+    setWork(initialSnapshot?.work ?? null);
+    setMessage(initialSnapshot ? "" : "작품을 찾지 못했음.");
+  }, [initialSnapshot]);
 
   async function toggleFavorite() {
     if (!user || !work) return setMessage("선호작은 로그인 후 사용할 수 있음.");
@@ -52,7 +59,7 @@ export function PublicWork({
       <section className="public-work-main">
         {!work ? <div className="blank-state">{message}</div> : <>
           <header className="work-hero">
-            <img src={!work.coverUrl || work.coverUrl === "/default-cover.png" ? (work.title === "저승식당" ? "/covers/unlimited-contest-expected-pass.png" : "/covers/overall-revision.png") : work.coverUrl} alt={`${work.title} 표지`} />
+            <img src={resolveCoverSrc(work.coverKey)} alt={`${work.title} 표지`} />
             <div className="work-hero-copy">
               <span className="work-genre">{work.genre}</span><h1>{work.title}</h1><p className="work-author">{work.authorName}</p><p className="work-logline">{work.logline}</p>
               <div className="work-stats"><strong><Star size={21} weight="fill" />{work.ratingCount ? work.ratingAverage.toFixed(1) : "평가 전"}</strong><span>{work.ratingCount}명 평가</span><span>{episodes.length}화 공개</span></div>

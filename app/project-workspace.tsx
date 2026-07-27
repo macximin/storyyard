@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CoverPicker } from "./cover-picker";
+import { CoverKey, resolveCoverSrc } from "./cover-options";
 import { startNavigationProgress } from "./navigation-progress";
+import { broadcastPublicationUpdate } from "./publication-events";
 import { ArrowsClockwise, DotsThree, FileText, GlobeHemisphereWest, PencilSimple, Plus, Trash } from "@phosphor-icons/react";
 import { FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkspaceSnapshot } from "./workspace-data";
 
 export type WorkspaceView = "overview" | "characters" | "plot" | "documents" | "manuscript" | "publish";
-type Project = { id: string; title: string; logline: string; genre: string; favorite: number; updatedAt: string };
+type Project = { id: string; title: string; logline: string; genre: string; coverKey: CoverKey; favorite: number; contentRevision: string; updatedAt: string };
 type Block = { id: string; act: number; kind: string; title: string; body: string; meta: string; sortOrder: number };
 type Item = { id: string; kind: string; title: string; body: string; meta: string; updatedAt?: string };
 type Draft = { id?: string; title: string; body: string; act?: number };
@@ -257,10 +260,22 @@ export function ProjectWorkspace({
     const response = await fetch(`/api/projects/${projectId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: form.get("title"), logline: form.get("logline"), genre: form.get("genre") }),
+      body: JSON.stringify({
+        title: form.get("title"),
+        logline: form.get("logline"),
+        genre: form.get("genre"),
+        coverKey: form.get("coverKey"),
+      }),
     });
     const data = await response.json();
     if (data.project) setProject(data.project);
+    if (data.publication?.status === "published") {
+      broadcastPublicationUpdate({
+        projectId,
+        slug: data.publication.slug,
+        revision: data.publication.revision,
+      });
+    }
   }
 
   function inspectBlock(block: Block) {
@@ -645,6 +660,13 @@ export function ProjectWorkspace({
           ? `Storyyard 수정본 ${data.report.conflicts.length}개 보존 · 나머지 정본 반영`
           : `작업실·커뮤니티 ${workspaceChanged}개, 플롯 ${changed}개 반영 · 같은 정본으로 잠금`,
       );
+      if (data.report.communitySlug) {
+        broadcastPublicationUpdate({
+          projectId,
+          slug: data.report.communitySlug,
+          revision: data.revision,
+        });
+      }
     } catch (error) {
       setFoundrySyncMessage(error instanceof Error ? error.message : "Foundry 동기화 실패");
     } finally {
@@ -1131,6 +1153,8 @@ function TreeDocument(props: {
 }
 
 function Overview({ project, onSave }: { project: Project; onSave: (event: FormEvent<HTMLFormElement>) => void }) {
+  const [coverKey, setCoverKey] = useState<CoverKey>(project.coverKey);
+  useEffect(() => setCoverKey(project.coverKey), [project.coverKey]);
   return (
     <div className="page-narrow">
       <PageHeader kicker="WORK OVERVIEW" title="작품 개요" description="작품의 중심 약속을 짧게 고정해 두는 곳." />
@@ -1138,6 +1162,7 @@ function Overview({ project, onSave }: { project: Project; onSave: (event: FormE
         <label>작품 제목<input name="title" defaultValue={project.title} /></label>
         <label>한 줄 소개<textarea name="logline" defaultValue={project.logline} /></label>
         <label>장르<input name="genre" defaultValue={project.genre} /></label>
+        <CoverPicker value={coverKey} onChange={setCoverKey} />
         <button className="black-button" type="submit">변경사항 저장</button>
       </form>
     </div>
@@ -1274,9 +1299,19 @@ function ManuscriptView({ projectId }: { projectId: string }) {
 
 function PublishView({ project, items, blocks }: { project: Project; items: Item[]; blocks: Block[] }) {
   const [manuscripts, setManuscripts] = useState<Manuscript[]>([]);
-  const [publication, setPublication] = useState<{ status?: string; slug?: string; authorName?: string; coverUrl?: string } | null>(null);
+  const [publication, setPublication] = useState<{
+    status?: string;
+    slug?: string;
+    authorName?: string;
+    coverKey?: CoverKey;
+    updatedAt?: string;
+    revision?: string;
+    publishedRevision?: string;
+    needsUpdate?: boolean;
+  } | null>(null);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const [unpublishPending, setUnpublishPending] = useState(false);
   const characters = items.filter((item) => item.kind === "character");
   const documents = items.filter((item) => item.kind === "document");
   const plots = items.filter((item) => item.kind === "plot");
@@ -1306,7 +1341,6 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         authorName: form.get("authorName"),
-        coverUrl: form.get("coverUrl"),
         publishAll: true,
         publishCanon: canonBound,
       }),
@@ -1314,14 +1348,35 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
     const data = await response.json();
     setPending(false);
     if (!response.ok) return setMessage(data.error || "공개하지 못했음.");
-    setPublication(data.publication);
+    setPublication({ ...data.publication, revision: data.revision, needsUpdate: false });
+    broadcastPublicationUpdate({
+      projectId: project.id,
+      slug: data.publication.slug,
+      revision: data.revision,
+    });
     setMessage("원고·등장인물·자료·플롯 전체 공개본을 갱신했음.");
   }
 
   async function unpublish() {
-    await fetch(`/api/projects/${project.id}/publication`, { method: "DELETE" });
-    setPublication((current) => current ? { ...current, status: "draft" } : null);
-    setMessage("커뮤니티에서 내렸음. 개인 작업 데이터는 그대로임.");
+    if (unpublishPending) return;
+    setUnpublishPending(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/projects/${project.id}/publication`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "공개를 중지하지 못했음.");
+      setPublication((current) => current ? { ...current, status: "draft", revision: data.revision, updatedAt: data.updatedAt } : null);
+      broadcastPublicationUpdate({
+        projectId: project.id,
+        slug: publication?.slug,
+        revision: data.revision,
+      });
+      setMessage("커뮤니티에서 내렸음. 개인 작업 데이터는 그대로임.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "공개를 중지하지 못했음.");
+    } finally {
+      setUnpublishPending(false);
+    }
   }
 
   return (
@@ -1329,17 +1384,31 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
       <PageHeader kicker="PUBLISH" title="공개 관리" description="버튼 한 번으로 현재 작업실의 원고·등장인물·자료·플롯 전체를 공개합니다." />
       <form className="publish-form" onSubmit={publish}>
         <div className="publication-status">
-          <strong>{publication?.status === "published" ? "현재 공개 중" : "현재 비공개"}</strong>
-          {publication?.slug && <Link href={`/works/${publication.slug}`}>공개 페이지 보기 →</Link>}
+          <div>
+            <strong>{publication?.status === "published" ? "현재 공개 중" : "현재 비공개"}</strong>
+            {publication?.status === "published" && (
+              <span className={`publication-revision-badge ${publication.needsUpdate ? "stale" : "current"}`}>
+                {publication.needsUpdate ? "공개본 업데이트 필요" : "최신 공개본"}
+              </span>
+            )}
+            {publication?.updatedAt && <small>최근 반영 {formatPublicationTime(publication.updatedAt)}</small>}
+          </div>
+          {publication?.slug && (
+            <Link
+              href={`/works/${publication.slug}?v=${encodeURIComponent(publication.revision || publication.updatedAt || "")}`}
+              prefetch={false}
+            >
+              공개 페이지 보기 →
+            </Link>
+          )}
         </div>
         <div className="publication-sync-note"><strong>작품 기본 정보 자동 동기화</strong><span>제목·소개·장르는 작업실의 작품 개요를 저장하면 공개 페이지에도 바로 반영됨.</span></div>
         {canonBound && <div className="publication-sync-note"><strong>Foundry 정본 연결됨</strong><span>개인 원고와 커뮤니티 공개본은 정본 전체 동기화로 함께 갱신됩니다.</span></div>}
         <dl className="publication-project-info"><div><dt>제목</dt><dd>{project.title}</dd></div><div><dt>장르</dt><dd>{project.genre}</dd></div><div><dt>소개</dt><dd>{project.logline}</dd></div></dl>
         <label>필명<input name="authorName" defaultValue={publication?.authorName || ""} placeholder="커뮤니티에 표시할 이름" /></label>
-        <label>표지 이미지 URL<input name="coverUrl" defaultValue={publication?.coverUrl || "/default-cover.png"} placeholder="https://…" /></label>
         <div className="cover-preview">
-          <img src={!publication?.coverUrl || publication.coverUrl === "/default-cover.png" ? (project.title === "저승식당" ? "/covers/unlimited-contest-expected-pass.png" : "/covers/overall-revision.png") : publication.coverUrl} alt="기본 표지 미리보기" />
-          <p>지금은 HTTPS 이미지 주소를 사용함. 주소가 없으면 Storyyard 기본 표지가 적용됨.</p>
+          <img src={resolveCoverSrc(project.coverKey)} alt="선택한 작품 표지 미리보기" />
+          <p>표지는 작품 개요 또는 내 작품의 ··· 메뉴에서 바꿀 수 있음. 공개 중이면 커뮤니티에도 즉시 반영됨.</p>
         </div>
         <section className="publish-all-summary" aria-label="전체 공개 대상">
           <div><strong>{manuscripts.length}</strong><span>원고</span></div>
@@ -1351,10 +1420,24 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
           <p>공개할 때의 작업실 전체를 읽기 전용 사본으로 만듭니다. 이후 다시 누르면 최신 상태로 통째로 갱신됩니다.</p>
         </section>
         {!manuscripts.length && <p className="tree-empty root">원고 메뉴에서 먼저 회차를 작성해 주세요.</p>}
-        {message && <p className="inline-message">{message}</p>}
+        {message && <p className="inline-message" aria-live="polite">{message}</p>}
         <div className="publish-actions">
           <button className="black-button" disabled={pending || !manuscripts.length}>{pending ? "전체 공개 중…" : canonBound ? publication?.status === "published" ? "정본 공개본 갱신" : "정본 전체 공개" : publication?.status === "published" ? "전체 공개본 갱신" : "전체 공개"}</button>
-          {publication?.status === "published" && <button type="button" className="outline-cancel" onClick={unpublish}>공개 중지</button>}
+          {publication?.status === "published" && (
+            <>
+              <button type="button" className="outline-cancel" onClick={unpublish} disabled={unpublishPending}>
+                {unpublishPending ? "중지 중…" : "공개 중지"}
+              </button>
+              {publication.slug && (
+                <a
+                  className="outline-cancel"
+                  href={`/works/${publication.slug}?v=${encodeURIComponent(publication.revision || publication.updatedAt || "")}`}
+                >
+                  갱신 후 보기
+                </a>
+              )}
+            </>
+          )}
         </div>
       </form>
     </div>
@@ -2472,6 +2555,18 @@ function readFoundrySyncInfo(meta: string) {
     authority: typeof record.authority === "string" ? record.authority : "",
     sourceCommit: typeof record.sourceCommit === "string" ? record.sourceCommit : "",
   };
+}
+
+function formatPublicationTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat("ko-KR", {
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
 }
 
 function readObject(value: string): Record<string, unknown> {

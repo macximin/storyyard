@@ -25,7 +25,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const input = (await request.json()) as Partial<{ act: number; title: string; body: string; kind: string; meta: string; sortOrder: number }>;
   const update = { ...input, updatedAt: new Date().toISOString() };
   await getDb().update(plotBlocks).set(update).where(eq(plotBlocks.id, id));
-  await getDb().update(projects).set({ updatedAt: update.updatedAt }).where(eq(projects.id, block.projectId));
+  await getDb().update(projects).set({ contentRevision: update.updatedAt, updatedAt: update.updatedAt }).where(eq(projects.id, block.projectId));
   return Response.json({ ok: true });
 }
 
@@ -42,7 +42,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   if (isFoundryProjection(block.meta)) {
     return Response.json({ error: "Foundry 정본 투영은 Storyyard에서 삭제할 수 없음." }, { status: 409 });
   }
+  const updatedAt = new Date().toISOString();
   await getDb().delete(plotBlocks).where(eq(plotBlocks.id, id));
-  await getDb().update(projects).set({ updatedAt: new Date().toISOString() }).where(eq(projects.id, block.projectId));
+  await getDb().update(projects).set({ contentRevision: updatedAt, updatedAt }).where(eq(projects.id, block.projectId));
   return Response.json({ ok: true });
 }

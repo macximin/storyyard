@@ -30,7 +30,9 @@ export const projects = sqliteTable("projects", {
   title: text("title").notNull(),
   logline: text("logline").notNull().default(""),
   genre: text("genre").notNull().default("웹소설"),
+  coverKey: text("cover_key").notNull().default("overall-revision"),
   favorite: integer("favorite").notNull().default(0),
+  contentRevision: text("content_revision").notNull().default(""),
   updatedAt: text("updated_at").notNull(),
   createdAt: text("created_at").notNull(),
 }, (table) => [
@@ -85,9 +87,11 @@ export const publications = sqliteTable("publications", {
   title: text("title").notNull(),
   logline: text("logline").notNull().default(""),
   genre: text("genre").notNull().default("웹소설"),
+  coverKey: text("cover_key").notNull().default("overall-revision"),
   coverUrl: text("cover_url").notNull().default("/default-cover.png"),
   authorName: text("author_name").notNull(),
   status: text("status").notNull().default("published"),
+  publishedRevision: text("published_revision").notNull().default(""),
   publishedAt: text("published_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 }, (table) => [

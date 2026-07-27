@@ -3,14 +3,18 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
+import { CoverPicker } from "./cover-picker";
+import { CoverKey, resolveCoverSrc } from "./cover-options";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
 import { startNavigationProgress } from "./navigation-progress";
+import { broadcastPublicationUpdate } from "./publication-events";
 
 type Project = {
   id: string;
   title: string;
   logline: string;
   genre: string;
+  coverKey: CoverKey;
   favorite: number;
   updatedAt: string;
 };
@@ -29,6 +33,8 @@ export function Library({
     searchParams.get("filter") === "favorites" ? "favorites" : "all";
   const [creating, setCreating] = useState(false);
   const [menuProjectId, setMenuProjectId] = useState<string | null>(null);
+  const [coverProject, setCoverProject] = useState<Project | null>(null);
+  const [coverError, setCoverError] = useState("");
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deletePending, setDeletePending] = useState(false);
@@ -75,6 +81,45 @@ export function Library({
     setDeletingProject(project);
     setDeleteConfirmation("");
     setDeleteError("");
+  }
+
+  function openCover(project: Project) {
+    setMenuProjectId(null);
+    setCoverProject(project);
+    setCoverError("");
+  }
+
+  async function changeCover(coverKey: CoverKey) {
+    if (!coverProject || coverProject.coverKey === coverKey) return;
+    const previous = coverProject;
+    const optimistic = { ...coverProject, coverKey };
+    setCoverProject(optimistic);
+    setProjects((current) => current.map((item) => item.id === optimistic.id ? optimistic : item));
+    setCoverError("");
+    try {
+      const response = await fetch(`/api/projects/${coverProject.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ coverKey }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "표지를 저장하지 못했음.");
+      if (data.project) {
+        setCoverProject(data.project);
+        setProjects((current) => current.map((item) => item.id === data.project.id ? data.project : item));
+      }
+      if (data.publication?.status === "published") {
+        broadcastPublicationUpdate({
+          projectId: coverProject.id,
+          slug: data.publication.slug,
+          revision: data.publication.revision,
+        });
+      }
+    } catch (error) {
+      setCoverProject(previous);
+      setProjects((current) => current.map((item) => item.id === previous.id ? previous : item));
+      setCoverError(error instanceof Error ? error.message : "표지를 저장하지 못했음.");
+    }
   }
 
   function closeDelete() {
@@ -150,7 +195,8 @@ export function Library({
                 </div>
                 {menuProjectId === project.id && (
                   <div className="work-card-menu">
-                    <button type="button" onClick={() => openDelete(project)}>작품 삭제</button>
+                    <button type="button" onClick={() => openCover(project)}>표지 선택</button>
+                    <button className="danger" type="button" onClick={() => openDelete(project)}>작품 삭제</button>
                   </div>
                 )}
                 <button
@@ -162,7 +208,7 @@ export function Library({
                 >
                   <span className="work-card-cover">
                     <img
-                      src="/default-cover-card.webp"
+                      src={resolveCoverSrc(project.coverKey)}
                       alt={`${project.title} 표지`}
                       width={480}
                       height={720}
@@ -201,6 +247,28 @@ export function Library({
             <label>장르<input name="genre" defaultValue="웹소설" /></label>
             <button className="black-button" type="submit">작품 만들기</button>
           </form>
+        </div>
+      )}
+
+      {coverProject && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setCoverProject(null)}>
+          <section
+            className="modal-card cover-picker-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cover-picker-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="modal-heading">
+              <div><p className="kicker">WORK COVER</p><h2 id="cover-picker-title">{coverProject.title} 표지</h2></div>
+              <button type="button" className="icon-button" onClick={() => setCoverProject(null)} aria-label="표지 선택 닫기">×</button>
+            </div>
+            <CoverPicker value={coverProject.coverKey} onChange={changeCover} />
+            {coverError && <p className="delete-error" role="alert">{coverError}</p>}
+            <p className="cover-picker-note" aria-live="polite">
+              선택 즉시 저장됨. 공개 중인 작품이면 커뮤니티 표지도 같이 바뀜.
+            </p>
+          </section>
         </div>
       )}
 

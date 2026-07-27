@@ -26,11 +26,12 @@ test("formats canon decision timestamps identically across host time zones", () 
 });
 
 test("ships the public community and private studio navigation", async () => {
-  const [sidebar, community, page, library, styles] = await Promise.all([
+  const [sidebar, community, page, library, coverOptions, styles] = await Promise.all([
     read("app/global-sidebar.tsx"),
     read("app/community-home.tsx"),
     read("app/page.tsx"),
     read("app/library.tsx"),
+    read("app/cover-options.ts"),
     read("app/globals.css"),
   ]);
   assert.match(sidebar, /커뮤니티/);
@@ -40,11 +41,13 @@ test("ships the public community and private studio navigation", async () => {
   assert.match(sidebar, /내 작품/);
   assert.match(community, /랭킹순/);
   assert.match(community, /최신순/);
-  assert.match(community, /covers\/overall-revision\.png/);
+  assert.match(community, /resolveCoverSrc\(work\.coverKey\)/);
   assert.match(community, /loading=\{index === 0 \? "eager" : "lazy"\}/);
   assert.match(page, /CommunityHome/);
   assert.match(library, /work-card-cover/);
-  assert.match(library, /default-cover-card\.webp/);
+  assert.match(library, /resolveCoverSrc\(project\.coverKey\)/);
+  assert.doesNotMatch(library, /default-cover-card\.webp/);
+  assert.equal((coverOptions.match(/key: "/g) ?? []).length, 7);
   assert.match(library, /loading=\{index === 0 \? "eager" : "lazy"\}/);
   assert.match(library, /fetchPriority=\{index === 0 \? "high" : "auto"\}/);
   assert.match(styles, /\.work-grid \{[^}]*grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
@@ -60,6 +63,38 @@ test("ships the public community and private studio navigation", async () => {
     "submission-complete.png",
   ]) await access(new URL(`public/covers/${cover}`, root));
   await access(new URL("public/default-cover-card.webp", root));
+});
+
+test("uses seven persisted cover keys and refreshes published views without exposing drafts", async () => {
+  const [schema, migration, projectRoute, publicationRoute, workspace, library, community, publicWork, events] = await Promise.all([
+    read("db/schema.ts"),
+    read("drizzle/0010_needy_scream.sql"),
+    read("app/api/projects/[id]/route.ts"),
+    read("app/api/projects/[id]/publication/route.ts"),
+    read("app/project-workspace.tsx"),
+    read("app/library.tsx"),
+    read("app/community-home.tsx"),
+    read("app/public-work.tsx"),
+    read("app/publication-events.ts"),
+  ]);
+  assert.match(schema, /coverKey: text\("cover_key"\)/);
+  assert.match(schema, /contentRevision: text\("content_revision"\)/);
+  assert.match(schema, /publishedRevision: text\("published_revision"\)/);
+  assert.match(migration, /unlimited-contest-expected-pass/);
+  assert.match(projectRoute, /isCoverKey\(input\.coverKey\)/);
+  assert.match(projectRoute, /허용되지 않은 표지임/);
+  assert.match(projectRoute, /UPDATE publications/);
+  assert.match(publicationRoute, /getCoverOption\(project\.coverKey\)/);
+  assert.match(publicationRoute, /revision: timestamp/);
+  assert.match(publicationRoute, /env\.DB\.batch\(batch\)/);
+  assert.match(workspace, /prefetch=\{false\}/);
+  assert.match(workspace, /공개본 업데이트 필요/);
+  assert.match(workspace, /if \(!response\.ok\) throw new Error/);
+  assert.match(library, /CoverPicker/);
+  assert.match(community, /useEffect\(\(\) => setWorks\(initialWorks\)/);
+  assert.match(publicWork, /setWork\(initialSnapshot\?\.work/);
+  assert.match(events, /BroadcastChannel\(CHANNEL_NAME\)/);
+  assert.doesNotMatch(`${community}\n${publicWork}\n${workspace}`, /title === "저승식당"/);
 });
 
 test("primes navigation data on the server and sorts community works locally", async () => {
@@ -162,7 +197,8 @@ test("publishes the entire workspace and renders public planning snapshots immed
   assert.match(publicationRoute, /readFoundryWorkSlug/);
   assert.match(publicationRoute, /validItemKinds/);
   assert.match(contentRoute, /p\.status = 'published'/);
-  assert.match(projectRoute, /UPDATE publications SET title = \?, logline = \?, genre = \?/);
+  assert.match(projectRoute, /UPDATE publications/);
+  assert.match(projectRoute, /cover_key = \?, cover_url = \?/);
   assert.match(workspace, /전체 공개본 갱신/);
   assert.match(workspace, /publishAll: true/);
   assert.match(workspace, /items\.some\(\(item\) => Boolean\(readFoundrySyncInfo\(item\.meta\)\)\)/);
@@ -284,13 +320,13 @@ test("ships a five-work admin-only Foundry canon review board with pending decis
   assert.match(exporter, /inlineRows/);
   assert.match(exporter, /buildConsistencyAudit/);
   assert.match(exporter, /computedRevisionSet/);
-  assert.match(canonPackage, /"revisionSetSha256": "2fb3648e1c57ab5f5a1e55a86e61edc150e118bd37e774be5615a4bcd97b02a7"/);
+  assert.match(canonPackage, /"revisionSetSha256": "23d336d3d3160267da6290ebc433f5e814b0d646e179453bac2b57be94315178"/);
   assert.match(canonPackage, /"sourceGitCommit": "[0-9a-f]{40}"/);
   for (const hash of [
-    "23a22f298b4ea37499b80ec55c0e86b3816604328255aee3529e7013a0712244",
-    "01802d4862a5b607f42b335c7a3126c0418a3ac2a2a406199f090d046d45595a",
-    "7138bace3e357d2e6369cdf27445c6c92e0a70bbf429632b88c7d4982ceb3f5a",
-    "f5ec74b51a97e76d2accf20a1b39bf00dc57d525df917876f35eae9c04b40dcc",
+    "d8a017f4de5cea7f463983a22f84dcad4f298257df495a519362a6cd6d1f8a57",
+    "e0ada71ce768a01e14717f04f5615890d5c8a14777f096b5bc781c3f01ccb788",
+    "2d95ad8ee5d577941b974643c23371996d20aaccc4cd99e3a04b32d838611bd7",
+    "beecf896db49348e40d18c298567b80d95bc944061fbedcc7d1fc2542c9e8966",
   ]) {
     assert.match(canonPackage, new RegExp(hash));
   }

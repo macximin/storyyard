@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { BookmarkSimple, Star } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { resolveCoverSrc } from "./cover-options";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
+import { usePublicationRefresh } from "./publication-events";
 import type { CommunityWork } from "./community-data";
 
 export function CommunityHome({
@@ -20,6 +22,8 @@ export function CommunityHome({
   const [sort, setSort] = useState<"rating" | "new">("rating");
   const [works, setWorks] = useState<CommunityWork[]>(initialWorks);
   const [error, setError] = useState("");
+  usePublicationRefresh();
+  useEffect(() => setWorks(initialWorks), [initialWorks]);
   const visibleWorks = useMemo(
     () => sortWorks(works, sort),
     [sort, works],
@@ -69,10 +73,10 @@ export function CommunityHome({
           <div className="cover-grid">
             {visibleWorks.map((work, index) => (
               <article className="cover-card" key={work.id}>
-                <Link className="cover-link" href={`/works/${work.slug}`} prefetch>
+                <Link className="cover-link" href={`/works/${work.slug}`} prefetch={false}>
                   <div className="cover-frame">
                     <img
-                      src={!work.coverUrl || work.coverUrl === "/default-cover.png" ? (work.title === "저승식당" ? "/covers/unlimited-contest-expected-pass.png" : "/covers/overall-revision.png") : work.coverUrl}
+                      src={resolveCoverSrc(work.coverKey)}
                       alt={`${work.title} 표지`}
                       width={480}
                       height={720}

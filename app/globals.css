@@ -161,8 +161,10 @@ a { color: inherit; text-decoration: none; }
 .work-menu-button { border-radius: 4px; font-size: 1rem; letter-spacing: .08em; }
 .work-menu-button:hover, .work-menu-button[aria-expanded="true"] { background: var(--yellow); color: var(--ink); }
 .work-card-menu { position: absolute; z-index: 4; top: 46px; right: 8px; width: 132px; padding: 5px; border: 1px solid var(--ink); background: #fff; box-shadow: 4px 4px 0 var(--yellow); }
-.work-card-menu button { width: 100%; padding: 9px 10px; border: 0; background: transparent; color: #a33424; font-size: .76rem; font-weight: 800; text-align: left; cursor: pointer; }
-.work-card-menu button:hover { background: #fff2ed; }
+.work-card-menu button { width: 100%; padding: 9px 10px; border: 0; background: transparent; color: var(--ink); font-size: .76rem; font-weight: 800; text-align: left; cursor: pointer; }
+.work-card-menu button:hover { background: #fff8d6; }
+.work-card-menu button.danger { color: #a33424; }
+.work-card-menu button.danger:hover { background: #fff2ed; }
 .blank-state { max-width: 1180px; min-height: 280px; display: grid; place-content: center; gap: 8px; border: 1px dashed #bbb; color: var(--muted); text-align: center; }
 .blank-state strong { color: var(--ink); font-size: 1.1rem; }
 
@@ -695,6 +697,18 @@ a { color: inherit; text-decoration: none; }
 .icon-button { border: 0; background: transparent; font-size: 1.6rem; line-height: 1; cursor: pointer; }
 .modal-card textarea { min-height: 120px; resize: vertical; line-height: 1.6; }
 .modal-card .black-button { justify-self: end; }
+.cover-picker-modal { width: min(820px, 100%); }
+.cover-picker { min-width: 0; margin: 0; padding: 0; border: 0; }
+.cover-picker legend { margin-bottom: 10px; font-size: .76rem; font-weight: 850; }
+.cover-picker-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 10px; }
+.cover-picker-grid label { position: relative; display: grid; gap: 7px; align-content: start; padding: 7px; border: 2px solid var(--line); background: #fff; cursor: pointer; }
+.cover-picker-grid label:hover { border-color: #a88a00; }
+.cover-picker-grid label.selected { border-color: var(--ink); background: #fff8ce; box-shadow: 3px 3px 0 var(--yellow-strong); }
+.cover-picker-grid label:has(input:focus-visible) { outline: 3px solid var(--yellow-strong); outline-offset: 2px; }
+.cover-picker-grid input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cover-picker-grid img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: #eee; }
+.cover-picker-grid span { min-height: 2.5em; font-size: .67rem; font-weight: 850; line-height: 1.25; text-align: center; }
+.cover-picker-note { margin: 0; color: #666; font-size: .7rem; line-height: 1.5; }
 .name-modal { width: min(420px, 100%); }
 .modal-actions { display: flex; justify-content: space-between; align-items: center; }
 .delete-button { padding: 9px 0; border: 0; background: transparent; color: #a33424; font-size: .78rem; font-weight: 800; cursor: pointer; }
@@ -987,7 +1001,12 @@ a { color: inherit; text-decoration: none; }
 .publish-all-summary span { color: var(--muted); font-size: .7rem; font-weight: 800; }
 .publish-all-summary p { grid-column: 1 / -1; margin: 0; padding: 13px 16px; border-top: 1px solid var(--line); color: #5f583d; font-size: .75rem; line-height: 1.5; }
 .publication-status { display: flex; justify-content: space-between; gap: 20px; padding: 14px; border-left: 3px solid var(--yellow-strong); background: #fffbe7; }
+.publication-status > div { display: flex; align-items: center; gap: 9px; }
+.publication-status small { color: #777; font-size: .62rem; }
 .publication-status a { text-decoration: underline; }
+.publication-revision-badge { padding: 4px 7px; border-radius: 20px; font-size: .61rem; font-weight: 850; }
+.publication-revision-badge.current { background: #e5f5e7; color: #246329; }
+.publication-revision-badge.stale { background: #fff0c2; color: #755900; }
 .cover-preview { display: grid; grid-template-columns: 86px 1fr; align-items: center; gap: 15px; padding: 12px; border: 1px solid var(--line); }
 .cover-preview img { width: 86px; aspect-ratio: 2 / 3; object-fit: cover; }
 .cover-preview p { margin: 0; color: #777; font-size: .7rem; font-weight: 500; line-height: 1.55; }

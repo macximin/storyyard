@@ -1,5 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { DEFAULT_COVER_KEY } from "@/app/cover-options";
 import { getDb } from "@/db";
 import { projects } from "@/db/schema";
 
@@ -24,7 +25,10 @@ export async function POST(request: Request) {
   const project = {
     id: id(), ownerEmail: user.email, title,
     logline: payload.logline?.trim() || "이 작품의 한 줄 출발점을 적어 보세요.",
-    genre: payload.genre?.trim() || "웹소설", favorite: 0,
+    genre: payload.genre?.trim() || "웹소설",
+    coverKey: DEFAULT_COVER_KEY,
+    favorite: 0,
+    contentRevision: timestamp,
     updatedAt: timestamp, createdAt: timestamp,
   };
   await getDb().insert(projects).values(project);

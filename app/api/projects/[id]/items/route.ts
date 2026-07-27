@@ -47,6 +47,6 @@ export async function POST(r: Request, c: { params: Promise<{ id: string }> }) {
     updatedAt: new Date().toISOString(),
   };
   await getDb().insert(projectItems).values(item);
-  await getDb().update(projects).set({ updatedAt: item.updatedAt }).where(eq(projects.id, projectId));
+  await getDb().update(projects).set({ contentRevision: item.updatedAt, updatedAt: item.updatedAt }).where(eq(projects.id, projectId));
   return Response.json({ item }, { status: 201 });
 }
