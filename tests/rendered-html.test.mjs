@@ -326,12 +326,12 @@ test("ships a six-work admin-only Foundry canon review board with pending decisi
   assert.match(exporter, /inlineRows/);
   assert.match(exporter, /buildConsistencyAudit/);
   assert.match(exporter, /computedRevisionSet/);
-  assert.match(canonPackage, /"revisionSetSha256": "67b205e5d16835ada592568cd1922c4e85de362b2845b684ea309789454b934b"/);
+  assert.match(canonPackage, /"revisionSetSha256": "3e10ea3cb109e7c2066b2f2589764d6bb0de470e9abb2448d1f7e665aa93be24"/);
   assert.match(canonPackage, /"sourceGitCommit": "[0-9a-f]{40}"/);
   for (const hash of [
-    "67a908d81ee5d1f4f012035c196ae01e4b6319090b27cbd257fcaf095a1969ff",
+    "c80913ca46c062e4f63e5b34433c02dea6197ee3cbe50fa52d42b8864a8957d9",
     "701bf3b86420d71a78adfc81f230d1bb7c13ac401efe16aeb834cd810aac744f",
-    "174560ba4c80f38afdf77dd9bcccf23a1fd630f850f1a9c48f7c5e1a7b2f320a",
+    "9d2d0f273269e04bf72f875972cdc8a60be1a0f300d016f6f849319c4d54d824",
     "23285a3853e6be3a82961368fbb4e7e2aaec8b0079d9d88eb8af55cbf1fbc0fb",
   ]) {
     assert.match(canonPackage, new RegExp(hash));
