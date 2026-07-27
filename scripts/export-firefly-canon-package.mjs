@@ -30,7 +30,7 @@ const manuscriptDefinitions = workSlug === "afterlife_restaurant"
       ["ep003", "3화 승인 원고", "manuscript", "04_manuscript/ep003_manuscript.md", "owner_approved"],
     ];
 const adoptionReviewDefinition = workSlug === "afterlife_restaurant"
-  ? ["adoption_review", "1~4화 승격 영수증", "review", "05_review/ep001-004_owner_direct_adoption_20260727_r3.md", "owner_approved"]
+  ? ["adoption_review", "1~4화 승격 영수증", "review", "05_review/ep001-004_owner_direct_adoption_20260727.md", "owner_approved"]
   : ["adoption_review", "1~3화 승격 영수증", "review", "05_review/ep001-003_adoption_review.md", "owner_approved"];
 const definitions = [
   ["status", "운영 상태", "status", "00_status.md", "work_status"],
@@ -75,7 +75,7 @@ function indentedYamlScalar(source, key, spaces = 2) {
 
 function parseManifestEntries(source) {
   return source.split("\n").flatMap((line) => {
-    const match = line.match(/^  - \{ (.+) \}$/);
+    const match = line.match(/^  - \{ (.+) \}\r?$/);
     if (!match) return [];
     return [Object.fromEntries(match[1].split(", ").map((field) => {
       const separator = field.indexOf(": ");
