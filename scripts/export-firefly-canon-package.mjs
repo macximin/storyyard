@@ -39,6 +39,7 @@ const supplementalReviewDefinitions = workSlug === "afterlife_restaurant"
       ["cooking_detail_touch_review", "2~3화 조리 디테일 보강", "review", "05_review/ep002-003_cooking_detail_touch_20260727.md", "owner_approved"],
       ["duplicate_removal_review", "4화 중복 삽입 복구", "review", "05_review/ep004_duplicate_removal_20260727.md", "owner_approved"],
       ["prose_tightening_review", "1·3화 도입부 압축", "review", "05_review/ep001-003_prose_tightening_20260727.md", "owner_approved"],
+      ["deceased_character_typo_review", "1화 死者 오탈자 국소 수정", "review", "05_review/ep001_deceased_character_typo_20260727.md", "owner_approved"],
     ]
   : [];
 const definitions = [

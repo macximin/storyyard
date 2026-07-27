@@ -326,10 +326,10 @@ test("ships a six-work admin-only Foundry canon review board with pending decisi
   assert.match(exporter, /inlineRows/);
   assert.match(exporter, /buildConsistencyAudit/);
   assert.match(exporter, /computedRevisionSet/);
-  assert.match(canonPackage, /"revisionSetSha256": "3e10ea3cb109e7c2066b2f2589764d6bb0de470e9abb2448d1f7e665aa93be24"/);
+  assert.match(canonPackage, /"revisionSetSha256": "7c9eae8e21cfea29eeacff4f81aefa2e7412b7163333cfe65b135474c55bfb63"/);
   assert.match(canonPackage, /"sourceGitCommit": "[0-9a-f]{40}"/);
   for (const hash of [
-    "c80913ca46c062e4f63e5b34433c02dea6197ee3cbe50fa52d42b8864a8957d9",
+    "1217fa881b90d951de0c8169a2d07bdc185b7a17e8b96d8e6e985dd60ce05082",
     "701bf3b86420d71a78adfc81f230d1bb7c13ac401efe16aeb834cd810aac744f",
     "9d2d0f273269e04bf72f875972cdc8a60be1a0f300d016f6f849319c4d54d824",
     "23285a3853e6be3a82961368fbb4e7e2aaec8b0079d9d88eb8af55cbf1fbc0fb",
