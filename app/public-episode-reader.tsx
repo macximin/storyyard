@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ArrowRight, ChatCircle, List, X } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { CommentThread } from "./comment-thread";
 import { GlobalSidebar, SidebarUser } from "./global-sidebar";
 import type { PublicEpisodeSnapshot } from "./public-episode-data";
@@ -32,6 +32,10 @@ export function PublicEpisodeReader({
   const previous = index > 0 ? episodes[index - 1] : null;
   const next = index >= 0 && index < episodes.length - 1 ? episodes[index + 1] : null;
   const episodeHref = (episodeNo: number) => `/works/${work.slug}/episodes/${episodeNo}`;
+  const proseParagraphs = episode.body
+    .replace(/\r\n?/g, "\n")
+    .split(/\n[ \t]*\n+/)
+    .filter(Boolean);
 
   return (
     <main className="library-shell reader-page-shell">
@@ -75,8 +79,15 @@ export function PublicEpisodeReader({
             <time>{formatDate(episode.published_at)}</time>
           </header>
           <div className="reader-prose">
-            {episode.body.split(/\n+/).filter(Boolean).map((paragraph, paragraphIndex) => (
-              <p key={paragraphIndex}>{paragraph}</p>
+            {proseParagraphs.map((paragraph, paragraphIndex) => (
+              <p key={paragraphIndex}>
+                {paragraph.split("\n").map((line, lineIndex) => (
+                  <Fragment key={lineIndex}>
+                    {lineIndex > 0 && <br />}
+                    {line}
+                  </Fragment>
+                ))}
+              </p>
             ))}
           </div>
           <nav className="reader-pagination" aria-label="이전 및 다음 회차">
