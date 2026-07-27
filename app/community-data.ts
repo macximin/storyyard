@@ -124,19 +124,28 @@ export function sortCommunityWorks(
   sort: "rating" | "new",
 ): CommunityWork[] {
   const sorted = [...works].sort((left, right) => {
-    const publishedDifference =
-      new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime();
-    if (sort === "new") return publishedDifference;
+    const newestDifference = compareNewest(left, right);
+    if (sort === "new") return newestDifference;
     const qualificationDifference = Number(right.ranked) - Number(left.ranked);
     if (qualificationDifference) return qualificationDifference;
     if (left.ranked && right.ranked && right.ratingAverage !== left.ratingAverage) {
       return right.ratingAverage - left.ratingAverage;
     }
     if (right.ratingCount !== left.ratingCount) return right.ratingCount - left.ratingCount;
-    return publishedDifference;
+    return newestDifference;
   });
   return sorted.map((work, index) => ({
     ...work,
     rank: sort === "rating" ? index + 1 : null,
   }));
+}
+
+function compareNewest(left: CommunityWork, right: CommunityWork): number {
+  const updatedDifference =
+    new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+  if (updatedDifference) return updatedDifference;
+  const publishedDifference =
+    new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime();
+  if (publishedDifference) return publishedDifference;
+  return left.id.localeCompare(right.id);
 }

@@ -39,7 +39,7 @@ test("ships the public community and private studio navigation", async () => {
   assert.match(sidebar, /개인 작업실/);
   assert.match(sidebar, /내 작품/);
   assert.match(community, /랭킹순/);
-  assert.match(community, /신작순/);
+  assert.match(community, /최신순/);
   assert.match(community, /default-cover-card\.webp/);
   assert.match(community, /loading=\{index === 0 \? "eager" : "lazy"\}/);
   assert.match(page, /CommunityHome/);
@@ -74,6 +74,8 @@ test("primes navigation data on the server and sorts community works locally", a
   assert.doesNotMatch(publicWork, /작품을 불러오는 중/);
   assert.match(plotPage, /initialSnapshot/);
   assert.match(communityData, /env\.DB\.batch/);
+  assert.match(communityData, /right\.updatedAt/);
+  assert.match(community, /right\.updatedAt/);
   assert.match(workspaceData, /env\.DB\.batch/);
   assert.match(publicWorkData, /env\.DB\.batch/);
 });

@@ -60,7 +60,7 @@ export function CommunityHome({
         <div className="community-toolbar">
           <div className="filter-tabs" role="tablist" aria-label="작품 정렬">
             <button className={sort === "rating" ? "active" : ""} onClick={() => changeSort("rating")}>랭킹순</button>
-            <button className={sort === "new" ? "active" : ""} onClick={() => changeSort("new")}>신작순</button>
+            <button className={sort === "new" ? "active" : ""} onClick={() => changeSort("new")}>최신순</button>
           </div>
           <span>{visibleWorks.length}작품</span>
         </div>
@@ -80,7 +80,7 @@ export function CommunityHome({
                       fetchPriority={index === 0 ? "high" : "auto"}
                       decoding="async"
                     />
-                    <strong className="rank-badge">{sort === "rating" ? index + 1 : "NEW"}</strong>
+                    <strong className="rank-badge">{sort === "rating" ? index + 1 : "최신"}</strong>
                     <span className="episode-badge">{work.episodeCount}화</span>
                   </div>
                   <h2>{work.title}</h2>
@@ -114,15 +114,19 @@ export function CommunityHome({
 
 function sortWorks(works: CommunityWork[], sort: "rating" | "new") {
   return [...works].sort((left, right) => {
+    const updatedDifference =
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
     const publishedDifference =
       new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime();
-    if (sort === "new") return publishedDifference;
+    const newestDifference =
+      updatedDifference || publishedDifference || left.id.localeCompare(right.id);
+    if (sort === "new") return newestDifference;
     const qualificationDifference = Number(right.ranked) - Number(left.ranked);
     if (qualificationDifference) return qualificationDifference;
     if (left.ranked && right.ranked && right.ratingAverage !== left.ratingAverage) {
       return right.ratingAverage - left.ratingAverage;
     }
     if (right.ratingCount !== left.ratingCount) return right.ratingCount - left.ratingCount;
-    return publishedDifference;
+    return newestDifference;
   });
 }
