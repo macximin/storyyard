@@ -1338,7 +1338,7 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
         <label>필명<input name="authorName" defaultValue={publication?.authorName || ""} placeholder="커뮤니티에 표시할 이름" /></label>
         <label>표지 이미지 URL<input name="coverUrl" defaultValue={publication?.coverUrl || "/default-cover.png"} placeholder="https://…" /></label>
         <div className="cover-preview">
-          <img src={!publication?.coverUrl || publication.coverUrl === "/default-cover.png" ? "/covers/overall-revision.png" : publication.coverUrl} alt="기본 표지 미리보기" />
+          <img src={!publication?.coverUrl || publication.coverUrl === "/default-cover.png" ? (project.title === "저승식당" ? "/covers/unlimited-contest-expected-pass.png" : "/covers/overall-revision.png") : publication.coverUrl} alt="기본 표지 미리보기" />
           <p>지금은 HTTPS 이미지 주소를 사용함. 주소가 없으면 Storyyard 기본 표지가 적용됨.</p>
         </div>
         <section className="publish-all-summary" aria-label="전체 공개 대상">
