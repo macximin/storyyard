@@ -37,7 +37,50 @@ type CharacterMeta = {
 };
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "recovered";
 type FolderDraft = { id?: string; title: string };
+type HumanActionKind = "publication.write" | "publication.delete" | "project.public-metadata";
 const workspaceCache = new Map<string, WorkspaceSnapshot>();
+
+async function fetchWithHumanAction(
+  url: string,
+  init: RequestInit,
+  projectId: string,
+): Promise<Response> {
+  const response = await fetch(url, init);
+  if (response.status !== 428) return response;
+  const challenge = await response.clone().json().catch(() => null) as {
+    humanActionRequired?: unknown;
+  } | null;
+  const action = challenge?.humanActionRequired;
+  if (
+    action !== "publication.write"
+    && action !== "publication.delete"
+    && action !== "project.public-metadata"
+  ) {
+    return response;
+  }
+  const password = window.prompt("이 작업은 공개 상태를 바꿉니다. Storyyard 관리자 비밀번호를 다시 입력해 주세요.");
+  if (password === null) throw new Error("인간 관리자 확인을 취소했음.");
+  const grantResponse = await fetch("/api/auth/human-action", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ projectId, action: action as HumanActionKind, password }),
+  });
+  const grant = await grantResponse.json().catch(() => null) as {
+    grantToken?: unknown;
+    error?: unknown;
+  } | null;
+  if (!grantResponse.ok || typeof grant?.grantToken !== "string") {
+    throw new Error(typeof grant?.error === "string" ? grant.error : "인간 관리자 확인에 실패함.");
+  }
+  const originalBody = typeof init.body === "string"
+    ? JSON.parse(init.body) as Record<string, unknown>
+    : {};
+  return fetch(url, {
+    ...init,
+    headers: { ...init.headers, "content-type": "application/json" },
+    body: JSON.stringify({ ...originalBody, humanActionToken: grant.grantToken }),
+  });
+}
 
 export function ProjectWorkspace({
   projectId,
@@ -257,7 +300,7 @@ export function ProjectWorkspace({
     event.preventDefault();
     if (!project) return;
     const form = new FormData(event.currentTarget);
-    const response = await fetch(`/api/projects/${projectId}`, {
+    const response = await fetchWithHumanAction(`/api/projects/${projectId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -266,7 +309,7 @@ export function ProjectWorkspace({
         genre: form.get("genre"),
         coverKey: form.get("coverKey"),
       }),
-    });
+    }, projectId);
     const data = await response.json();
     if (data.project) setProject(data.project);
     if (data.publication?.status === "published") {
@@ -632,8 +675,8 @@ export function ProjectWorkspace({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           workSlug: canonPackage.workSlug,
-          repairLegacySnapshot: true,
-          preserveConflicts: true,
+          repairLegacySnapshot: false,
+          dryRun: false,
         }),
       });
       const data = await response.json();
@@ -656,17 +699,8 @@ export function ProjectWorkspace({
         .filter(([, value]) => typeof value === "number")
         .reduce((sum, [, value]) => sum + Number(value), 0);
       setFoundrySyncMessage(
-        data.report.conflicts.length
-          ? `Storyyard 수정본 ${data.report.conflicts.length}개 보존 · 나머지 정본 반영`
-          : `작업실·커뮤니티 ${workspaceChanged}개, 플롯 ${changed}개 반영 · 같은 정본으로 잠금`,
+        `개인 작업실 ${workspaceChanged}개, 플롯 ${changed}개 반영 · 공개본은 변경하지 않음`,
       );
-      if (data.report.communitySlug) {
-        broadcastPublicationUpdate({
-          projectId,
-          slug: data.report.communitySlug,
-          revision: data.revision,
-        });
-      }
     } catch (error) {
       setFoundrySyncMessage(error instanceof Error ? error.message : "Foundry 동기화 실패");
     } finally {
@@ -1336,25 +1370,30 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
     setPending(true);
     setMessage("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch(`/api/projects/${project.id}/publication`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        authorName: form.get("authorName"),
-        publishAll: true,
-        publishCanon: canonBound,
-      }),
-    });
-    const data = await response.json();
-    setPending(false);
-    if (!response.ok) return setMessage(data.error || "공개하지 못했음.");
-    setPublication({ ...data.publication, revision: data.revision, needsUpdate: false });
-    broadcastPublicationUpdate({
-      projectId: project.id,
-      slug: data.publication.slug,
-      revision: data.revision,
-    });
-    setMessage("원고·등장인물·자료·플롯 전체 공개본을 갱신했음.");
+    try {
+      const response = await fetchWithHumanAction(`/api/projects/${project.id}/publication`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          authorName: form.get("authorName"),
+          publishAll: true,
+          publishCanon: canonBound,
+        }),
+      }, project.id);
+      const data = await response.json();
+      if (!response.ok) return setMessage(data.error || "공개하지 못했음.");
+      setPublication({ ...data.publication, revision: data.revision, needsUpdate: false });
+      broadcastPublicationUpdate({
+        projectId: project.id,
+        slug: data.publication.slug,
+        revision: data.revision,
+      });
+      setMessage("원고·등장인물·자료·플롯 전체 공개본을 갱신했음.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "공개하지 못했음.");
+    } finally {
+      setPending(false);
+    }
   }
 
   async function unpublish() {
@@ -1362,7 +1401,11 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
     setUnpublishPending(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/projects/${project.id}/publication`, { method: "DELETE" });
+      const response = await fetchWithHumanAction(
+        `/api/projects/${project.id}/publication`,
+        { method: "DELETE" },
+        project.id,
+      );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "공개를 중지하지 못했음.");
       setPublication((current) => current ? { ...current, status: "draft", revision: data.revision, updatedAt: data.updatedAt } : null);
@@ -1402,8 +1445,8 @@ function PublishView({ project, items, blocks }: { project: Project; items: Item
             </Link>
           )}
         </div>
-        <div className="publication-sync-note"><strong>작품 기본 정보 자동 동기화</strong><span>제목·소개·장르는 작업실의 작품 개요를 저장하면 공개 페이지에도 바로 반영됨.</span></div>
-        {canonBound && <div className="publication-sync-note"><strong>Foundry 정본 연결됨</strong><span>개인 원고와 커뮤니티 공개본은 정본 전체 동기화로 함께 갱신됩니다.</span></div>}
+        <div className="publication-sync-note"><strong>공개는 별도 인간 작업</strong><span>공개·갱신·공개 중지는 실행 직전에 관리자 비밀번호를 다시 확인합니다.</span></div>
+        {canonBound && <div className="publication-sync-note"><strong>Foundry 정본 연결됨</strong><span>정본 동기화는 개인 작업실만 바꾸며 공개본은 이 화면에서 별도로 승인해 갱신합니다.</span></div>}
         <dl className="publication-project-info"><div><dt>제목</dt><dd>{project.title}</dd></div><div><dt>장르</dt><dd>{project.genre}</dd></div><div><dt>소개</dt><dd>{project.logline}</dd></div></dl>
         <label>필명<input name="authorName" defaultValue={publication?.authorName || ""} placeholder="커뮤니티에 표시할 이름" /></label>
         <div className="cover-preview">

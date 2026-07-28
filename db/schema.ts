@@ -19,6 +19,10 @@ export const sessions = sqliteTable("sessions", {
   userId: text("user_id").notNull(),
   tokenHash: text("token_hash").notNull(),
   expiresAt: text("expires_at").notNull(),
+  humanActionTokenHash: text("human_action_token_hash").notNull().default(""),
+  humanActionProjectId: text("human_action_project_id").notNull().default(""),
+  humanActionKind: text("human_action_kind").notNull().default(""),
+  humanActionExpiresAt: text("human_action_expires_at").notNull().default(""),
   createdAt: text("created_at").notNull(),
 }, (table) => [
   uniqueIndex("sessions_token_hash_unique").on(table.tokenHash),

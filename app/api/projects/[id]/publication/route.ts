@@ -1,6 +1,6 @@
 import { asc, eq, inArray } from "drizzle-orm";
 import { env } from "cloudflare:workers";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { consumeHumanActionGrant, getChatGPTUser } from "@/app/chatgpt-auth";
 import { getSyncableCanonPackage } from "@/app/canon-packages";
 import { getCoverOption } from "@/app/cover-options";
 import { getDb } from "@/db";
@@ -52,10 +52,14 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   if (!user) return Response.json({ error: "로그인이 필요함." }, { status: 401 });
   const project = await ownedProject(projectId, user.email);
   if (!project) return Response.json({ error: "Not found" }, { status: 404 });
+  if (user.role !== "admin") {
+    return Response.json({ error: "공개 작업은 인간 관리자 확인이 필요함." }, { status: 403 });
+  }
   const [canonBinding] = await getDb().select().from(canonBindings).where(eq(canonBindings.projectId, projectId));
   const input = await request.json() as Partial<{
     publishAll: boolean;
     publishCanon: boolean;
+    humanActionToken: string;
     authorName: string;
     episodeIds: string[];
     characterIds: string[];
@@ -68,7 +72,22 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   const publishCanon = Boolean(canonBinding) && input.publishCanon === true && user.role === "admin";
   if (canonBinding && !publishCanon) {
     return Response.json({
-      error: "Foundry 정본 작품의 공개본은 개인 작업실과 함께 정본 전체 동기화로만 갱신할 수 있음.",
+      error: "Foundry 정본 작품의 공개본은 인간 관리자 확인이 있는 별도 정본 공개 작업으로만 갱신할 수 있음.",
+    }, { status: 409 });
+  }
+  const canonPackage = publishCanon ? getSyncableCanonPackage(canonBinding.workSlug) : null;
+  if (
+    publishCanon
+    && (
+      input.publishAll !== true
+      || !canonPackage
+      || canonBinding.sourceCommit !== canonPackage.sourceGitCommit
+      || canonBinding.bundleSha256 !== canonPackage.bundleSha256
+      || canonBinding.revisionSetSha256 !== canonPackage.revisionSetSha256
+    )
+  ) {
+    return Response.json({
+      error: "현재 Foundry 정본 binding과 개인 작업실 공개 요청이 정확히 일치하지 않음.",
     }, { status: 409 });
   }
   const db = getDb();
@@ -78,18 +97,28 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
       .where(eq(manuscripts.projectId, projectId))
       .orderBy(asc(manuscripts.episodeNo))
     : [];
-  const canonEpisodeNos = publishCanon
-    ? new Set(
-      getSyncableCanonPackage(canonBinding.workSlug)
-        ?.workspaceProjection.manuscripts.map((item) => item.episodeNo) ?? [],
-    )
-    : new Set<number>();
   const allManuscripts = publishCanon
-    ? manuscriptRows.filter((item) =>
-      readFoundryWorkSlug(item.meta) === canonBinding.workSlug
-      || canonEpisodeNos.has(item.episodeNo),
-    )
+    ? manuscriptRows.filter((item) => matchesCurrentCanon(item.meta, canonBinding))
     : manuscriptRows;
+  if (publishCanon) {
+    const expectedManuscriptKeys = new Set(
+      canonPackage.workspaceProjection.manuscripts.map((item) => `manuscript:${item.entityKey}`),
+    );
+    const actualManuscriptKeys = new Set(
+      allManuscripts.flatMap((item) => {
+        const identity = readFoundryIdentity(item.meta);
+        return identity ? [identity.entityKey] : [];
+      }),
+    );
+    if (
+      expectedManuscriptKeys.size !== actualManuscriptKeys.size
+      || [...expectedManuscriptKeys].some((key) => !actualManuscriptKeys.has(key))
+    ) {
+      return Response.json({
+        error: "현재 정본 원고 집합이 완전하지 않아 공개를 중단했음.",
+      }, { status: 409 });
+    }
+  }
   const episodeIds = publishAll
     ? allManuscripts.map((item) => item.id)
     : Array.isArray(input.episodeIds) ? input.episodeIds.filter(Boolean) : [];
@@ -108,11 +137,39 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     db.select().from(plotBlocks).where(eq(plotBlocks.projectId, projectId)).orderBy(asc(plotBlocks.act), asc(plotBlocks.sortOrder)),
   ]);
   const allItems = publishCanon
-    ? itemRows.filter((item) => readFoundryWorkSlug(item.meta) === canonBinding.workSlug)
+    ? itemRows.filter((item) => matchesCurrentCanon(item.meta, canonBinding))
     : itemRows;
   const allBlocks = publishCanon
-    ? blockRows.filter((item) => readFoundryWorkSlug(item.meta) === canonBinding.workSlug)
+    ? blockRows.filter((item) => matchesCurrentCanon(item.meta, canonBinding))
     : blockRows;
+  if (publishCanon) {
+    const expectedItemKeys = new Set([
+      "plot",
+      ...canonPackage.workspaceProjection.characters.map((item) => `character:${item.entityKey}`),
+      ...canonPackage.storyyardProjection.arcs.map((item) => `arc:${item.bId}`),
+    ]);
+    const expectedBlockKeys = new Set(
+      canonPackage.storyyardProjection.episodeBlocks.map((item) => `episode:${item.episode}`),
+    );
+    const actualItemKeys = new Set(allItems.flatMap((item) => {
+      const identity = readFoundryIdentity(item.meta);
+      return identity ? [identity.entityKey] : [];
+    }));
+    const actualBlockKeys = new Set(allBlocks.flatMap((item) => {
+      const identity = readFoundryIdentity(item.meta);
+      return identity ? [identity.entityKey] : [];
+    }));
+    if (
+      expectedItemKeys.size !== actualItemKeys.size
+      || expectedBlockKeys.size !== actualBlockKeys.size
+      || [...expectedItemKeys].some((key) => !actualItemKeys.has(key))
+      || [...expectedBlockKeys].some((key) => !actualBlockKeys.has(key))
+    ) {
+      return Response.json({
+        error: "현재 정본 인물·아크·회차 블록 집합이 완전하지 않아 공개를 중단했음.",
+      }, { status: 409 });
+    }
+  }
   const itemById = new Map(allItems.map((item) => [item.id, item]));
   const blockById = new Map(allBlocks.map((block) => [block.id, block]));
   const requested = {
@@ -130,6 +187,12 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     requested.blockIds.some((id) => !blockById.has(id))
   ) {
     return Response.json({ error: "공개 정보 선택이 작업실 데이터와 맞지 않음." }, { status: 400 });
+  }
+  if (!(await consumeHumanActionGrant(user.id, projectId, "publication.write", input.humanActionToken))) {
+    return Response.json({
+      error: "공개 직전에 인간 관리자 비밀번호 확인이 필요함.",
+      humanActionRequired: "publication.write",
+    }, { status: 428 });
   }
   const [existing] = await db.select().from(publications).where(eq(publications.projectId, projectId));
   const timestamp = new Date().toISOString();
@@ -221,11 +284,21 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   return Response.json({ publication, revision: timestamp, updatedAt: timestamp });
 }
 
-export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getChatGPTUser();
   const { id } = await context.params;
   if (!user) return Response.json({ error: "로그인이 필요함." }, { status: 401 });
   if (!(await ownedProject(id, user.email))) return Response.json({ error: "Not found" }, { status: 404 });
+  if (user.role !== "admin") {
+    return Response.json({ error: "공개 중지는 인간 관리자 확인이 필요함." }, { status: 403 });
+  }
+  const input = await request.json().catch(() => null) as { humanActionToken?: unknown } | null;
+  if (!(await consumeHumanActionGrant(user.id, id, "publication.delete", input?.humanActionToken))) {
+    return Response.json({
+      error: "공개 중지 직전에 인간 관리자 비밀번호 확인이 필요함.",
+      humanActionRequired: "publication.delete",
+    }, { status: 428 });
+  }
   const timestamp = new Date().toISOString();
   const result = await env.DB.prepare(
     "UPDATE publications SET status = 'draft', updated_at = ? WHERE project_id = ?",
@@ -284,17 +357,37 @@ function readMeta(value: string): { plotId: string; act: number; status: string;
   }
 }
 
-function readFoundryWorkSlug(value: string): string {
+function readFoundryIdentity(value: string): {
+  workSlug: string;
+  sourceCommit: string;
+  entityKey: string;
+} | null {
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
     const foundrySync = parsed.foundrySync;
-    return foundrySync && typeof foundrySync === "object"
-      && typeof (foundrySync as Record<string, unknown>).workSlug === "string"
-      ? String((foundrySync as Record<string, unknown>).workSlug)
-      : "";
+    if (!foundrySync || typeof foundrySync !== "object") return null;
+    const record = foundrySync as Record<string, unknown>;
+    return typeof record.workSlug === "string"
+      && typeof record.sourceCommit === "string"
+      && typeof record.entityKey === "string"
+      ? {
+        workSlug: record.workSlug,
+        sourceCommit: record.sourceCommit,
+        entityKey: record.entityKey,
+      }
+      : null;
   } catch {
-    return "";
+    return null;
   }
+}
+
+function matchesCurrentCanon(
+  value: string,
+  binding: { workSlug: string; sourceCommit: string },
+) {
+  const identity = readFoundryIdentity(value);
+  return identity?.workSlug === binding.workSlug
+    && identity.sourceCommit === binding.sourceCommit;
 }
 
 function buildContentSnapshots({
