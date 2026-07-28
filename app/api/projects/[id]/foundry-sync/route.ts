@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getSessionTokenHash } from "@/app/chatgpt-auth";
 import { getSyncableCanonPackage, listSyncableCanonPackages } from "@/app/canon-packages";
+import { executeFoundryWrites } from "@/app/foundry-sync-write-policy.mjs";
 import { plotBlocks, projectItems } from "@/db/schema";
 
 type JsonObject = Record<string, unknown>;
@@ -11,12 +12,12 @@ type ManuscriptRow = {
   id: string; projectId: string; episodeNo: number; title: string; body: string;
   status: string; meta: string; createdAt: string; updatedAt: string;
 };
-type PublicationRow = {
-  id: string; projectId: string; slug: string; status: string; title: string; logline: string; genre: string;
-};
-type PublicationEpisodeRow = {
-  id: string; publicationId: string; sourceManuscriptId: string; episodeNo: number;
-  title: string; body: string; meta: string;
+type CanonBindingRow = {
+  projectId: string;
+  workSlug: string;
+  sourceCommit: string;
+  bundleSha256: string;
+  revisionSetSha256: string;
 };
 type FoundrySyncMeta = {
   mappingVersion: string;
@@ -63,11 +64,15 @@ function syncMeta(
   return JSON.stringify({ ...base, foundrySync: input });
 }
 
+function normalizedTitle(value: string) {
+  return value.normalize("NFKC").replace(/\s+/g, " ").trim().toLocaleLowerCase("ko-KR");
+}
+
 async function loadAdminOwnerState(projectId: string) {
   const tokenHash = await getSessionTokenHash();
   if (!tokenHash) return { error: "관리자 권한이 필요함.", status: 403 } as const;
   const now = new Date().toISOString();
-  const [userResult, projectResult, itemsResult, blocksResult, manuscriptsResult, publicationResult, publicationEpisodesResult] = await env.DB.batch([
+  const [userResult, projectResult, itemsResult, blocksResult, manuscriptsResult, bindingResult] = await env.DB.batch([
     env.DB.prepare(
       `SELECT u.id, u.role
          FROM sessions s
@@ -116,49 +121,13 @@ async function loadAdminOwnerState(projectId: string) {
         WHERE m.project_id = ?`,
     ).bind(projectId),
     env.DB.prepare(
-      `SELECT p.id, p.project_id AS "projectId", p.slug, p.status,
-              p.title, p.logline, p.genre
-         FROM publications p
-        WHERE p.project_id = ?
-           OR (
-             (
-               p.owner_user_id = (
-                 SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
-                  WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
-               )
-               OR p.author_name = (
-                 SELECT u.display_name FROM sessions s JOIN users u ON u.id = s.user_id
-                  WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
-               )
-             )
-             AND p.title = (SELECT title FROM projects WHERE id = ?)
-             AND p.status = 'published'
-           )
-        ORDER BY CASE WHEN p.project_id = ? THEN 0 ELSE 1 END, p.updated_at DESC
-        LIMIT 3`,
-    ).bind(projectId, tokenHash, now, tokenHash, now, projectId, projectId),
-    env.DB.prepare(
-      `SELECT pe.id, pe.publication_id AS "publicationId",
-              pe.source_manuscript_id AS "sourceManuscriptId",
-              pe.episode_no AS "episodeNo", pe.title, pe.body, pe.meta
-         FROM publication_episodes pe
-         JOIN publications p ON p.id = pe.publication_id
-        WHERE p.project_id = ?
-           OR (
-             (
-               p.owner_user_id = (
-                 SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id
-                  WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
-               )
-               OR p.author_name = (
-                 SELECT u.display_name FROM sessions s JOIN users u ON u.id = s.user_id
-                  WHERE s.token_hash = ? AND s.expires_at > ? LIMIT 1
-               )
-             )
-             AND p.title = (SELECT title FROM projects WHERE id = ?)
-             AND p.status = 'published'
-           )`,
-    ).bind(projectId, tokenHash, now, tokenHash, now, projectId),
+      `SELECT project_id AS "projectId", work_slug AS "workSlug",
+              source_commit AS "sourceCommit", bundle_sha256 AS "bundleSha256",
+              revision_set_sha256 AS "revisionSetSha256"
+         FROM canon_bindings
+        WHERE project_id = ?
+        LIMIT 1`,
+    ).bind(projectId),
   ]);
   const user = userResult.results?.[0] as { id: string; role: string } | undefined;
   if (!user || user.role !== "admin") {
@@ -167,28 +136,12 @@ async function loadAdminOwnerState(projectId: string) {
   if (!projectResult.results?.length) {
     return { error: "작품을 찾을 수 없음.", status: 404 } as const;
   }
-  const publicationRows = (publicationResult.results ?? []) as PublicationRow[];
-  const exactPublication = publicationRows.find((item) => item.projectId === projectId);
-  const publishedOrphanCandidates = publicationRows.filter(
-    (item) => item.projectId !== projectId && item.status === "published",
-  );
-  const publication = exactPublication?.status === "published"
-    ? exactPublication
-    : publishedOrphanCandidates.length === 1
-      ? publishedOrphanCandidates[0]
-      : exactPublication;
-  const shadowPublication = publication?.id !== exactPublication?.id
-    ? exactPublication
-    : undefined;
   return {
     project: projectResult.results[0] as ProjectRow,
     items: (itemsResult.results ?? []) as ProjectItemRow[],
     blocks: (blocksResult.results ?? []) as PlotBlockRow[],
     manuscripts: (manuscriptsResult.results ?? []) as ManuscriptRow[],
-    publication,
-    shadowPublication,
-    publicationEpisodes: ((publicationEpisodesResult.results ?? []) as PublicationEpisodeRow[])
-      .filter((item) => item.publicationId === publication?.id),
+    binding: bindingResult.results?.[0] as CanonBindingRow | undefined,
   } as const;
 }
 
@@ -220,34 +173,71 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id: projectId } = await context.params;
   const access = await loadAdminOwnerState(projectId);
-  if ("error" in access) return Response.json({ error: access.error }, { status: access.status });
+  if ("error" in access) {
+    return Response.json({
+      error: access.error,
+      publicationMutated: false,
+    }, { status: access.status });
+  }
 
   const input = await request.json().catch(() => null) as {
     workSlug?: string;
     repairLegacySnapshot?: boolean;
-    preserveConflicts?: boolean;
+    dryRun?: boolean;
   } | null;
+  const dryRun = input?.dryRun === true;
   const canonPackage = getSyncableCanonPackage(input?.workSlug?.trim() ?? "");
-  if (!canonPackage) return Response.json({ error: "커밋된 정본만 Storyyard 플롯으로 동기화할 수 있음." }, { status: 409 });
+  if (!canonPackage) {
+    return Response.json({
+      error: "커밋된 정본만 Storyyard 플롯으로 동기화할 수 있음.",
+      dryRun,
+      publicationMutated: false,
+    }, { status: 409 });
+  }
   if (
     !["foundry_storyyard_arc_episode_v1", "foundry_storyyard_arc_episode_v2"].includes(
       canonPackage.storyyardProjection.mappingVersion,
     )
+    || canonPackage.storyyardProjection.arcUnit !== "b_rail_arc"
     || canonPackage.storyyardProjection.blockUnit !== "episode"
+    || canonPackage.storyyardProjection.reverseSync !== false
     || canonPackage.workspaceProjection.mappingVersion !== "foundry_storyyard_workspace_v1"
+    || canonPackage.workspaceProjection.reverseSync !== false
     || canonPackage.workspaceProjection.revisionSetSha256 !== canonPackage.revisionSetSha256
   ) {
-    return Response.json({ error: "Storyyard 전체 정본 투영 계약과 맞지 않음." }, { status: 409 });
+    return Response.json({
+      error: "Storyyard 전체 정본 투영 계약과 맞지 않음.",
+      dryRun,
+      publicationMutated: false,
+    }, { status: 409 });
+  }
+  if (access.binding && access.binding.workSlug !== canonPackage.workSlug) {
+    return Response.json({
+      error: `이 프로젝트는 이미 ${access.binding.workSlug} 정본에 연결되어 있어 다른 작품으로 다시 연결할 수 없음.`,
+      dryRun,
+      publicationMutated: false,
+    }, { status: 409 });
+  }
+  if (
+    !access.binding
+    && normalizedTitle(access.project.title) !== normalizedTitle(canonPackage.workspaceProjection.overview.title)
+  ) {
+    return Response.json({
+      error: "최초 정본 연결은 Storyyard 프로젝트 제목과 Foundry 작품 제목이 일치해야 함.",
+      dryRun,
+      publicationMutated: false,
+    }, { status: 409 });
+  }
+  if (input?.repairLegacySnapshot === true) {
+    return Response.json({
+      error: "기존 무표식 원고 복구는 자동 동기화에서 수행하지 않음. 인간 검토가 있는 별도 마이그레이션이 필요함.",
+      dryRun,
+      publicationMutated: false,
+    }, { status: 409 });
   }
 
   const existingItems = access.items;
   const existingBlocks = access.blocks;
-  // One-time migration path for the legacy split-brain state: an old public
-  // snapshot exists but the private workspace has no manuscripts at all.
-  // Once canonical manuscripts are inserted, normal fail-closed drift checks
-  // apply on every later sync.
-  const legacySnapshotRepair = Boolean(access.publication)
-    && access.manuscripts.every((manuscript) => readFoundrySync(manuscript.meta) === null);
   const writes: ReturnType<typeof env.DB.prepare>[] = [];
   const timestamp = new Date().toISOString();
   const plotEntity = existingItems.find((item) => {
@@ -296,32 +286,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       ),
     );
   }
-  if (input?.repairLegacySnapshot === true) {
-    const legacyEmptyPlots = existingItems.filter((item) => {
-      if (
-        item.kind !== "plot"
-        || item.id === plotId
-        || item.title !== `${canonPackage.title} — 아크 로드맵`
-        || readFoundrySync(item.meta)
-      ) {
-        return false;
-      }
-      const hasActs = existingItems.some((candidate) =>
-        candidate.kind === "act" && readObject(candidate.meta).plotId === item.id
-      );
-      const hasBlocks = existingBlocks.some((candidate) =>
-        readObject(candidate.meta).plotId === item.id
-      );
-      return !hasActs && !hasBlocks;
-    });
-    for (const legacyPlot of legacyEmptyPlots) {
-      writes.push(
-        env.DB.prepare(`DELETE FROM project_items WHERE id = ? AND project_id = ?`)
-          .bind(legacyPlot.id, projectId),
-      );
-    }
-  }
-
   const report = {
     plotId,
     created: 0,
@@ -333,25 +297,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       overview: 0,
       characters: 0,
       manuscripts: 0,
-      communityEpisodes: 0,
-      communitySlug: access.publication?.slug ?? null,
     },
+    overviewPreserved: true,
   };
   const workspaceMappingVersion = canonPackage.workspaceProjection.mappingVersion;
-  const overview = canonPackage.workspaceProjection.overview;
-  if (
-    access.project.title !== overview.title
-    || access.project.logline !== overview.logline
-  ) {
-    writes.push(
-      env.DB.prepare(
-        `UPDATE projects SET title = ?, logline = ?, updated_at = ? WHERE id = ?`,
-      ).bind(overview.title, overview.logline, timestamp, projectId),
-    );
-    report.workspace.overview = 1;
-  }
 
-  const characterIds = new Map<string, string>();
   for (const character of canonPackage.workspaceProjection.characters) {
     const entityKey = `character:${character.entityKey}`;
     const existing = existingItems.find((item) => {
@@ -364,13 +314,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const desiredHash = await sha256(desired);
     const previousSync = existing ? readFoundrySync(existing.meta) : null;
     const currentHash = existing ? await sha256({ title: existing.title, body: existing.body }) : "";
-    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256 && !legacySnapshotRepair) {
+    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256) {
       report.conflicts.push({ entityKey, title: existing.title });
-      characterIds.set(character.entityKey, existing.id);
       continue;
     }
     const id = existing?.id ?? crypto.randomUUID();
-    characterIds.set(character.entityKey, id);
     const meta = syncMeta({
       ...(existing ? readObject(existing.meta) : {}),
       tags: character.tags,
@@ -412,7 +360,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
   }
 
-  const manuscriptIds = new Map<number, string>();
   for (const manuscript of canonPackage.workspaceProjection.manuscripts) {
     const entityKey = `manuscript:${manuscript.entityKey}`;
     const existing = access.manuscripts.find((item) => item.episodeNo === manuscript.episodeNo);
@@ -424,14 +371,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       existing
       && ((previousSync && currentHash !== previousSync.projectedContentSha256)
         || (!previousSync && Boolean(existing.body.trim()) && currentHash !== desiredHash))
-      && !legacySnapshotRepair
     ) {
       report.conflicts.push({ entityKey, title: existing.title });
-      manuscriptIds.set(manuscript.episodeNo, existing.id);
       continue;
     }
     const id = existing?.id ?? crypto.randomUUID();
-    manuscriptIds.set(manuscript.episodeNo, id);
     const meta = syncMeta(existing ? readObject(existing.meta) : {}, {
       mappingVersion: workspaceMappingVersion,
       workSlug: canonPackage.workSlug,
@@ -469,112 +413,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
   }
 
-  if (access.publication) {
-    if (access.shadowPublication) {
-      writes.push(
-        env.DB.prepare(
-          `UPDATE publications SET project_id = ?, updated_at = ? WHERE id = ?`,
-        ).bind(`detached-${access.shadowPublication.id}`, timestamp, access.shadowPublication.id),
-      );
-    }
-    writes.push(
-        env.DB.prepare(
-          `UPDATE publications
-             SET project_id = ?, title = ?, logline = ?, published_revision = ?, updated_at = ?
-           WHERE id = ?`,
-      ).bind(projectId, overview.title, overview.logline, timestamp, timestamp, access.publication.id),
-    );
-    writes.push(
-      env.DB.prepare(
-        `DELETE FROM publication_content
-          WHERE publication_id = ? AND kind IN ('plot', 'act', 'block')`,
-      ).bind(access.publication.id),
-    );
-    writes.push(
-      env.DB.prepare(
-        `INSERT INTO publication_content
-          (id, publication_id, source_id, kind, parent_source_id, sort_order,
-           title, body, meta, created_at, updated_at)
-         VALUES (?, ?, ?, 'plot', '', 0, ?, ?, '{}', ?, ?)`,
-      ).bind(
-        crypto.randomUUID(), access.publication.id, plotId,
-        `Foundry · ${canonPackage.title}`,
-        `B-Rail을 아크로, 한 화를 블록 하나로 비추는 읽기 투영 · source ${canonPackage.sourceGitCommit.slice(0, 12)}`,
-        timestamp, timestamp,
-      ),
-    );
-    for (const manuscript of canonPackage.workspaceProjection.manuscripts) {
-      const sourceManuscriptId = manuscriptIds.get(manuscript.episodeNo);
-      if (!sourceManuscriptId) continue;
-      const entityKey = `publication:${manuscript.entityKey}`;
-      const desiredHash = await sha256({ title: manuscript.title, body: manuscript.body });
-      const existing = access.publicationEpisodes.find((item) => item.episodeNo === manuscript.episodeNo);
-      const meta = syncMeta(existing ? readObject(existing.meta) : {}, {
-        mappingVersion: workspaceMappingVersion,
-        workSlug: canonPackage.workSlug,
-        entityKey,
-        sourceCommit: canonPackage.sourceGitCommit,
-        sourceSha256: manuscript.sourceSha256,
-        projectedContentSha256: desiredHash,
-        authority: "owner_approved_publication_mirror",
-        status: "committed",
-        reverseSync: false,
-      });
-      if (existing) {
-        writes.push(
-          env.DB.prepare(
-            `UPDATE publication_episodes
-                SET source_manuscript_id = ?, title = ?, body = ?, meta = ?, updated_at = ?
-              WHERE id = ?`,
-          ).bind(sourceManuscriptId, manuscript.title, manuscript.body, meta, timestamp, existing.id),
-        );
-      } else {
-        writes.push(
-          env.DB.prepare(
-            `INSERT INTO publication_episodes
-              (id, publication_id, source_manuscript_id, episode_no, title, body, meta, published_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          ).bind(
-            crypto.randomUUID(), access.publication.id, sourceManuscriptId, manuscript.episodeNo,
-            manuscript.title, manuscript.body, meta, timestamp, timestamp,
-          ),
-        );
-      }
-      report.workspace.communityEpisodes += 1;
-    }
-    for (const character of canonPackage.workspaceProjection.characters) {
-      const sourceId = characterIds.get(character.entityKey);
-      if (!sourceId) continue;
-      const meta = JSON.stringify({
-        tags: character.tags,
-        fields: character.fields,
-        foundrySync: {
-          mappingVersion: workspaceMappingVersion,
-          workSlug: canonPackage.workSlug,
-          entityKey: `publication-character:${character.entityKey}`,
-          sourceCommit: canonPackage.sourceGitCommit,
-          sourceSha256: character.sourceSha256,
-          authority: "derived_narrative_state_projection",
-          status: "active",
-          reverseSync: false,
-        },
-      });
-      writes.push(
-        env.DB.prepare(
-          `INSERT INTO publication_content
-            (id, publication_id, source_id, kind, parent_source_id, sort_order,
-             title, body, meta, created_at, updated_at)
-           VALUES (?, ?, ?, 'character', '', ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(publication_id, kind, source_id) DO UPDATE SET
-             sort_order = excluded.sort_order, title = excluded.title,
-             body = excluded.body, meta = excluded.meta, updated_at = excluded.updated_at`,
-        ).bind(
-          crypto.randomUUID(), access.publication.id, sourceId, character.sortOrder,
-          character.title, character.body, meta, timestamp, timestamp,
-        ),
-      );
-    }
-  }
   const actByBId = new Map<string, number>();
   const projectedKeys = new Set<string>();
 
@@ -595,7 +433,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const currentHash = existing
       ? await sha256({ title: existing.title, body: existing.body, act: Number(readObject(existing.meta).act ?? 0) })
       : "";
-    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256 && !legacySnapshotRepair) {
+    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256) {
       report.conflicts.push({ entityKey, title: existing.title });
       continue;
     }
@@ -639,26 +477,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       );
       report.updated += 1;
     }
-    if (access.publication) {
-      writes.push(
-        env.DB.prepare(
-          `INSERT INTO publication_content
-            (id, publication_id, source_id, kind, parent_source_id, sort_order,
-             title, body, meta, created_at, updated_at)
-           VALUES (?, ?, ?, 'act', ?, ?, ?, ?, ?, ?, ?)`,
-        ).bind(
-          crypto.randomUUID(), access.publication.id, id, plotId, act,
-          arc.title, arc.body, JSON.stringify({ act, status: arc.status }),
-          timestamp, timestamp,
-        ),
-      );
-    }
   }
 
   for (const episode of canonPackage.storyyardProjection.episodeBlocks) {
     const act = actByBId.get(episode.bId);
     if (!act) {
-      return Response.json({ error: `${episode.episode}의 B-Rail 아크가 투영 범위에 없음.` }, { status: 409 });
+      return Response.json({
+        error: `${episode.episode}의 B-Rail 아크가 투영 범위에 없음.`,
+        dryRun,
+        publicationMutated: false,
+      }, { status: 409 });
     }
     const entityKey = `episode:${episode.episode}`;
     projectedKeys.add(entityKey);
@@ -672,7 +500,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const currentHash = existing
       ? await sha256({ title: existing.title, body: existing.body, act: existing.act })
       : "";
-    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256 && !legacySnapshotRepair) {
+    if (existing && previousSync && currentHash !== previousSync.projectedContentSha256) {
       report.conflicts.push({ entityKey, title: existing.title });
       continue;
     }
@@ -740,20 +568,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       );
       report.updated += 1;
     }
-    if (access.publication) {
-      writes.push(
-        env.DB.prepare(
-          `INSERT INTO publication_content
-            (id, publication_id, source_id, kind, parent_source_id, sort_order,
-             title, body, meta, created_at, updated_at)
-           VALUES (?, ?, ?, 'block', ?, ?, ?, ?, ?, ?, ?)`,
-        ).bind(
-          crypto.randomUUID(), access.publication.id, id, plotId,
-          episode.sortOrder, episode.title, episode.body,
-          JSON.stringify({ act, status: episode.status }), timestamp, timestamp,
-        ),
-      );
-    }
   }
 
   report.retained = [
@@ -763,44 +577,58 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const sync = readFoundrySync(entity.meta);
     return sync?.workSlug === canonPackage.workSlug && !projectedKeys.has(sync.entityKey);
   }).length;
-  if (report.conflicts.length && input?.preserveConflicts !== true) {
+  if (report.conflicts.length) {
     return Response.json({
-      error: "Storyyard에서 수정된 정본 투영이 있어 전체 동기화를 중단했음. Foundry 정본을 덮어쓰지 않도록 충돌을 먼저 확인해 줘.",
+      error: "Storyyard에서 수정된 정본 투영이 있어 전체 동기화를 쓰기 없이 중단했음. 인간 검토로 충돌을 먼저 해결해 줘.",
       report,
+      dryRun,
+      publicationMutated: false,
+      plannedWrites: writes.length,
     }, { status: 409 });
   }
-  writes.push(
-    env.DB.prepare(
-      `INSERT INTO canon_bindings
-        (project_id, work_slug, source_commit, bundle_sha256, revision_set_sha256, synced_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(project_id) DO UPDATE SET
-         work_slug = excluded.work_slug,
-         source_commit = excluded.source_commit,
-         bundle_sha256 = excluded.bundle_sha256,
-         revision_set_sha256 = excluded.revision_set_sha256,
-         synced_at = excluded.synced_at`,
-    ).bind(
-      projectId,
-      canonPackage.workSlug,
-      canonPackage.sourceGitCommit,
-      canonPackage.bundleSha256,
-      canonPackage.revisionSetSha256,
-      timestamp,
-    ),
-  );
-  if (writes.length) {
+  const contentWriteCount = writes.length;
+  const bindingNeedsUpdate = !access.binding
+    || access.binding.sourceCommit !== canonPackage.sourceGitCommit
+    || access.binding.bundleSha256 !== canonPackage.bundleSha256
+    || access.binding.revisionSetSha256 !== canonPackage.revisionSetSha256;
+  if (contentWriteCount > 0 || bindingNeedsUpdate) {
+    writes.push(
+      env.DB.prepare(
+        `INSERT INTO canon_bindings
+          (project_id, work_slug, source_commit, bundle_sha256, revision_set_sha256, synced_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(project_id) DO UPDATE SET
+           source_commit = excluded.source_commit,
+           bundle_sha256 = excluded.bundle_sha256,
+           revision_set_sha256 = excluded.revision_set_sha256,
+           synced_at = excluded.synced_at
+         WHERE canon_bindings.work_slug = excluded.work_slug`,
+      ).bind(
+        projectId,
+        canonPackage.workSlug,
+        canonPackage.sourceGitCommit,
+        canonPackage.bundleSha256,
+        canonPackage.revisionSetSha256,
+        timestamp,
+      ),
+    );
+  }
+  if (contentWriteCount > 0) {
     writes.push(
       env.DB.prepare(`UPDATE projects SET content_revision = ?, updated_at = ? WHERE id = ?`)
         .bind(timestamp, timestamp, projectId),
     );
-    await env.DB.batch(writes);
   }
+  const plannedWrites = writes.length;
+  await executeFoundryWrites(env.DB, writes, { dryRun });
 
   return Response.json({
     report,
-    revision: timestamp,
-    updatedAt: timestamp,
+    dryRun,
+    publicationMutated: false,
+    plannedWrites,
+    revision: dryRun ? null : timestamp,
+    updatedAt: dryRun ? null : timestamp,
     source: {
       workSlug: canonPackage.workSlug,
       commit: canonPackage.sourceGitCommit,

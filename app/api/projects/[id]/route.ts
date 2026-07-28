@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { env } from "cloudflare:workers";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { consumeHumanActionGrant, getChatGPTUser } from "@/app/chatgpt-auth";
 import { getCoverOption, isCoverKey } from "@/app/cover-options";
 import { getDb } from "@/db";
 import { projects } from "@/db/schema";
@@ -30,15 +30,22 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     genre: string;
     coverKey: string;
     favorite: boolean | number;
+    humanActionToken: string;
   }>;
   if (input.coverKey !== undefined && !isCoverKey(input.coverKey)) {
     return Response.json({ error: "허용되지 않은 표지임." }, { status: 400 });
   }
   const binding = await env.DB.prepare("SELECT project_id FROM canon_bindings WHERE project_id = ?")
     .bind(id).first();
+  const requestedTitle = typeof input.title === "string"
+    ? input.title.trim() || project.title
+    : project.title;
+  const requestedLogline = typeof input.logline === "string"
+    ? input.logline.trim()
+    : project.logline;
   if (
     binding
-    && (typeof input.title === "string" || typeof input.logline === "string")
+    && (requestedTitle !== project.title || requestedLogline !== project.logline)
   ) {
     return Response.json({
       error: "Foundry 정본 작품의 제목과 소개는 정본 전체 동기화로만 갱신할 수 있음.",
@@ -47,8 +54,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const timestamp = new Date().toISOString();
   const next = {
     ...project,
-    title: typeof input.title === "string" ? input.title.trim() || project.title : project.title,
-    logline: typeof input.logline === "string" ? input.logline.trim() : project.logline,
+    title: requestedTitle,
+    logline: requestedLogline,
     genre: typeof input.genre === "string" ? input.genre.trim() || "웹소설" : project.genre,
     coverKey: isCoverKey(input.coverKey) ? input.coverKey : project.coverKey,
     favorite: typeof input.favorite === "boolean" || typeof input.favorite === "number"
@@ -61,6 +68,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     || typeof input.logline === "string"
     || typeof input.genre === "string"
     || input.coverKey !== undefined;
+  const publicPublication = binding && syncPublication
+    ? await env.DB.prepare("SELECT id FROM publications WHERE project_id = ? AND status = 'published'")
+      .bind(id).first<{ id: string }>()
+    : null;
+  if (publicPublication) {
+    if (user.role !== "admin") {
+      return Response.json({ error: "정본 공개 정보 변경은 인간 관리자 확인이 필요함." }, { status: 403 });
+    }
+    if (!(await consumeHumanActionGrant(user.id, id, "project.public-metadata", input.humanActionToken))) {
+      return Response.json({
+        error: "공개 정보 변경 직전에 인간 관리자 비밀번호 확인이 필요함.",
+        humanActionRequired: "project.public-metadata",
+      }, { status: 428 });
+    }
+  }
   const statements = [
     env.DB.prepare(
       `UPDATE projects

@@ -140,6 +140,13 @@ Foundry. Source commit and hashes are retained. If a projected arc or episode
 was edited locally after the last sync, the next sync reports a conflict and
 preserves the local edit instead of overwriting it.
 
+Foundry sync updates the private Storyyard workspace only. It never creates or
+updates a publication, publication episode, or public content snapshot. Public
+release remains a separate human-approved action. Publishing, unpublishing, and
+public metadata changes for a Foundry-bound project require a short-lived,
+single-use grant issued only after the signed-in admin re-enters their password.
+The grant is bound to the current session, project, and exact action.
+
 ## Learn More
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)

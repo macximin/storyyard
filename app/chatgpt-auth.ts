@@ -17,6 +17,12 @@ export type ChatGPTUser = {
 const SESSION_COOKIE = "storyyard_session";
 const SESSION_DAYS = 30;
 const PASSWORD_ITERATIONS = 100_000;
+const HUMAN_ACTION_GRANT_MS = 2 * 60 * 1000;
+
+export type HumanActionKind =
+  | "publication.write"
+  | "publication.delete"
+  | "project.public-metadata";
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const tokenHash = await getSessionTokenHash();
@@ -41,6 +47,68 @@ export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
 export async function getSessionTokenHash(): Promise<string | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   return token ? sha256(token) : null;
+}
+
+export function isHumanActionKind(value: unknown): value is HumanActionKind {
+  return value === "publication.write"
+    || value === "publication.delete"
+    || value === "project.public-metadata";
+}
+
+export async function issueHumanActionGrant(
+  userId: string,
+  projectId: string,
+  action: HumanActionKind,
+): Promise<string | null> {
+  const sessionTokenHash = await getSessionTokenHash();
+  if (!sessionTokenHash) return null;
+  const now = new Date();
+  const grantToken = randomToken(32);
+  const grantTokenHash = await sha256(grantToken);
+  const issued = await env.DB.prepare(
+    `UPDATE sessions
+        SET human_action_token_hash = ?, human_action_project_id = ?,
+            human_action_kind = ?, human_action_expires_at = ?
+      WHERE token_hash = ? AND user_id = ? AND expires_at > ?
+      RETURNING id`,
+  ).bind(
+    grantTokenHash,
+    projectId,
+    action,
+    new Date(now.getTime() + HUMAN_ACTION_GRANT_MS).toISOString(),
+    sessionTokenHash,
+    userId,
+    now.toISOString(),
+  ).first<{ id: string }>();
+  return issued ? grantToken : null;
+}
+
+export async function consumeHumanActionGrant(
+  userId: string,
+  projectId: string,
+  action: HumanActionKind,
+  grantToken: unknown,
+): Promise<boolean> {
+  if (typeof grantToken !== "string" || !grantToken) return false;
+  const sessionTokenHash = await getSessionTokenHash();
+  if (!sessionTokenHash) return false;
+  const consumed = await env.DB.prepare(
+    `UPDATE sessions
+        SET human_action_token_hash = '', human_action_project_id = '',
+            human_action_kind = '', human_action_expires_at = ''
+      WHERE token_hash = ? AND user_id = ?
+        AND human_action_token_hash = ? AND human_action_project_id = ?
+        AND human_action_kind = ? AND human_action_expires_at > ?
+      RETURNING id`,
+  ).bind(
+    sessionTokenHash,
+    userId,
+    await sha256(grantToken),
+    projectId,
+    action,
+    new Date().toISOString(),
+  ).first<{ id: string }>();
+  return Boolean(consumed);
 }
 
 export async function requireChatGPTUser(returnTo: string): Promise<ChatGPTUser> {

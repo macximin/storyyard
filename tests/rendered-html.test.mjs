@@ -163,18 +163,30 @@ test("uses route prefetching and shows navigation progress", async () => {
 });
 
 test("keeps credentials out of browser storage and uses durable secure sessions", async () => {
-  const [auth, sidebar, schema] = await Promise.all([
+  const [auth, humanActionRoute, sidebar, workspace, schema, migration] = await Promise.all([
     read("app/chatgpt-auth.ts"),
+    read("app/api/auth/human-action/route.ts"),
     read("app/global-sidebar.tsx"),
+    read("app/project-workspace.tsx"),
     read("db/schema.ts"),
+    read("drizzle/0011_reflective_outlaw_kid.sql"),
   ]);
   assert.match(auth, /PBKDF2/);
   assert.match(auth, /httpOnly:\s*true/);
   assert.match(auth, /sameSite:\s*"lax"/);
   assert.match(auth, /SESSION_DAYS\s*=\s*30/);
-  assert.doesNotMatch(`${auth}\n${sidebar}`, /localStorage.*password|password.*localStorage/i);
+  assert.doesNotMatch(`${auth}\n${sidebar}\n${workspace}`, /localStorage.*password|password.*localStorage/i);
   assert.match(schema, /sessions/);
   assert.match(schema, /passwordHash/);
+  assert.match(schema, /humanActionTokenHash/);
+  assert.match(migration, /human_action_token_hash/);
+  assert.match(humanActionRoute, /verifyPassword/);
+  assert.match(humanActionRoute, /user\.role !== "admin"/);
+  assert.match(auth, /human_action_project_id = \?/);
+  assert.match(auth, /human_action_kind = \?/);
+  assert.match(auth, /human_action_expires_at > \?/);
+  assert.match(auth, /SET human_action_token_hash = ''/);
+  assert.match(workspace, /\/api\/auth\/human-action/);
 });
 
 test("publishes the entire workspace and renders public planning snapshots immediately", async () => {
@@ -193,12 +205,17 @@ test("publishes the entire workspace and renders public planning snapshots immed
   assert.match(publicationRoute, /characterFieldIds/);
   assert.match(publicationRoute, /publishAll/);
   assert.match(publicationRoute, /publishCanon/);
-  assert.match(publicationRoute, /canonEpisodeNos/);
-  assert.match(publicationRoute, /readFoundryWorkSlug/);
+  assert.match(publicationRoute, /matchesCurrentCanon/);
+  assert.match(publicationRoute, /expectedManuscriptKeys/);
+  assert.match(publicationRoute, /expectedItemKeys/);
+  assert.match(publicationRoute, /consumeHumanActionGrant/);
+  assert.match(publicationRoute, /humanActionRequired: "publication\.write"/);
+  assert.match(publicationRoute, /humanActionRequired: "publication\.delete"/);
   assert.match(publicationRoute, /validItemKinds/);
   assert.match(contentRoute, /p\.status = 'published'/);
   assert.match(projectRoute, /UPDATE publications/);
   assert.match(projectRoute, /cover_key = \?, cover_url = \?/);
+  assert.match(projectRoute, /humanActionRequired: "project\.public-metadata"/);
   assert.match(workspace, /전체 공개본 갱신/);
   assert.match(workspace, /publishAll: true/);
   assert.match(workspace, /items\.some\(\(item\) => Boolean\(readFoundrySyncInfo\(item\.meta\)\)\)/);
@@ -326,7 +343,7 @@ test("ships a six-work admin-only Foundry canon review board with pending decisi
   assert.match(exporter, /inlineRows/);
   assert.match(exporter, /buildConsistencyAudit/);
   assert.match(exporter, /computedRevisionSet/);
-  assert.match(canonPackage, /"revisionSetSha256": "7c9eae8e21cfea29eeacff4f81aefa2e7412b7163333cfe65b135474c55bfb63"/);
+  assert.match(canonPackage, /"revisionSetSha256": "632cb40c1a5297bf9ca0ab628a5dc63d27625c7e4b199f45ea6c65168bc0432b"/);
   assert.match(canonPackage, /"sourceGitCommit": "[0-9a-f]{40}"/);
   for (const hash of [
     "1217fa881b90d951de0c8169a2d07bdc185b7a17e8b96d8e6e985dd60ce05082",
@@ -338,7 +355,7 @@ test("ships a six-work admin-only Foundry canon review board with pending decisi
   }
 });
 
-test("atomically projects the full Foundry canon into private and public Storyyard views", async () => {
+test("projects Foundry canon fail-closed into the private workspace without mutating publication surfaces", async () => {
   const [canonSource, syncRoute, workspace, exporter, manuscriptRoute, publicationRoute, migration] = await Promise.all([
     read("data/canon/afterlife_restaurant.json"),
     read("app/api/projects/[id]/foundry-sync/route.ts"),
@@ -391,30 +408,55 @@ test("atomically projects the full Foundry canon into private and public Storyya
   assert.match(syncRoute, /projectedContentSha256/);
   assert.match(syncRoute, /report\.conflicts\.push/);
   assert.match(syncRoute, /reverseSync: false/);
+  assert.match(syncRoute, /storyyardProjection\.reverseSync !== false/);
+  assert.match(syncRoute, /workspaceProjection\.reverseSync !== false/);
   assert.match(syncRoute, /foundry_storyyard_arc_episode_v2/);
-  assert.match(syncRoute, /preserveConflicts\?: boolean/);
-  assert.match(syncRoute, /input\?\.preserveConflicts !== true/);
-  assert.match(syncRoute, /manuscriptIds\.set\(manuscript\.episodeNo, existing\.id\)/);
-  assert.match(syncRoute, /env\.DB\.batch\(writes\)/);
-  assert.match(syncRoute, /if \(writes\.length\)/);
+  assert.doesNotMatch(syncRoute, /preserveConflicts/);
+  assert.match(syncRoute, /repairLegacySnapshot\?: boolean/);
+  assert.match(syncRoute, /input\?\.repairLegacySnapshot === true/);
+  assert.match(syncRoute, /dryRun\?: boolean/);
+  assert.match(syncRoute, /executeFoundryWrites\(env\.DB, writes, \{ dryRun \}\)/);
+  assert.match(syncRoute, /publicationMutated: false/);
+  assert.match(syncRoute, /access\.binding\.workSlug !== canonPackage\.workSlug/);
+  assert.match(syncRoute, /normalizedTitle\(access\.project\.title\) !== normalizedTitle/);
+  assert.match(syncRoute, /if \(report\.conflicts\.length\)/);
+  assert.match(syncRoute, /const contentWriteCount = writes\.length/);
+  assert.match(syncRoute, /contentWriteCount > 0 \|\| bindingNeedsUpdate/);
+  assert.doesNotMatch(syncRoute, /UPDATE projects SET title = \?, logline = \?/);
   assert.doesNotMatch(syncRoute, /\.delete\(/);
-  assert.match(syncRoute, /item\.title !== `\$\{canonPackage\.title\} — 아크 로드맵`/);
-  assert.match(syncRoute, /DELETE FROM publication_content/);
-  assert.match(syncRoute, /kind IN \('plot', 'act', 'block'\)/);
-  assert.match(syncRoute, /VALUES \(\?, \?, \?, 'plot'/);
-  assert.match(syncRoute, /VALUES \(\?, \?, \?, 'act'/);
-  assert.match(syncRoute, /VALUES \(\?, \?, \?, 'block'/);
-  assert.match(syncRoute, /UPDATE publication_episodes/);
+  assert.doesNotMatch(syncRoute, /\bpublications\b/);
+  assert.doesNotMatch(syncRoute, /\bpublication_episodes\b/);
+  assert.doesNotMatch(syncRoute, /\bpublication_content\b/);
   assert.match(syncRoute, /ON CONFLICT\(project_id\) DO UPDATE/);
   assert.match(syncRoute, /canon_bindings/);
   assert.match(manuscriptRoute, /Foundry 승인 정본은 Storyyard에서 직접 수정할 수 없음/);
-  assert.match(publicationRoute, /정본 전체 동기화로만 갱신/);
+  assert.match(publicationRoute, /인간 관리자 확인이 있는 별도 정본 공개 작업/);
   assert.match(migration, /ALTER TABLE `manuscripts` ADD `meta`/);
   assert.match(migration, /ALTER TABLE `publication_episodes` ADD `meta`/);
   assert.match(workspace, /정본 전체 동기화/);
+  assert.match(workspace, /repairLegacySnapshot: false/);
+  assert.doesNotMatch(workspace, /preserveConflicts/);
+  assert.match(workspace, /공개본은 변경하지 않음/);
   assert.match(workspace, /blockBodyPreview\(block\.body\)/);
   assert.match(workspace, /\.\.\.\(existingBlock \? readObject\(existingBlock\.meta\) : \{\}\)/);
   assert.match(workspace, /\.\.\.\(existing \? readObject\(existing\.meta\) : \{\}\)/);
+});
+
+test("executes no Foundry writes for dry-run or an empty plan", async () => {
+  const { executeFoundryWrites } = await import("../app/foundry-sync-write-policy.mjs");
+  const batches = [];
+  const db = {
+    async batch(statements) {
+      batches.push(statements);
+    },
+  };
+  const planned = [{ sql: "private write 1" }, { sql: "private write 2" }];
+  await executeFoundryWrites(db, planned, { dryRun: true });
+  await executeFoundryWrites(db, [], { dryRun: false });
+  assert.equal(batches.length, 0);
+  await executeFoundryWrites(db, planned, { dryRun: false });
+  assert.equal(batches.length, 1);
+  assert.equal(batches[0], planned);
 });
 
 test("indexes the private workspace lookup paths", async () => {
