@@ -5,7 +5,7 @@ import { manuscripts, projects } from "@/db/schema";
 
 async function ownedProject(projectId: string, ownerKey: string) {
   const [project] = await getDb().select().from(projects).where(eq(projects.id, projectId));
-  return project?.ownerEmail === ownerKey ? project : null;
+  return project?.ownerEmail === ownerKey && project.lifecycle === "active" ? project : null;
 }
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {

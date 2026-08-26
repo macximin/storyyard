@@ -1,6 +1,6 @@
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { Library } from "@/app/library";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { projects } from "@/db/schema";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function StudioPage() {
   const user = await requireChatGPTUser("/studio");
   const initialProjects = await getDb().select().from(projects)
-    .where(eq(projects.ownerEmail, user.email))
+    .where(and(eq(projects.ownerEmail, user.email), eq(projects.lifecycle, "active")))
     .orderBy(desc(projects.updatedAt));
   return (
     <Library

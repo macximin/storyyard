@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { DEFAULT_COVER_KEY } from "@/app/cover-options";
 import { getDb } from "@/db";
@@ -11,7 +11,7 @@ export async function GET() {
   const user = await getChatGPTUser();
   if (!user) return Response.json({ error: "Sign in required" }, { status: 401 });
   const rows = await getDb().select().from(projects)
-    .where(eq(projects.ownerEmail, user.email))
+    .where(and(eq(projects.ownerEmail, user.email), eq(projects.lifecycle, "active")))
     .orderBy(desc(projects.updatedAt));
   return Response.json({ projects: rows });
 }
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     coverKey: DEFAULT_COVER_KEY,
     favorite: 0,
     contentRevision: timestamp,
+    lifecycle: "active", sourceSystem: "manual", archivedAt: null,
     updatedAt: timestamp, createdAt: timestamp,
   };
   await getDb().insert(projects).values(project);

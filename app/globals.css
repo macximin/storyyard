@@ -939,6 +939,58 @@ a { color: inherit; text-decoration: none; }
 .decision-history blockquote { margin: 7px 0; padding-left: 8px; border-left: 2px solid #c5a600; color: #666; font-size: .66rem; line-height: 1.5; }
 .decision-history time { color: #999; font-size: .57rem; }
 
+/* Firefly review is intentionally a focused mobile HIL surface, not another editor. */
+.firefly-review-main, .legacy-main { min-width: 0; padding: 48px clamp(22px, 5vw, 78px) 100px; }
+.review-queue-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 28px; max-width: 1480px; }
+.review-queue-head h1, .legacy-main h1 { margin: 6px 0 10px; font-size: clamp(2.2rem, 6vw, 5.2rem); letter-spacing: -.07em; }
+.review-queue-head > div:first-child > p:last-child, .legacy-main header > p:last-child { margin: 0; color: #6f6e69; line-height: 1.65; }
+.review-authority { flex: 0 0 auto; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; padding: 13px 15px; border: 1px solid var(--ink); background: var(--yellow); }
+.review-authority svg { grid-row: 1 / 3; align-self: center; }
+.review-authority strong { font-size: .77rem; }
+.review-authority span { color: #6d5d06; font-size: .64rem; }
+.review-queue { display: flex; gap: 8px; max-width: 1480px; margin: 36px 0 22px; overflow-x: auto; }
+.review-queue button { min-width: 220px; display: grid; gap: 4px; padding: 13px 15px; border: 1px solid #aaa; background: #fff; text-align: left; cursor: pointer; }
+.review-queue button.active { border-color: var(--ink); background: var(--ink); color: #fff; box-shadow: 4px 4px 0 var(--yellow); }
+.review-queue span, .review-queue small { font-size: .62rem; }
+.review-queue span { color: #8b7500; font-weight: 850; }
+.review-queue button.active span, .review-queue button.active small { color: #ddd; }
+.review-queue strong { font-size: .78rem; }
+.firefly-review-grid { display: grid; grid-template-columns: minmax(0, 900px) 330px; gap: clamp(26px, 4vw, 64px); max-width: 1480px; }
+.candidate-reader { min-width: 0; }
+.candidate-reader-head { display: flex; justify-content: space-between; align-items: flex-end; padding: 22px 0 15px; border-bottom: 1px solid var(--ink); }
+.candidate-reader-head h2 { margin: 4px 0; font-size: clamp(1.5rem, 3vw, 2.5rem); letter-spacing: -.045em; }
+.candidate-reader-head span { color: #777; font-size: .72rem; }
+.score-chip { min-width: 94px; display: grid; justify-items: end; padding: 10px 12px; background: var(--yellow); }
+.score-chip span { color: #6e5d00; font-size: .62rem; font-weight: 850; }
+.score-chip strong { font-size: 1.7rem; }
+.candidate-tabs { display: flex; gap: 6px; padding: 12px 0; overflow-x: auto; }
+.candidate-tabs button { display: flex; gap: 12px; padding: 9px 12px; border: 1px solid #aaa; background: #fff; font-size: .72rem; font-weight: 850; cursor: pointer; }
+.candidate-tabs button.active { border-color: var(--ink); background: var(--yellow); box-shadow: 3px 3px 0 var(--ink); }
+.candidate-tabs span { color: #777; }
+.recommendation { display: flex; align-items: flex-start; gap: 7px; margin: 8px 0; padding: 10px 12px; background: #edf8f1; color: #285e40; font-size: .69rem; line-height: 1.45; }
+.candidate-prose, .baseline-details article { padding: clamp(24px, 5vw, 58px); border: 1px solid #aaa; background: #fff; font-size: 1rem; line-height: 2; white-space: pre-wrap; word-break: keep-all; }
+.baseline-details { margin-top: 14px; }
+.baseline-details summary { padding: 13px 15px; border: 1px solid #aaa; background: #f2f1ec; font-size: .72rem; font-weight: 850; cursor: pointer; }
+.baseline-details article { border-top: 0; color: #666; }
+.decision-dock { min-width: 0; }
+.decision-dock form { position: sticky; top: 24px; padding: 18px; border: 1px solid var(--ink); background: #fff; box-shadow: 7px 7px 0 var(--yellow); }
+.decision-dock h2 { margin: 5px 0 16px; }
+.decision-options { display: grid; gap: 6px; }
+.decision-options label { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 8px; padding: 10px; border: 1px solid #ddd; cursor: pointer; }
+.decision-options label.selected { border-color: var(--ink); background: #f4f4f1; }
+.decision-options label.selected.approve { background: #edf8f1; }
+.decision-options label.selected.polish { background: #fff9dc; }
+.decision-options label.selected.hold, .decision-options label.selected.reject { background: #fff1ec; }
+.decision-dock .black-button { width: 100%; justify-content: center; margin-top: 12px; }
+.legacy-list { max-width: 1000px; margin-top: 42px; border-top: 1px solid var(--ink); }
+.legacy-list article { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding: 22px 4px; border-bottom: 1px solid #ccc; }
+.legacy-list h2 { margin: 5px 0 8px; font-size: 1.25rem; }
+.legacy-list p { margin: 0; color: #777; font-size: .75rem; }
+.legacy-list span, .legacy-list small, .legacy-list time { color: #8a8984; font-size: .65rem; }
+.legacy-list aside { display: grid; justify-items: end; gap: 5px; }
+.legacy-list aside strong { padding: 4px 7px; border: 1px solid #aaa; font-size: .65rem; }
+.legacy-empty { margin-top: 42px; color: #888; }
+
 .reader-main { min-width: 0; display: grid; grid-template-columns: 250px minmax(0, 800px); gap: clamp(34px, 6vw, 88px); justify-content: start; padding: 0 clamp(28px, 5vw, 78px) 100px 0; }
 .reader-toc { position: sticky; top: 0; overflow: hidden auto; height: 100vh; padding: 34px 18px 50px 24px; border-right: 1px solid var(--line); background: #fafafa; }
 .reader-toc-head { display: flex; align-items: center; justify-content: space-between; }
@@ -1134,7 +1186,17 @@ a { color: inherit; text-decoration: none; }
   .global-nav a, .project-nav a { width: 40px; }
   .back-home { margin: 0 auto 0 0; }
   .library-main, .page-wide, .page-narrow, .community-main, .public-work-main, .admin-main { padding: 30px 18px 55px; }
-  .canon-main { padding: 30px 18px 55px; }
+  .canon-main, .firefly-review-main, .legacy-main { padding: 30px 18px 55px; }
+  .review-queue-head { align-items: stretch; flex-direction: column; }
+  .review-authority { width: 100%; }
+  .review-queue { margin-left: -18px; margin-right: -18px; padding: 0 18px 6px; }
+  .firefly-review-grid { grid-template-columns: 1fr; }
+  .candidate-reader-head { align-items: flex-start; gap: 16px; }
+  .candidate-prose, .baseline-details article { padding: 26px 18px; font-size: .98rem; line-height: 2; }
+  .decision-dock { padding-top: 20px; border-top: 1px solid var(--ink); }
+  .decision-dock form { position: static; box-shadow: 5px 5px 0 var(--yellow); }
+  .legacy-list article { grid-template-columns: 1fr; }
+  .legacy-list aside { grid-template-columns: auto auto auto; justify-items: start; justify-content: start; }
   .canon-hero { align-items: flex-start; flex-direction: column; }
   .canon-lock { width: 100%; }
   .canon-tabs { margin: 0 -18px; padding: 10px 18px; }

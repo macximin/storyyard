@@ -37,6 +37,9 @@ export const projects = sqliteTable("projects", {
   coverKey: text("cover_key").notNull().default("overall-revision"),
   favorite: integer("favorite").notNull().default(0),
   contentRevision: text("content_revision").notNull().default(""),
+  lifecycle: text("lifecycle").notNull().default("active"),
+  sourceSystem: text("source_system").notNull().default("manual"),
+  archivedAt: text("archived_at"),
   updatedAt: text("updated_at").notNull(),
   createdAt: text("created_at").notNull(),
 }, (table) => [
@@ -218,4 +221,43 @@ export const canonDecisions = sqliteTable("canon_decisions", {
 }, (table) => [
   index("canon_decisions_work_created_idx").on(table.workSlug, table.createdAt),
   index("canon_decisions_pending_idx").on(table.status, table.workSlug),
+]);
+
+// InkOS remains canonical. Storyyard stores immutable review projections and
+// pending human decisions only; InkOS applies accepted decisions later.
+export const fireflyReviewSnapshots = sqliteTable("firefly_review_snapshots", {
+  packetId: text("packet_id").primaryKey(),
+  packetSha256: text("packet_sha256").notNull(),
+  schemaVersion: text("schema_version").notNull(),
+  bookId: text("book_id").notNull(),
+  artifactId: text("artifact_id").notNull(),
+  title: text("title").notNull(),
+  payload: text("payload").notNull(),
+  sourceRevision: text("source_revision").notNull(),
+  generatedAt: text("generated_at").notNull(),
+  importedAt: text("imported_at").notNull(),
+}, (table) => [
+  uniqueIndex("firefly_review_snapshots_sha_unique").on(table.packetSha256),
+  index("firefly_review_snapshots_book_generated_idx").on(table.bookId, table.generatedAt),
+]);
+
+export const fireflyReviewDecisions = sqliteTable("firefly_review_decisions", {
+  id: text("id").primaryKey(),
+  packetId: text("packet_id").notNull(),
+  packetSha256: text("packet_sha256").notNull(),
+  bookId: text("book_id").notNull(),
+  artifactId: text("artifact_id").notNull(),
+  candidateId: text("candidate_id").notNull().default(""),
+  candidateSha256: text("candidate_sha256").notNull().default(""),
+  decision: text("decision").notNull(),
+  comment: text("comment").notNull().default(""),
+  actorUserId: text("actor_user_id").notNull(),
+  actorEmail: text("actor_email").notNull(),
+  status: text("status").notNull().default("pending"),
+  createdAt: text("created_at").notNull(),
+  appliedAt: text("applied_at"),
+  applyReceiptPath: text("apply_receipt_path"),
+}, (table) => [
+  index("firefly_review_decisions_packet_created_idx").on(table.packetId, table.createdAt),
+  index("firefly_review_decisions_pending_idx").on(table.status, table.bookId),
 ]);

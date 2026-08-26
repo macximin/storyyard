@@ -18,7 +18,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const [block] = await getDb().select().from(plotBlocks).where(eq(plotBlocks.id, id));
   if (!block) return Response.json({ error: "Not found" }, { status: 404 });
   const [project] = await getDb().select().from(projects).where(eq(projects.id, block.projectId));
-  if (!project || project.ownerEmail !== user.email) return Response.json({ error: "Not found" }, { status: 404 });
+  if (!project || project.ownerEmail !== user.email || project.lifecycle !== "active") return Response.json({ error: "Not found" }, { status: 404 });
   if (isFoundryProjection(block.meta)) {
     return Response.json({ error: "Foundry 정본 투영은 Storyyard에서 직접 수정할 수 없음." }, { status: 409 });
   }
@@ -36,7 +36,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   const [block] = await getDb().select().from(plotBlocks).where(eq(plotBlocks.id, id));
   if (!block) return Response.json({ error: "Not found" }, { status: 404 });
   const [project] = await getDb().select().from(projects).where(eq(projects.id, block.projectId));
-  if (!project || project.ownerEmail !== user.email) {
+  if (!project || project.ownerEmail !== user.email || project.lifecycle !== "active") {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
   if (isFoundryProjection(block.meta)) {

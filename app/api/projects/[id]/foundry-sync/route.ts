@@ -7,7 +7,7 @@ import { plotBlocks, projectItems } from "@/db/schema";
 type JsonObject = Record<string, unknown>;
 type ProjectItemRow = typeof projectItems.$inferSelect;
 type PlotBlockRow = typeof plotBlocks.$inferSelect;
-type ProjectRow = { id: string; title: string; logline: string; genre: string };
+type ProjectRow = { id: string; title: string; logline: string; genre: string; lifecycle: string };
 type ManuscriptRow = {
   id: string; projectId: string; episodeNo: number; title: string; body: string;
   status: string; meta: string; createdAt: string; updatedAt: string;
@@ -81,11 +81,11 @@ async function loadAdminOwnerState(projectId: string) {
         LIMIT 1`,
     ).bind(tokenHash, now),
     env.DB.prepare(
-      `SELECT p.id, p.title, p.logline, p.genre
+      `SELECT p.id, p.title, p.logline, p.genre, p.lifecycle
          FROM projects p
          JOIN users u ON u.owner_key = p.owner_email
          JOIN sessions s ON s.user_id = u.id
-        WHERE p.id = ? AND s.token_hash = ? AND s.expires_at > ? AND u.role = 'admin'
+        WHERE p.id = ? AND p.lifecycle = 'active' AND s.token_hash = ? AND s.expires_at > ? AND u.role = 'admin'
         LIMIT 1`,
     ).bind(projectId, tokenHash, now),
     env.DB.prepare(

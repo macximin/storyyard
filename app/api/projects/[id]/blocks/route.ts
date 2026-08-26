@@ -6,7 +6,8 @@ import { plotBlocks, projects } from "@/db/schema";
 async function owns(projectId: string, email: string) {
   const [project] = await getDb().select({ id: projects.id }).from(projects)
     .where(eq(projects.id, projectId));
-  return Boolean(project && (await getDb().select({ ownerEmail: projects.ownerEmail }).from(projects).where(eq(projects.id, projectId)))[0]?.ownerEmail === email);
+  const [owner] = project ? await getDb().select({ ownerEmail: projects.ownerEmail, lifecycle: projects.lifecycle }).from(projects).where(eq(projects.id, projectId)) : [];
+  return Boolean(owner?.ownerEmail === email && owner.lifecycle === "active");
 }
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {

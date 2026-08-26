@@ -65,6 +65,40 @@ test("ships the public community and private studio navigation", async () => {
   await access(new URL("public/default-cover-card.webp", root));
 });
 
+test("routes Firefly review packets one way and archives legacy works without deletion", async () => {
+  const [schema, migration, sidebar, reviewPage, reviewBoard, decisionRoute, packet, studio, projectsRoute] = await Promise.all([
+    read("db/schema.ts"),
+    read("drizzle/0012_glorious_major_mapleleaf.sql"),
+    read("app/global-sidebar.tsx"),
+    read("app/review/page.tsx"),
+    read("app/review/review-board.tsx"),
+    read("app/api/firefly/review-decisions/route.ts"),
+    read("data/firefly/review-packets/current.json"),
+    read("app/studio/page.tsx"),
+    read("app/api/projects/route.ts"),
+  ]);
+  const parsed = JSON.parse(packet);
+  assert.equal(parsed.schemaVersion, "firefly_review_packet/v1");
+  assert.equal(parsed.authority.canon, "inkos");
+  assert.equal(parsed.authority.apply, "inkos");
+  assert.equal(parsed.authority.reverseSync, false);
+  assert.equal(parsed.candidates.length, 2);
+  assert.match(schema, /fireflyReviewSnapshots/);
+  assert.match(schema, /fireflyReviewDecisions/);
+  assert.match(migration, /SET `lifecycle` = 'legacy'/);
+  assert.match(migration, /UPDATE `publications` SET `status` = 'archived'/);
+  assert.doesNotMatch(migration, /DELETE FROM/);
+  assert.match(sidebar, /검토 대기/);
+  assert.match(sidebar, /이전 작품/);
+  assert.match(reviewPage, /user\.role !== "admin"/);
+  assert.match(reviewBoard, /정본은 InkOS/);
+  assert.match(reviewBoard, /재미와 도파민을 먼저/);
+  assert.match(decisionRoute, /status: "pending"/);
+  assert.match(decisionRoute, /후보 원고의 해시/);
+  assert.match(studio, /projects\.lifecycle, "active"/);
+  assert.match(projectsRoute, /projects\.lifecycle, "active"/);
+});
+
 test("uses seven persisted cover keys and refreshes published views without exposing drafts", async () => {
   const [schema, migration, projectRoute, publicationRoute, workspace, library, community, publicWork, events] = await Promise.all([
     read("db/schema.ts"),

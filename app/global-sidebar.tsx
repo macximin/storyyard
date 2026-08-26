@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Archive,
   BookOpen,
   BookmarkSimple,
+  ClipboardText,
   Eye,
   EyeSlash,
   GearSix,
@@ -30,7 +32,7 @@ export function GlobalSidebar({
   setupRequired = false,
 }: {
   user: SidebarUser;
-  active: "community" | "preferred" | "studio" | "studio-favorites" | "canon" | "admin";
+  active: "community" | "preferred" | "studio" | "studio-favorites" | "review" | "legacy" | "canon" | "admin";
   setupRequired?: boolean;
 }) {
   const router = useRouter();
@@ -172,10 +174,17 @@ export function GlobalSidebar({
         </Link>
         {user?.role === "admin" && (
           <>
-            <p>관리자</p>
-            <Link className={active === "canon" ? "active" : ""} href="/canon" aria-label="캐논 확인판">
-              <ShieldCheck size={18} /><span>캐논 확인판</span>
+            <p>Firefly</p>
+            <Link className={active === "review" ? "active" : ""} href="/review" aria-label="검토 대기">
+              <ClipboardText size={18} /><span>검토 대기</span>
             </Link>
+            <Link className={active === "legacy" ? "active" : ""} href="/legacy" aria-label="이전 작품">
+              <Archive size={18} /><span>이전 작품</span>
+            </Link>
+            <Link className={active === "canon" ? "active" : ""} href="/canon" aria-label="캐논 확인판">
+              <ShieldCheck size={18} /><span>구 Foundry 기록</span>
+            </Link>
+            <p>관리자</p>
             <Link className={active === "admin" ? "active" : ""} href="/admin" aria-label="운영 관리">
               <GearSix size={18} /><span>운영 관리</span>
             </Link>

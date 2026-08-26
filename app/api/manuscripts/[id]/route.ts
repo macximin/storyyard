@@ -16,7 +16,7 @@ async function owned(id: string, ownerKey: string) {
   const [manuscript] = await getDb().select().from(manuscripts).where(eq(manuscripts.id, id));
   if (!manuscript) return null;
   const [project] = await getDb().select().from(projects).where(eq(projects.id, manuscript.projectId));
-  return project?.ownerEmail === ownerKey ? manuscript : null;
+  return project?.ownerEmail === ownerKey && project.lifecycle === "active" ? manuscript : null;
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {

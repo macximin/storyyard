@@ -24,6 +24,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!project || project.ownerEmail !== user.email) {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
+  if (project.lifecycle !== "active") {
+    return Response.json({ error: "이전 체제 작품은 읽기 전용으로 보관 중임." }, { status: 409 });
+  }
   const input = (await request.json()) as Partial<{
     title: string;
     logline: string;
@@ -119,6 +122,9 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   const [project] = await getDb().select().from(projects).where(eq(projects.id, id));
   if (!project || project.ownerEmail !== user.email) {
     return Response.json({ error: "Not found" }, { status: 404 });
+  }
+  if (project.lifecycle !== "active") {
+    return Response.json({ error: "이전 체제 작품은 삭제할 수 없음." }, { status: 409 });
   }
 
   const publication = await env.DB.prepare("SELECT id FROM publications WHERE project_id = ?").bind(id).first<{ id: string }>();
