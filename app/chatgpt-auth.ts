@@ -178,7 +178,7 @@ export async function clearUserSession(): Promise<void> {
   });
 }
 
-export function runtimeSecret(name: "STORYYARD_SETUP_CODE" | "STORYYARD_LEGACY_OWNER_EMAIL" | "STORYYARD_COOKIE_SECURE"): string {
+export function runtimeSecret(name: "STORYYARD_SETUP_CODE" | "STORYYARD_LEGACY_OWNER_EMAIL" | "STORYYARD_COOKIE_SECURE" | "STORYYARD_APPLY_TOKEN"): string {
   const runtimeEnv = env as unknown as Record<string, string | undefined>;
   return runtimeEnv[name]?.trim() ?? "";
 }

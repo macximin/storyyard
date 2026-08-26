@@ -95,6 +95,10 @@ test("routes Firefly review packets one way and archives legacy works without de
   assert.match(reviewBoard, /재미와 도파민을 먼저/);
   assert.match(decisionRoute, /status: "pending"/);
   assert.match(decisionRoute, /후보 원고의 해시/);
+  assert.match(decisionRoute, /export async function PATCH/);
+  assert.match(decisionRoute, /STORYYARD_APPLY_TOKEN/);
+  assert.match(decisionRoute, /validateAppliedReceipt/);
+  assert.match(decisionRoute, /\.returning\(\)/);
   assert.match(studio, /projects\.lifecycle, "active"/);
   assert.match(projectsRoute, /projects\.lifecycle, "active"/);
 });

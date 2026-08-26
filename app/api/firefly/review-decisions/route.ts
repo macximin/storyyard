@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { getChatGPTUser, runtimeSecret } from "@/app/chatgpt-auth";
+import { validateAppliedReceipt } from "@/app/firefly-review-ack";
 import { ensureFireflyReviewSnapshot, toFireflyReviewDecisionContract } from "@/app/firefly-review-data";
 import { FireflyDecision, getFireflyReviewPacket } from "@/app/firefly-review-packets";
 import { getDb } from "@/db";
@@ -10,6 +11,22 @@ const allowed = new Set<FireflyDecision>(["approve", "polish", "hold", "reject"]
 async function requireAdmin() {
   const user = await getChatGPTUser();
   return user?.role === "admin" ? user : null;
+}
+
+function bearerToken(request: Request): string {
+  const value = request.headers.get("authorization") ?? "";
+  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
+}
+
+function hasApplyAuthority(request: Request): boolean {
+  const expected = runtimeSecret("STORYYARD_APPLY_TOKEN");
+  const actual = bearerToken(request);
+  if (!expected || !actual || expected.length !== actual.length) return false;
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= expected.charCodeAt(index) ^ actual.charCodeAt(index);
+  }
+  return mismatch === 0;
 }
 
 export async function GET(request: Request) {
@@ -67,4 +84,48 @@ export async function POST(request: Request) {
   };
   await getDb().insert(fireflyReviewDecisions).values(decision);
   return Response.json({ decision: toFireflyReviewDecisionContract(decision) }, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  if (!hasApplyAuthority(request)) {
+    return Response.json({ error: "InkOS 적용 확인 권한이 필요함." }, { status: 403 });
+  }
+  const input = await request.json().catch(() => null);
+  const decisionId = typeof input === "object" && input !== null && "decisionId" in input
+    ? String(input.decisionId)
+    : "";
+  const [stored] = await getDb().select().from(fireflyReviewDecisions)
+    .where(eq(fireflyReviewDecisions.id, decisionId)).limit(1);
+  if (!stored) return Response.json({ error: "원판정을 찾지 못했음." }, { status: 404 });
+  const validation = validateAppliedReceipt(stored, input);
+  if (!validation.ok) return Response.json({ error: validation.error }, { status: validation.status });
+  const { receipt } = validation;
+  if (stored.status === "applied") {
+    if (stored.appliedAt !== receipt.appliedAt || stored.applyReceiptPath !== receipt.applyReceiptPath) {
+      return Response.json({ error: "이미 다른 InkOS 영수증으로 적용 확인된 판정임." }, { status: 409 });
+    }
+    return Response.json({ decision: toFireflyReviewDecisionContract(stored) });
+  }
+  if (stored.status !== "pending") {
+    return Response.json({ error: "적용 확인할 수 없는 판정 상태임." }, { status: 409 });
+  }
+
+  const [applied] = await getDb().update(fireflyReviewDecisions).set({
+    status: "applied",
+    appliedAt: receipt.appliedAt,
+    applyReceiptPath: receipt.applyReceiptPath,
+  }).where(and(
+    eq(fireflyReviewDecisions.id, stored.id),
+    eq(fireflyReviewDecisions.status, "pending"),
+  )).returning();
+  if (applied) return Response.json({ decision: toFireflyReviewDecisionContract(applied) });
+
+  const [raced] = await getDb().select().from(fireflyReviewDecisions)
+    .where(eq(fireflyReviewDecisions.id, stored.id)).limit(1);
+  if (raced?.status === "applied"
+    && raced.appliedAt === receipt.appliedAt
+    && raced.applyReceiptPath === receipt.applyReceiptPath) {
+    return Response.json({ decision: toFireflyReviewDecisionContract(raced) });
+  }
+  return Response.json({ error: "적용 확인 중 다른 영수증이 먼저 기록됐음." }, { status: 409 });
 }

@@ -120,6 +120,23 @@ Decisions are recorded in `canon_decisions` with the exact bundle and artifact
 SHA-256. An external, separately authorized apply worker may later consume
 pending decisions; that worker is intentionally outside Storyyard.
 
+## Firefly InkOS review acknowledgement
+
+`/review` stores each administrator decision as `pending`. InkOS remains the
+only process allowed to apply that decision. After InkOS writes its
+`firefly_review_decision/v1` applied receipt, an authorized HQ worker can return
+the exact receipt to Storyyard:
+
+```text
+STORYYARD_APPLY_TOKEN=<runtime secret> npm run firefly:ack-review -- <InkOS applied receipt.json>
+```
+
+The callback fails closed unless the decision UUID, packet and candidate
+SHA-256, work, artifact, action, comment, timestamps, and canonical receipt path
+match the original Storyyard row. Replaying the same receipt is idempotent;
+conflicting receipts are rejected. The token is a production runtime secret and
+must not be committed or sent to the browser.
+
 ### Foundry arc and episode projection
 
 An administrator who owns a Storyyard project with the same title as a bundled
