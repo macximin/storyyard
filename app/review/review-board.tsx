@@ -9,20 +9,39 @@ type DecisionRow = { decisionId: string; candidateId: string; decision: string; 
 const labels: Record<FireflyDecision, string> = { approve: "이 후보 승인", polish: "폴리싱 요청", hold: "보류", reject: "반려" };
 const icons = { approve: Check, polish: MagicWand, hold: Pause, reject: X };
 
-export function FireflyReviewBoard({ user, packets, initialDecisions }: {
+export function FireflyReviewBoard({ user, packets, completedCount, initialDecisions }: {
   user: Exclude<SidebarUser, null>;
   packets: FireflyReviewPacket[];
+  completedCount: number;
   initialDecisions: Record<string, DecisionRow[]>;
 }) {
   const [packetIndex, setPacketIndex] = useState(0);
-  const packet = packets[packetIndex]!;
-  const [candidateId, setCandidateId] = useState(packet.candidates[0]?.id ?? "");
-  const candidate = packet.candidates.find((item) => item.id === candidateId) ?? packet.candidates[0]!;
+  const packet = packets[packetIndex] ?? null;
+  const [candidateId, setCandidateId] = useState(packets[0]?.candidates[0]?.id ?? "");
+  const candidate = packet?.candidates.find((item) => item.id === candidateId) ?? packet?.candidates[0] ?? null;
   const [decision, setDecision] = useState<FireflyDecision>("approve");
   const [comment, setComment] = useState("");
   const [histories, setHistories] = useState(initialDecisions);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+
+  if (!packet || !candidate) {
+    return <main className="library-shell firefly-review-shell">
+      <GlobalSidebar user={user} active="review" />
+      <section className="firefly-review-main">
+        <header className="review-queue-head">
+          <div><p className="kicker">FIREFLY HUMAN REVIEW</p><h1>오늘 검토</h1><p>재미와 도파민을 먼저 보고, 정합성은 치명적인 모순만 막습니다.</p></div>
+          <div className="review-authority"><LockKey size={18} /><strong>정본은 InkOS</strong><span>Storyyard는 판정만 기록</span></div>
+        </header>
+        <section className="review-empty-state">
+          <Check size={28} />
+          <h2>검토 대기 없음</h2>
+          <p>InkOS 적용 영수증까지 확인된 패킷은 활성 큐에서 자동 종료됩니다.</p>
+          {completedCount > 0 && <span>종료된 패킷 {completedCount}개</span>}
+        </section>
+      </section>
+    </main>;
+  }
 
   function selectPacket(index: number) {
     setPacketIndex(index);

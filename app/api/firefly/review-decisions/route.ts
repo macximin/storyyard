@@ -52,6 +52,16 @@ export async function POST(request: Request) {
   if (input?.packetSha256 !== packet.packetSha256) {
     return Response.json({ error: "화면의 패킷이 현재 InkOS 스냅샷과 다름. 새로 열어 확인해 줘." }, { status: 409 });
   }
+  const [terminalDecision] = await getDb().select({ id: fireflyReviewDecisions.id })
+    .from(fireflyReviewDecisions)
+    .where(and(
+      eq(fireflyReviewDecisions.packetId, packet.packetId),
+      eq(fireflyReviewDecisions.status, "applied"),
+    ))
+    .limit(1);
+  if (terminalDecision) {
+    return Response.json({ error: "InkOS 적용까지 끝난 검토 패킷임. 새 판정을 만들 수 없음." }, { status: 409 });
+  }
   if (!input.decision || !allowed.has(input.decision)) return Response.json({ error: "판정값이 올바르지 않음." }, { status: 400 });
   const candidate = packet.candidates.find((item) => item.id === input.candidateId);
   if (!candidate || candidate.sha256 !== input.candidateSha256) {

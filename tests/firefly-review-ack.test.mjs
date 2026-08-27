@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { validateAppliedReceipt } from "../app/firefly-review-ack.ts";
+import { hasAppliedFireflyDecision, partitionFireflyReviewPackets } from "../app/firefly-review-queue.ts";
 
 const stored = {
   id: "9a63d4c0-b828-4c2e-a545-e6b3a4d583bd",
@@ -48,4 +49,17 @@ test("rejects a changed hash, path, timestamp, or missing result", () => {
     { ...receipt, appliedAt: "2026-08-26T05:01:00.000Z" },
     withoutResult,
   ]) assert.equal(validateAppliedReceipt(stored, changed).ok, false);
+});
+
+test("removes a packet from the active queue after InkOS apply acknowledgement", () => {
+  const packets = [{ packetId: "pending" }, { packetId: "terminal" }];
+  const decisions = {
+    pending: [{ status: "pending" }],
+    terminal: [{ status: "pending" }, { status: "applied" }],
+  };
+  assert.equal(hasAppliedFireflyDecision(decisions.pending), false);
+  assert.equal(hasAppliedFireflyDecision(decisions.terminal), true);
+  const queue = partitionFireflyReviewPackets(packets, decisions);
+  assert.deepEqual(queue.active.map((packet) => packet.packetId), ["pending"]);
+  assert.deepEqual(queue.completed.map((packet) => packet.packetId), ["terminal"]);
 });

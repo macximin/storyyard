@@ -949,6 +949,10 @@ a { color: inherit; text-decoration: none; }
 .review-authority strong { font-size: .77rem; }
 .review-authority span { color: #6d5d06; font-size: .64rem; }
 .review-queue { display: flex; gap: 8px; max-width: 1480px; margin: 36px 0 22px; overflow-x: auto; }
+.review-empty-state { max-width: 720px; display: grid; justify-items: start; gap: 8px; margin-top: 42px; padding: clamp(26px, 5vw, 48px); border: 1px solid var(--ink); background: #fff; box-shadow: 7px 7px 0 var(--yellow); }
+.review-empty-state h2, .review-empty-state p { margin: 0; }
+.review-empty-state p { color: #6f6e69; line-height: 1.6; }
+.review-empty-state span { margin-top: 8px; padding: 5px 8px; background: #edf8f1; color: #285e40; font-size: .68rem; font-weight: 850; }
 .review-queue button { min-width: 220px; display: grid; gap: 4px; padding: 13px 15px; border: 1px solid #aaa; background: #fff; text-align: left; cursor: pointer; }
 .review-queue button.active { border-color: var(--ink); background: var(--ink); color: #fff; box-shadow: 4px 4px 0 var(--yellow); }
 .review-queue span, .review-queue small { font-size: .62rem; }
