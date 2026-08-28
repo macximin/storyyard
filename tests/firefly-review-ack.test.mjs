@@ -5,6 +5,7 @@ import { hasAppliedFireflyDecision, partitionFireflyReviewPackets } from "../app
 
 const stored = {
   id: "9a63d4c0-b828-4c2e-a545-e6b3a4d583bd",
+  schemaVersion: "firefly_review_decision/v1",
   packetId: "frp-53c23574a09caeef1122f213",
   packetSha256: "53c23574a09caeef1122f213ddee00f31f1891fd1897502895bb729acee06492",
   bookId: "처가에서-쫓겨난-날-재벌가가-나를-찾았다",
@@ -13,6 +14,7 @@ const stored = {
   candidateSha256: "cada98e7eaf128eaacb56ab08bb3da47ce1e6558e913eefabb1a3d04e38e36c7",
   decision: "hold",
   comment: "실운영 왕복 카나리",
+  surfaceClassifications: "[]",
   status: "pending",
   createdAt: "2026-08-26T05:02:51.610Z",
   appliedAt: null,
@@ -49,6 +51,29 @@ test("rejects a changed hash, path, timestamp, or missing result", () => {
     { ...receipt, appliedAt: "2026-08-26T05:01:00.000Z" },
     withoutResult,
   ]) assert.equal(validateAppliedReceipt(stored, changed).ok, false);
+});
+
+test("binds a v2 applied receipt to the exact human surface classifications", () => {
+  const classifications = [{
+    matchId: "fsm-1234567890abcdef12345678",
+    selectorSha256: "1".repeat(64),
+    classification: "source-surface",
+    classifiedByActorId: "owner-one",
+    classifiedByRole: "admin",
+    ownerScope: "owner-scope",
+    classifiedAt: stored.createdAt,
+  }];
+  const v2Stored = {
+    ...stored,
+    schemaVersion: "firefly_review_decision/v2",
+    surfaceClassifications: JSON.stringify(classifications),
+  };
+  const v2Receipt = { ...receipt, schemaVersion: "firefly_review_decision/v2", surfaceClassifications: classifications };
+  assert.equal(validateAppliedReceipt(v2Stored, v2Receipt).ok, true);
+  assert.equal(validateAppliedReceipt(v2Stored, {
+    ...v2Receipt,
+    surfaceClassifications: [{ ...classifications[0], classification: "engine" }],
+  }).ok, false);
 });
 
 test("removes a packet from the active queue after InkOS apply acknowledgement", () => {

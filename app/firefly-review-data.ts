@@ -26,8 +26,11 @@ export async function listFireflyReviewDecisions(packetId: string) {
 
 export type FireflyReviewDecisionRecord = typeof fireflyReviewDecisions.$inferSelect;
 export function toFireflyReviewDecisionContract(row: FireflyReviewDecisionRecord) {
+  const schemaVersion = row.schemaVersion === "firefly_review_decision/v2"
+    ? "firefly_review_decision/v2" as const
+    : "firefly_review_decision/v1" as const;
   return {
-    schemaVersion: "firefly_review_decision/v1" as const,
+    schemaVersion,
     decisionId: row.id,
     packetId: row.packetId,
     packetSha256: row.packetSha256,
@@ -37,9 +40,21 @@ export function toFireflyReviewDecisionContract(row: FireflyReviewDecisionRecord
     candidateSha256: row.candidateSha256,
     decision: row.decision,
     comment: row.comment,
+    ...(schemaVersion === "firefly_review_decision/v2"
+      ? { surfaceClassifications: parseSurfaceClassifications(row.surfaceClassifications) }
+      : {}),
     status: row.status,
     createdAt: row.createdAt,
     appliedAt: row.appliedAt,
     applyReceiptPath: row.applyReceiptPath,
   };
+}
+
+function parseSurfaceClassifications(value: string): unknown[] {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }

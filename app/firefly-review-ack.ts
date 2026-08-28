@@ -1,5 +1,6 @@
 export type StoredReviewDecision = {
   id: string;
+  schemaVersion: string;
   packetId: string;
   packetSha256: string;
   bookId: string;
@@ -8,6 +9,7 @@ export type StoredReviewDecision = {
   candidateSha256: string;
   decision: string;
   comment: string;
+  surfaceClassifications: string;
   status: string;
   createdAt: string;
   appliedAt: string | null;
@@ -15,7 +17,7 @@ export type StoredReviewDecision = {
 };
 
 export type ValidAppliedReceipt = {
-  schemaVersion: "firefly_review_decision/v1";
+  schemaVersion: "firefly_review_decision/v1" | "firefly_review_decision/v2";
   decisionId: string;
   packetId: string;
   packetSha256: string;
@@ -25,6 +27,7 @@ export type ValidAppliedReceipt = {
   candidateSha256: string;
   decision: string;
   comment: string;
+  surfaceClassifications?: unknown[];
   status: "applied";
   createdAt: string;
   appliedAt: string;
@@ -50,7 +53,7 @@ export function expectedReceiptPath(workId: string, decisionId: string): string 
 
 export function validateAppliedReceipt(stored: StoredReviewDecision, value: unknown): ReceiptValidation {
   if (!isRecord(value)
-    || value.schemaVersion !== "firefly_review_decision/v1"
+    || (value.schemaVersion !== "firefly_review_decision/v1" && value.schemaVersion !== "firefly_review_decision/v2")
     || value.status !== "applied"
     || !("result" in value)) {
     return { ok: false, status: 400, error: "InkOS 적용 영수증 형식이 올바르지 않음." };
@@ -59,6 +62,7 @@ export function validateAppliedReceipt(stored: StoredReviewDecision, value: unkn
     return { ok: false, status: 400, error: "InkOS 적용 시각이 올바르지 않음." };
   }
   const exactIdentity = stored.packetId === value.packetId
+    && stored.schemaVersion === value.schemaVersion
     && stored.packetSha256 === value.packetSha256
     && stored.bookId === value.workId
     && stored.artifactId === value.artifactId
@@ -67,8 +71,21 @@ export function validateAppliedReceipt(stored: StoredReviewDecision, value: unkn
     && stored.decision === value.decision
     && stored.comment === value.comment
     && stored.createdAt === value.createdAt;
+  let exactSurfaceClassifications = false;
+  if (stored.schemaVersion === "firefly_review_decision/v1") {
+    exactSurfaceClassifications = !("surfaceClassifications" in value);
+  } else {
+    try {
+      const storedClassifications = JSON.parse(stored.surfaceClassifications);
+      exactSurfaceClassifications = Array.isArray(storedClassifications)
+        && Array.isArray(value.surfaceClassifications)
+        && JSON.stringify(storedClassifications) === JSON.stringify(value.surfaceClassifications);
+    } catch {
+      exactSurfaceClassifications = false;
+    }
+  }
   const exactPath = value.applyReceiptPath === expectedReceiptPath(stored.bookId, stored.id);
-  if (!exactIdentity || !exactPath) {
+  if (!exactIdentity || !exactSurfaceClassifications || !exactPath) {
     return { ok: false, status: 409, error: "InkOS 영수증이 Storyyard 원판정과 정확히 일치하지 않음." };
   }
   if (Date.parse(value.appliedAt) < Date.parse(stored.createdAt)) {

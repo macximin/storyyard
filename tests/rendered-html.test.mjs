@@ -66,13 +66,15 @@ test("ships the public community and private studio navigation", async () => {
 });
 
 test("routes Firefly review packets one way and archives legacy works without deletion", async () => {
-  const [schema, migration, sidebar, reviewPage, reviewBoard, decisionRoute, packet, studio, projectsRoute] = await Promise.all([
+  const [schema, migration, v2Migration, sidebar, reviewPage, reviewBoard, decisionRoute, sliceRoute, packet, studio, projectsRoute] = await Promise.all([
     read("db/schema.ts"),
     read("drizzle/0012_glorious_major_mapleleaf.sql"),
+    read("drizzle/0013_secret_the_spike.sql"),
     read("app/global-sidebar.tsx"),
     read("app/review/page.tsx"),
     read("app/review/review-board.tsx"),
     read("app/api/firefly/review-decisions/route.ts"),
+    read("app/api/firefly/source-slices/route.ts"),
     read("data/firefly/review-packets/current.json"),
     read("app/studio/page.tsx"),
     read("app/api/projects/route.ts"),
@@ -85,6 +87,8 @@ test("routes Firefly review packets one way and archives legacy works without de
   assert.equal(parsed.candidates.length, 2);
   assert.match(schema, /fireflyReviewSnapshots/);
   assert.match(schema, /fireflyReviewDecisions/);
+  assert.match(schema, /surfaceClassifications/);
+  assert.match(v2Migration, /surface_classifications/);
   assert.match(migration, /SET `lifecycle` = 'legacy'/);
   assert.match(migration, /UPDATE `publications` SET `status` = 'archived'/);
   assert.doesNotMatch(migration, /DELETE FROM/);
@@ -93,12 +97,19 @@ test("routes Firefly review packets one way and archives legacy works without de
   assert.match(reviewPage, /user\.role !== "admin"/);
   assert.match(reviewBoard, /정본은 InkOS/);
   assert.match(reviewBoard, /재미와 도파민을 먼저/);
+  assert.match(reviewBoard, /독립 blind pair/);
+  assert.match(reviewBoard, /표면 비교/);
   assert.match(decisionRoute, /status: "pending"/);
   assert.match(decisionRoute, /후보 원고의 해시/);
   assert.match(decisionRoute, /export async function PATCH/);
   assert.match(decisionRoute, /STORYYARD_APPLY_TOKEN/);
   assert.match(decisionRoute, /validateAppliedReceipt/);
+  assert.match(decisionRoute, /모든 표면 일치를 사람이 분류/);
+  assert.match(decisionRoute, /캐논 유입으로 분류된 후보는 승인할 수 없음/);
   assert.match(decisionRoute, /\.returning\(\)/);
+  assert.match(sliceRoute, /STORYYARD_SOURCE_GRANT_PRIVATE_JWK/);
+  assert.match(sliceRoute, /private, no-store/);
+  assert.match(sliceRoute, /packetId.*packetSha256.*matchId/);
   assert.match(studio, /projects\.lifecycle, "active"/);
   assert.match(projectsRoute, /projects\.lifecycle, "active"/);
 });

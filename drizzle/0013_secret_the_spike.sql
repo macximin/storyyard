@@ -1,0 +1,2 @@
+ALTER TABLE `firefly_review_decisions` ADD `schema_version` text DEFAULT 'firefly_review_decision/v1' NOT NULL;--> statement-breakpoint
+ALTER TABLE `firefly_review_decisions` ADD `surface_classifications` text DEFAULT '[]' NOT NULL;

@@ -178,7 +178,15 @@ export async function clearUserSession(): Promise<void> {
   });
 }
 
-export function runtimeSecret(name: "STORYYARD_SETUP_CODE" | "STORYYARD_LEGACY_OWNER_EMAIL" | "STORYYARD_COOKIE_SECURE" | "STORYYARD_APPLY_TOKEN"): string {
+export function runtimeSecret(name:
+  | "STORYYARD_SETUP_CODE"
+  | "STORYYARD_LEGACY_OWNER_EMAIL"
+  | "STORYYARD_COOKIE_SECURE"
+  | "STORYYARD_APPLY_TOKEN"
+  | "STORYYARD_SOURCE_GATEWAY_URL"
+  | "STORYYARD_SOURCE_GRANT_PRIVATE_JWK"
+  | "STORYYARD_SOURCE_GRANT_KEY_ID"
+): string {
   const runtimeEnv = env as unknown as Record<string, string | undefined>;
   return runtimeEnv[name]?.trim() ?? "";
 }

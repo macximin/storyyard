@@ -972,7 +972,42 @@ a { color: inherit; text-decoration: none; }
 .candidate-tabs button.active { border-color: var(--ink); background: var(--yellow); box-shadow: 3px 3px 0 var(--ink); }
 .candidate-tabs span { color: #777; }
 .recommendation { display: flex; align-items: flex-start; gap: 7px; margin: 8px 0; padding: 10px 12px; background: #edf8f1; color: #285e40; font-size: .69rem; line-height: 1.45; }
+.blind-comparison-banner { margin: 8px 0 14px; padding: 14px; border: 1px solid var(--ink); background: #f7f6f1; }
+.blind-comparison-banner > div { display: flex; align-items: center; gap: 7px; }
+.blind-comparison-banner p { margin: 7px 0 12px; color: #666; font-size: .7rem; line-height: 1.55; }
+.blind-comparison-banner dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0; }
+.blind-comparison-banner dl > div { min-width: 0; padding: 8px; background: #fff; }
+.blind-comparison-banner dt { color: #999; font-size: .55rem; font-weight: 850; text-transform: uppercase; }
+.blind-comparison-banner dd { overflow: hidden; margin: 3px 0 0; font-size: .65rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.commercial-dimensions { margin: 14px 0; padding: 15px; border: 1px solid #aaa; background: #fff; }
+.commercial-dimensions > header, .surface-review > header { display: flex; align-items: flex-end; justify-content: space-between; gap: 15px; }
+.commercial-dimensions h3, .surface-review h3 { margin: 3px 0 0; font-size: 1.05rem; }
+.commercial-dimensions > header > strong { font-size: 1.7rem; }
+.commercial-dimensions > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-top: 13px; background: #ddd; }
+.commercial-dimensions dl { margin: 0; padding: 9px; background: #fafafa; }
+.commercial-dimensions dt { color: #777; font-size: .58rem; }
+.commercial-dimensions dd { margin: 3px 0 0; font-size: .84rem; font-weight: 900; }
+.commercial-dimensions > p { margin: 12px 0 0; padding: 8px; font-size: .66rem; font-weight: 800; }
+.neutrality-pass { background: #edf8f1; color: #285e40; }
+.neutrality-alert { background: #fff1ec; color: #8b2f21; }
 .candidate-prose, .baseline-details article { padding: clamp(24px, 5vw, 58px); border: 1px solid #aaa; background: #fff; font-size: 1rem; line-height: 2; white-space: pre-wrap; word-break: keep-all; }
+.surface-review { margin-top: 14px; padding: clamp(15px, 3vw, 24px); border: 1px solid var(--ink); background: #f7f6f1; }
+.surface-review > header > span { padding: 5px 8px; background: var(--yellow); font-size: .66rem; font-weight: 900; }
+.surface-empty { margin: 14px 0 0; color: #52705d; font-size: .7rem; }
+.surface-match-card { margin-top: 12px; padding: 13px; border: 1px solid #bbb; background: #fff; }
+.surface-match-card > header { display: flex; justify-content: space-between; gap: 12px; }
+.surface-match-card > header strong { font-size: .7rem; }
+.surface-match-card code { color: #999; font-size: .58rem; }
+.surface-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 11px 0; }
+.surface-pair > div { min-width: 0; padding: 9px; background: #f5f4ef; }
+.surface-pair span, .surface-match-card > label > span { display: block; margin-bottom: 6px; color: #777; font-size: .58rem; font-weight: 850; }
+.surface-pair blockquote { max-height: 170px; overflow: auto; margin: 0; font-family: Georgia, "Noto Serif KR", serif; font-size: .72rem; line-height: 1.7; white-space: pre-wrap; }
+.surface-pair button { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; padding: 6px 8px; border: 1px solid #999; background: #fff; font-size: .62rem; cursor: pointer; }
+.surface-pair p { margin: 7px 0 0; color: #9b3d30; font-size: .64rem; }
+.surface-match-card > label { display: block; }
+.surface-match-card select { width: 100%; padding: 8px; border: 1px solid #999; background: #fff; font-size: .7rem; }
+.surface-match-card > small { display: block; margin-top: 7px; color: #999; font-size: .57rem; line-height: 1.45; }
+.classification-required { margin: 10px 0 0; padding: 8px; background: #fff7cc; color: #665600; font-size: .66rem; }
 .baseline-details { margin-top: 14px; }
 .baseline-details summary { padding: 13px 15px; border: 1px solid #aaa; background: #f2f1ec; font-size: .72rem; font-weight: 850; cursor: pointer; }
 .baseline-details article { border-top: 0; color: #666; }
@@ -1196,6 +1231,8 @@ a { color: inherit; text-decoration: none; }
   .review-queue { margin-left: -18px; margin-right: -18px; padding: 0 18px 6px; }
   .firefly-review-grid { grid-template-columns: 1fr; }
   .candidate-reader-head { align-items: flex-start; gap: 16px; }
+  .blind-comparison-banner dl, .commercial-dimensions > div { grid-template-columns: 1fr 1fr; }
+  .surface-pair { grid-template-columns: 1fr; }
   .candidate-prose, .baseline-details article { padding: 26px 18px; font-size: .98rem; line-height: 2; }
   .decision-dock { padding-top: 20px; border-top: 1px solid var(--ink); }
   .decision-dock form { position: static; box-shadow: 5px 5px 0 var(--yellow); }

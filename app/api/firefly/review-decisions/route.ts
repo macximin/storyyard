@@ -2,11 +2,13 @@ import { and, desc, eq } from "drizzle-orm";
 import { getChatGPTUser, runtimeSecret } from "@/app/chatgpt-auth";
 import { validateAppliedReceipt } from "@/app/firefly-review-ack";
 import { ensureFireflyReviewSnapshot, toFireflyReviewDecisionContract } from "@/app/firefly-review-data";
-import { FireflyDecision, getFireflyReviewPacket } from "@/app/firefly-review-packets";
+import { allSurfaceMatches } from "@/app/firefly-review-contract";
+import { FireflyDecision, getFireflyReviewPacket, SurfaceClassification } from "@/app/firefly-review-packets";
 import { getDb } from "@/db";
 import { fireflyReviewDecisions } from "@/db/schema";
 
 const allowed = new Set<FireflyDecision>(["approve", "polish", "hold", "reject"]);
+const allowedSurfaceClassifications = new Set<SurfaceClassification>(["engine", "genre-convention", "source-surface", "canon-leak"]);
 
 async function requireAdmin() {
   const user = await getChatGPTUser();
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
   const input = await request.json().catch(() => null) as Partial<{
     packetId: string; packetSha256: string; candidateId: string;
     candidateSha256: string; decision: FireflyDecision; comment: string;
+    surfaceClassifications: Array<{ matchId: string; selectorSha256: string; classification: SurfaceClassification }>;
   }> | null;
   const packet = getFireflyReviewPacket(input?.packetId?.trim() ?? "");
   if (!packet) return Response.json({ error: "등록되지 않은 검토 패킷임." }, { status: 404 });
@@ -73,23 +76,71 @@ export async function POST(request: Request) {
     return Response.json({ error: "폴리싱·보류·반려에는 작업 지시나 근거가 필요함." }, { status: 400 });
   }
 
+  const classifiedAt = new Date().toISOString();
+  let surfaceClassifications: Array<{
+    matchId: string; selectorSha256: string; classification: SurfaceClassification;
+    classifiedByActorId: string; classifiedByRole: "admin"; ownerScope: string; classifiedAt: string;
+  }> = [];
+  if (packet.schemaVersion === "firefly_review_packet/v2") {
+    const expectedMatches = allSurfaceMatches(packet);
+    const supplied = input.surfaceClassifications;
+    if (!Array.isArray(supplied) || supplied.length !== expectedMatches.length) {
+      return Response.json({ error: "v2 판정 전 모든 표면 일치를 사람이 분류해야 함." }, { status: 400 });
+    }
+    const suppliedById = new Map<string, typeof supplied[number]>();
+    for (const item of supplied) {
+      if (!item || typeof item.matchId !== "string" || suppliedById.has(item.matchId)
+        || typeof item.selectorSha256 !== "string" || !allowedSurfaceClassifications.has(item.classification)) {
+        return Response.json({ error: "표면 일치 분류값이 올바르지 않음." }, { status: 400 });
+      }
+      suppliedById.set(item.matchId, item);
+    }
+    if (expectedMatches.some((match) => suppliedById.get(match.matchId)?.selectorSha256 !== match.selectorSha256)) {
+      return Response.json({ error: "표면 일치 selector가 현재 패킷과 다름." }, { status: 409 });
+    }
+    surfaceClassifications = expectedMatches.map((match) => {
+      const item = suppliedById.get(match.matchId);
+      if (!item) throw new Error("validated surface classification disappeared");
+      return {
+        matchId: match.matchId,
+        selectorSha256: match.selectorSha256,
+        classification: item.classification,
+        classifiedByActorId: user.id,
+        classifiedByRole: "admin" as const,
+        ownerScope: user.email,
+        classifiedAt,
+      };
+    });
+    if (input.decision === "approve" && surfaceClassifications.some((item) => item.classification === "canon-leak")) {
+      return Response.json({ error: "캐논 유입으로 분류된 후보는 승인할 수 없음. 폴리싱·보류·반려를 선택해 줘." }, { status: 400 });
+    }
+  } else if (input.surfaceClassifications !== undefined) {
+    return Response.json({ error: "v1 패킷에는 v2 표면 분류를 기록할 수 없음." }, { status: 400 });
+  }
+  const surfaceClassificationsJson = JSON.stringify(surfaceClassifications);
+
   await ensureFireflyReviewSnapshot(packet);
   const [duplicate] = await getDb().select().from(fireflyReviewDecisions).where(and(
     eq(fireflyReviewDecisions.actorUserId, user.id),
+    eq(fireflyReviewDecisions.schemaVersion, packet.schemaVersion === "firefly_review_packet/v2" ? "firefly_review_decision/v2" : "firefly_review_decision/v1"),
     eq(fireflyReviewDecisions.packetId, packet.packetId),
     eq(fireflyReviewDecisions.candidateId, candidate.id),
     eq(fireflyReviewDecisions.decision, input.decision),
     eq(fireflyReviewDecisions.comment, comment),
+    eq(fireflyReviewDecisions.surfaceClassifications, surfaceClassificationsJson),
     eq(fireflyReviewDecisions.status, "pending"),
   )).orderBy(desc(fireflyReviewDecisions.createdAt)).limit(1);
   if (duplicate && duplicate.createdAt >= new Date(Date.now() - 10_000).toISOString()) {
     return Response.json({ decision: toFireflyReviewDecisionContract(duplicate) });
   }
   const decision = {
-    id: crypto.randomUUID(), packetId: packet.packetId, packetSha256: packet.packetSha256,
+    id: crypto.randomUUID(),
+    schemaVersion: packet.schemaVersion === "firefly_review_packet/v2" ? "firefly_review_decision/v2" : "firefly_review_decision/v1",
+    packetId: packet.packetId, packetSha256: packet.packetSha256,
     bookId: packet.source.bookId, artifactId: packet.artifact.id,
     candidateId: candidate.id, candidateSha256: candidate.sha256,
-    decision: input.decision, comment, actorUserId: user.id, actorEmail: user.email,
+    decision: input.decision, comment, surfaceClassifications: surfaceClassificationsJson,
+    actorUserId: user.id, actorEmail: user.email,
     status: "pending", createdAt: new Date().toISOString(), appliedAt: null, applyReceiptPath: null,
   };
   await getDb().insert(fireflyReviewDecisions).values(decision);

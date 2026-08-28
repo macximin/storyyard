@@ -243,6 +243,7 @@ export const fireflyReviewSnapshots = sqliteTable("firefly_review_snapshots", {
 
 export const fireflyReviewDecisions = sqliteTable("firefly_review_decisions", {
   id: text("id").primaryKey(),
+  schemaVersion: text("schema_version").notNull().default("firefly_review_decision/v1"),
   packetId: text("packet_id").notNull(),
   packetSha256: text("packet_sha256").notNull(),
   bookId: text("book_id").notNull(),
@@ -251,6 +252,7 @@ export const fireflyReviewDecisions = sqliteTable("firefly_review_decisions", {
   candidateSha256: text("candidate_sha256").notNull().default(""),
   decision: text("decision").notNull(),
   comment: text("comment").notNull().default(""),
+  surfaceClassifications: text("surface_classifications").notNull().default("[]"),
   actorUserId: text("actor_user_id").notNull(),
   actorEmail: text("actor_email").notNull(),
   status: text("status").notNull().default("pending"),
