@@ -137,6 +137,34 @@ match the original Storyyard row. Replaying the same receipt is idempotent;
 conflicting receipts are rejected. The token is a production runtime secret and
 must not be committed or sent to the browser.
 
+### Blind-pair batch projection and decision readback
+
+The legacy `data/firefly/review-packets/current.json` projection remains active.
+An operator can additionally import several immutable v2 packets in one batch:
+
+```text
+npm run firefly:import-review-v2-batch -- <packet-v2-a.json> <packet-v2-b.json> [...]
+```
+
+The command validates every packet, refuses v1 values and duplicate packet IDs
+or hashes, writes content-addressed copies under
+`data/firefly/review-packets/immutable/`, and atomically regenerates the strict
+`data/firefly/review-packets/index.json`. The review page loads the indexed v2
+packets first and then the legacy current packet, deduplicating only an exact
+packet identity.
+
+An authorized HQ sync process may read decisions for one exact active packet
+without an administrator browser cookie:
+
+```text
+GET /api/firefly/review-decisions?packet_id=<frp-id>
+Authorization: Bearer <STORYYARD_REVIEW_SYNC_TOKEN>
+```
+
+`STORYYARD_REVIEW_SYNC_TOKEN` is read-only. It does not authorize decision
+creation or applied-receipt acknowledgement. `STORYYARD_APPLY_TOKEN` remains
+PATCH-only; configuring both variables to the same value fails closed.
+
 ### Foundry arc and episode projection
 
 An administrator who owns a Storyyard project with the same title as a bundled

@@ -4,6 +4,7 @@ import { validateAppliedReceipt } from "@/app/firefly-review-ack";
 import { ensureFireflyReviewSnapshot, toFireflyReviewDecisionContract } from "@/app/firefly-review-data";
 import { allSurfaceMatches } from "@/app/firefly-review-contract";
 import { FireflyDecision, getFireflyReviewPacket, SurfaceClassification } from "@/app/firefly-review-packets";
+import { hasDistinctBearerAuthority } from "@/app/firefly-review-service-auth";
 import { getDb } from "@/db";
 import { fireflyReviewDecisions } from "@/db/schema";
 
@@ -15,31 +16,37 @@ async function requireAdmin() {
   return user?.role === "admin" ? user : null;
 }
 
-function bearerToken(request: Request): string {
-  const value = request.headers.get("authorization") ?? "";
-  return value.startsWith("Bearer ") ? value.slice(7).trim() : "";
+function hasApplyAuthority(request: Request): boolean {
+  return hasDistinctBearerAuthority(
+    request,
+    runtimeSecret("STORYYARD_APPLY_TOKEN"),
+    runtimeSecret("STORYYARD_REVIEW_SYNC_TOKEN"),
+  );
 }
 
-function hasApplyAuthority(request: Request): boolean {
-  const expected = runtimeSecret("STORYYARD_APPLY_TOKEN");
-  const actual = bearerToken(request);
-  if (!expected || !actual || expected.length !== actual.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < expected.length; index += 1) {
-    mismatch |= expected.charCodeAt(index) ^ actual.charCodeAt(index);
-  }
-  return mismatch === 0;
+function hasReviewSyncAuthority(request: Request): boolean {
+  return hasDistinctBearerAuthority(
+    request,
+    runtimeSecret("STORYYARD_REVIEW_SYNC_TOKEN"),
+    runtimeSecret("STORYYARD_APPLY_TOKEN"),
+  );
 }
 
 export async function GET(request: Request) {
-  const user = await requireAdmin();
-  if (!user) return Response.json({ error: "관리자 권한이 필요함." }, { status: 403 });
+  if (!hasReviewSyncAuthority(request)) {
+    const user = await requireAdmin();
+    if (!user) return Response.json({ error: "관리자 또는 검토 동기화 읽기 권한이 필요함." }, { status: 403 });
+  }
   const packetId = new URL(request.url).searchParams.get("packet_id")?.trim() ?? "";
+  if (!packetId) return Response.json({ error: "packet_id가 필요함." }, { status: 400 });
   if (!getFireflyReviewPacket(packetId)) return Response.json({ error: "등록되지 않은 검토 패킷임." }, { status: 404 });
   const decisions = await getDb().select().from(fireflyReviewDecisions)
     .where(eq(fireflyReviewDecisions.packetId, packetId))
     .orderBy(desc(fireflyReviewDecisions.createdAt));
-  return Response.json({ decisions: decisions.map(toFireflyReviewDecisionContract) });
+  return Response.json(
+    { decisions: decisions.map(toFireflyReviewDecisionContract) },
+    { headers: { "cache-control": "private, no-store" } },
+  );
 }
 
 export async function POST(request: Request) {

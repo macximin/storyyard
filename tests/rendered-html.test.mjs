@@ -66,7 +66,7 @@ test("ships the public community and private studio navigation", async () => {
 });
 
 test("routes Firefly review packets one way and archives legacy works without deletion", async () => {
-  const [schema, migration, v2Migration, sidebar, reviewPage, reviewBoard, decisionRoute, sliceRoute, packet, studio, projectsRoute] = await Promise.all([
+  const [schema, migration, v2Migration, sidebar, reviewPage, reviewBoard, decisionRoute, sliceRoute, packet, packetIndex, studio, projectsRoute] = await Promise.all([
     read("db/schema.ts"),
     read("drizzle/0012_glorious_major_mapleleaf.sql"),
     read("drizzle/0013_secret_the_spike.sql"),
@@ -76,6 +76,7 @@ test("routes Firefly review packets one way and archives legacy works without de
     read("app/api/firefly/review-decisions/route.ts"),
     read("app/api/firefly/source-slices/route.ts"),
     read("data/firefly/review-packets/current.json"),
+    read("data/firefly/review-packets/index.json"),
     read("app/studio/page.tsx"),
     read("app/api/projects/route.ts"),
   ]);
@@ -85,6 +86,7 @@ test("routes Firefly review packets one way and archives legacy works without de
   assert.equal(parsed.authority.apply, "inkos");
   assert.equal(parsed.authority.reverseSync, false);
   assert.equal(parsed.candidates.length, 2);
+  assert.equal(JSON.parse(packetIndex).schemaVersion, "firefly_review_packet_static_index/v1");
   assert.match(schema, /fireflyReviewSnapshots/);
   assert.match(schema, /fireflyReviewDecisions/);
   assert.match(schema, /surfaceClassifications/);
@@ -103,6 +105,8 @@ test("routes Firefly review packets one way and archives legacy works without de
   assert.match(decisionRoute, /후보 원고의 해시/);
   assert.match(decisionRoute, /export async function PATCH/);
   assert.match(decisionRoute, /STORYYARD_APPLY_TOKEN/);
+  assert.match(decisionRoute, /STORYYARD_REVIEW_SYNC_TOKEN/);
+  assert.match(decisionRoute, /hasReviewSyncAuthority/);
   assert.match(decisionRoute, /validateAppliedReceipt/);
   assert.match(decisionRoute, /모든 표면 일치를 사람이 분류/);
   assert.match(decisionRoute, /캐논 유입으로 분류된 후보는 승인할 수 없음/);

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { ArrowRight, Check, Clock, Eye, LockKey, MagicWand, Pause, ShieldCheck, X } from "@phosphor-icons/react";
 import { GlobalSidebar, SidebarUser } from "@/app/global-sidebar";
+import { fireflyReviewQueueMetadata } from "@/app/firefly-review-display.mjs";
 import type { FireflyDecision, FireflyReviewPacket, FireflySurfaceMatch, SurfaceClassification } from "@/app/firefly-review-packets";
 
 type DecisionRow = { decisionId: string; candidateId: string; decision: string; comment: string; status: string; createdAt: string };
@@ -131,7 +132,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
       </header>
       <nav className="review-queue" aria-label="검토 패킷">
         {packets.map((item, index) => <button key={item.packetId} className={index === packetIndex ? "active" : ""} onClick={() => selectPacket(index)}>
-          <span>{item.work.title}</span><strong>{item.artifact.chapterNumber}화 · {item.artifact.title}</strong><small>{item.schemaVersion.endsWith("/v2") ? "blind pair" : `${item.candidates.length}개 후보`}</small>
+          <span>{item.work.title}</span><strong>{item.artifact.chapterNumber}화 · {item.artifact.title}</strong><small>{fireflyReviewQueueMetadata(item)}</small>
         </button>)}
       </nav>
       <div className="firefly-review-grid">
