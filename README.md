@@ -148,10 +148,18 @@ npm run firefly:import-review-v2-batch -- <packet-v2-a.json> <packet-v2-b.json> 
 
 The command validates every packet, refuses v1 values and duplicate packet IDs
 or hashes, writes content-addressed copies under
-`data/firefly/review-packets/immutable/`, and atomically regenerates the strict
+`data/firefly/review-packets/immutable/`, preserves packets already present in a
+validated index, and atomically regenerates and reads back the strict
 `data/firefly/review-packets/index.json`. The review page loads the indexed v2
 packets first and then the legacy current packet, deduplicating only an exact
 packet identity.
+
+Review packet v2 is an evaluation-only blind pair. It exposes only shuffled
+candidate labels, never a lane, internal path, or label-to-lane map. An
+administrator must explicitly select a candidate, declare a tie, or invalidate
+the pair. Every v2 decision remains advisory (`manuscriptApply: false`): InkOS
+may acknowledge receipt, but neither Storyyard nor that acknowledgement applies
+the selected text to a manuscript or canon.
 
 An authorized HQ sync process may read decisions for one exact active packet
 without an administrator browser cookie:
@@ -162,8 +170,10 @@ Authorization: Bearer <STORYYARD_REVIEW_SYNC_TOKEN>
 ```
 
 `STORYYARD_REVIEW_SYNC_TOKEN` is read-only. It does not authorize decision
-creation or applied-receipt acknowledgement. `STORYYARD_APPLY_TOKEN` remains
-PATCH-only; configuring both variables to the same value fails closed.
+creation, manuscript-apply receipt acknowledgement, or evaluation receipt
+acknowledgement. `STORYYARD_APPLY_TOKEN` remains PATCH-only; configuring both
+variables to the same value fails closed. A v2 acknowledgement terminates the
+review queue as `acknowledged`, not `applied`.
 
 ### Foundry arc and episode projection
 

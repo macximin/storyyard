@@ -10,7 +10,7 @@ function span(body, text) {
   return { coordinateKind: "utf8-byte", startByte, endByte, sliceSha256: hash(text) };
 }
 
-function candidate(id, body, receiptSeed, withMatch) {
+function candidate(id, body, receiptSeed, withMatch, canaryIsolation) {
   const candidateSha256 = hash(body);
   const selected = span(body, "압박");
   const candidateSelector = {
@@ -37,7 +37,9 @@ function candidate(id, body, receiptSeed, withMatch) {
   const selectorSha256 = hash(JSON.stringify(selectorBody));
   return {
     id,
-    applicationBindingSha256: hash(`application-${receiptSeed}-${id}`),
+    kind: "blind-pair-candidate",
+    evaluationBindingSha256: hash(`evaluation-${receiptSeed}-${id}`),
+    canaryIsolation: { ...canaryIsolation },
     status: "unreviewed",
     body,
     sha256: candidateSha256,
@@ -85,7 +87,14 @@ export function makeFireflyReviewPacketV2({
 } = {}) {
   const receiptSeed = `${bookId}-${round}-${pairId}`;
   const currentContent = `현재 원고 ${receiptSeed}`;
+  const canaryIsolation = {
+    receiptSha256: hash(`canary-receipt-${receiptSeed}`),
+    receiptSelfHash: hash(`canary-self-${receiptSeed}`),
+    isolationScopeSha256: hash(`canary-scope-${receiptSeed}`),
+    commonSnapshotSha256: hash(`common-snapshot-${receiptSeed}`),
+  };
   const body = {
+    purpose: "promotion-evaluation",
     source: { system: "inkos", bookId, sourceRevision: `revision-${receiptSeed}` },
     work: { id: bookId, title, genre, status: "active", targetChapters: 200 },
     artifact: { id: "chapter-0001", kind: "chapter", chapterNumber: 1, title: "첫 화", status: "ready-for-review", currentContent, currentContentSha256: hash(currentContent) },
@@ -94,21 +103,22 @@ export function makeFireflyReviewPacketV2({
       blindRunId: `blind-run-${receiptSeed}`, blindSessionId: `blind-session-${receiptSeed}`,
       commonInputReceiptSha256: hash(`common-${receiptSeed}`), pairedGenerationReceiptSha256: hash(`paired-${receiptSeed}`),
       labelAssignmentReceiptSha256: hash(`labels-${receiptSeed}`), runtimeReceiptSha256: hash(`runtime-${receiptSeed}`),
+      canaryIsolation: { ...canaryIsolation },
       candidateLabelsShuffled: true, generatorMetadataExcluded: true,
       runtime: { kernel: "enforce", piWorker: "off", retrieval: "legacy", fts: "off", model: "gpt-5.6-sol", reasoning: "high" },
     },
     candidates: [
-      candidate("candidate-A", `첫 후보의 압박 장면 ${receiptSeed}`, receiptSeed, true),
-      candidate("candidate-B", `둘째 후보의 압박 장면 ${receiptSeed}`, receiptSeed, false),
+      candidate("candidate-A", `첫 후보의 압박 장면 ${receiptSeed}`, receiptSeed, true, canaryIsolation),
+      candidate("candidate-B", `둘째 후보의 압박 장면 ${receiptSeed}`, receiptSeed, false, canaryIsolation),
     ],
     sealedGenerationEvidence: {
       candidateEvidenceReceiptSha256s: [hash(`candidate-1-${receiptSeed}`), hash(`candidate-2-${receiptSeed}`)].sort(),
       contentNeutralReceiptSha256s: [hash(`neutral-1-${receiptSeed}`), hash(`neutral-2-${receiptSeed}`)].sort(),
     },
     recommendation: null,
-    actions: ["approve", "polish", "hold", "reject"],
-    authority: { canon: "inkos", decisionSurface: "storyyard", apply: "inkos", reverseSync: false },
+    actions: ["select", "tie", "invalid"],
+    authority: { canon: "inkos", decisionSurface: "storyyard", decisionEffect: "advisory", manuscriptApply: false, reverseSync: false },
   };
-  const packetSha256 = hash(JSON.stringify(body));
+  const packetSha256 = hash(JSON.stringify({ generatedAt: iso, ...body }));
   return { schemaVersion: "firefly_review_packet/v2", packetId: `frp-${packetSha256.slice(0, 24)}`, packetSha256, generatedAt: iso, ...body };
 }

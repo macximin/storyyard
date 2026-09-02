@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,6 +14,8 @@ import {
 import { hasDistinctBearerAuthority } from "../app/firefly-review-service-auth.ts";
 import { importFireflyReviewPacketBatch } from "../scripts/firefly-review-packet-index-lib.mjs";
 import { makeFireflyReviewPacketV2 } from "./firefly-review-v2-fixture.mjs";
+
+const hash = (value) => createHash("sha256").update(value).digest("hex");
 
 test("builds a strict, canonical multi-packet v2 static index", () => {
   const second = makeFireflyReviewPacketV2({ round: 2 });
@@ -81,11 +84,15 @@ test("imports several packets to immutable files and one generated index", async
   const second = await importFireflyReviewPacketBatch({ sourcePaths, targetDir });
   assert.equal(first.packetCount, 2);
   assert.equal(second.indexSha256, first.indexSha256);
-  const index = validateFireflyReviewPacketStaticIndex(JSON.parse(await readFile(join(targetDir, "index.json"), "utf8")));
+  const indexRaw = await readFile(join(targetDir, "index.json"), "utf8");
+  const index = validateFireflyReviewPacketStaticIndex(JSON.parse(indexRaw));
+  assert.equal(first.indexArtifactSha256, hash(indexRaw));
   assert.deepEqual(index.packets.map((packet) => packet.comparison.round), [1, 2]);
   for (const packet of index.packets) {
-    const immutable = JSON.parse(await readFile(join(targetDir, "immutable", `${packet.packetId}.json`), "utf8"));
+    const immutableRaw = await readFile(join(targetDir, "immutable", `${packet.packetId}.json`), "utf8");
+    const immutable = JSON.parse(immutableRaw);
     assert.equal(immutable.packetSha256, packet.packetSha256);
+    assert.equal(first.packets.find((item) => item.packetId === packet.packetId).artifactSha256, hash(immutableRaw));
   }
 
   const occupied = join(targetDir, "immutable", `${index.packets[0].packetId}.json`);
@@ -94,6 +101,27 @@ test("imports several packets to immutable files and one generated index", async
     importFireflyReviewPacketBatch({ sourcePaths, targetDir }),
     /different packet already occupies immutable path/u,
   );
+});
+
+test("adds a later batch without dropping an immutable indexed packet", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "storyyard-review-additive-batch-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const targetDir = join(root, "target");
+  const packets = [
+    makeFireflyReviewPacketV2({ round: 1 }),
+    makeFireflyReviewPacketV2({ round: 2 }),
+  ];
+  const sourcePaths = await Promise.all(packets.map(async (packet, index) => {
+    const path = join(root, `source-${index}.json`);
+    await writeFile(path, `${JSON.stringify(packet, null, 2)}\n`, "utf8");
+    return path;
+  }));
+
+  await importFireflyReviewPacketBatch({ sourcePaths: [sourcePaths[0]], targetDir });
+  const receipt = await importFireflyReviewPacketBatch({ sourcePaths: [sourcePaths[1]], targetDir });
+  const stored = validateFireflyReviewPacketStaticIndex(JSON.parse(await readFile(join(targetDir, "index.json"), "utf8")));
+  assert.equal(receipt.packetCount, 2);
+  assert.deepEqual(stored.packets.map((packet) => packet.comparison.round), [1, 2]);
 });
 
 test("separates review-sync read authority from apply authority", () => {
@@ -113,7 +141,7 @@ test("separates review-sync read authority from apply authority", () => {
 
 test("shows genre and round progress for v2 without breaking legacy metadata", async () => {
   const v2 = makeFireflyReviewPacketV2({ genre: "무협", round: 2 });
-  assert.equal(fireflyReviewQueueMetadata(v2), "무협 · blind pair · 2/3");
+  assert.equal(fireflyReviewQueueMetadata(v2), "무협 · blind 평가 · 2/3");
   const legacy = validateFireflyReviewPacket(JSON.parse(await readFile(
     new URL("../data/firefly/review-packets/current.json", import.meta.url),
     "utf8",

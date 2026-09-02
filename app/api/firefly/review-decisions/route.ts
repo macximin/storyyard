@@ -1,6 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { getChatGPTUser, runtimeSecret } from "@/app/chatgpt-auth";
-import { validateAppliedReceipt } from "@/app/firefly-review-ack";
+import { validateAppliedReceipt, validateEvaluationAck } from "@/app/firefly-review-ack";
+import { validateFireflyDecisionIntent } from "@/app/firefly-review-decision-intent";
 import { ensureFireflyReviewSnapshot, toFireflyReviewDecisionContract } from "@/app/firefly-review-data";
 import { allSurfaceMatches } from "@/app/firefly-review-contract";
 import { FireflyDecision, getFireflyReviewPacket, SurfaceClassification } from "@/app/firefly-review-packets";
@@ -8,7 +9,6 @@ import { hasDistinctBearerAuthority } from "@/app/firefly-review-service-auth";
 import { getDb } from "@/db";
 import { fireflyReviewDecisions } from "@/db/schema";
 
-const allowed = new Set<FireflyDecision>(["approve", "polish", "hold", "reject"]);
 const allowedSurfaceClassifications = new Set<SurfaceClassification>(["engine", "genre-convention", "source-surface", "canon-leak"]);
 
 async function requireAdmin() {
@@ -16,7 +16,7 @@ async function requireAdmin() {
   return user?.role === "admin" ? user : null;
 }
 
-function hasApplyAuthority(request: Request): boolean {
+function hasReceiptAckAuthority(request: Request): boolean {
   return hasDistinctBearerAuthority(
     request,
     runtimeSecret("STORYYARD_APPLY_TOKEN"),
@@ -66,22 +66,18 @@ export async function POST(request: Request) {
     .from(fireflyReviewDecisions)
     .where(and(
       eq(fireflyReviewDecisions.packetId, packet.packetId),
-      eq(fireflyReviewDecisions.status, "applied"),
+      or(
+        eq(fireflyReviewDecisions.status, "applied"),
+        eq(fireflyReviewDecisions.status, "acknowledged"),
+      ),
     ))
     .limit(1);
   if (terminalDecision) {
-    return Response.json({ error: "InkOS 적용까지 끝난 검토 패킷임. 새 판정을 만들 수 없음." }, { status: 409 });
+    return Response.json({ error: "종료 확인된 검토 패킷임. 새 판정을 만들 수 없음." }, { status: 409 });
   }
-  if (!input.decision || !allowed.has(input.decision)) return Response.json({ error: "판정값이 올바르지 않음." }, { status: 400 });
-  const candidate = packet.candidates.find((item) => item.id === input.candidateId);
-  if (!candidate || candidate.sha256 !== input.candidateSha256) {
-    return Response.json({ error: "후보 원고의 해시가 검토 패킷과 다름." }, { status: 409 });
-  }
-  const comment = input.comment?.trim() ?? "";
-  if (comment.length > 2_000) return Response.json({ error: "의견은 2,000자 이내로 작성해 줘." }, { status: 400 });
-  if (input.decision !== "approve" && !comment) {
-    return Response.json({ error: "폴리싱·보류·반려에는 작업 지시나 근거가 필요함." }, { status: 400 });
-  }
+  const intent = validateFireflyDecisionIntent(packet, input);
+  if (!intent.ok) return Response.json({ error: intent.error }, { status: intent.status });
+  const { comment, decision: decisionChoice, storedCandidateId, storedCandidateSha256 } = intent.value;
 
   const classifiedAt = new Date().toISOString();
   let surfaceClassifications: Array<{
@@ -118,8 +114,10 @@ export async function POST(request: Request) {
         classifiedAt,
       };
     });
-    if (input.decision === "approve" && surfaceClassifications.some((item) => item.classification === "canon-leak")) {
-      return Response.json({ error: "캐논 유입으로 분류된 후보는 승인할 수 없음. 폴리싱·보류·반려를 선택해 줘." }, { status: 400 });
+    const selectedCandidate = packet.candidates.find((item) => item.id === storedCandidateId);
+    const selectedMatchIds = new Set(selectedCandidate?.review.surfaceComparison.surfaceMatches.map((match) => match.matchId) ?? []);
+    if (decisionChoice === "select" && surfaceClassifications.some((item) => selectedMatchIds.has(item.matchId) && item.classification === "canon-leak")) {
+      return Response.json({ error: "캐논 유입으로 분류된 후보는 선택할 수 없음. 동률·페어 무효를 검토해 줘." }, { status: 400 });
     }
   } else if (input.surfaceClassifications !== undefined) {
     return Response.json({ error: "v1 패킷에는 v2 표면 분류를 기록할 수 없음." }, { status: 400 });
@@ -131,8 +129,8 @@ export async function POST(request: Request) {
     eq(fireflyReviewDecisions.actorUserId, user.id),
     eq(fireflyReviewDecisions.schemaVersion, packet.schemaVersion === "firefly_review_packet/v2" ? "firefly_review_decision/v2" : "firefly_review_decision/v1"),
     eq(fireflyReviewDecisions.packetId, packet.packetId),
-    eq(fireflyReviewDecisions.candidateId, candidate.id),
-    eq(fireflyReviewDecisions.decision, input.decision),
+    eq(fireflyReviewDecisions.candidateId, storedCandidateId),
+    eq(fireflyReviewDecisions.decision, decisionChoice),
     eq(fireflyReviewDecisions.comment, comment),
     eq(fireflyReviewDecisions.surfaceClassifications, surfaceClassificationsJson),
     eq(fireflyReviewDecisions.status, "pending"),
@@ -145,8 +143,8 @@ export async function POST(request: Request) {
     schemaVersion: packet.schemaVersion === "firefly_review_packet/v2" ? "firefly_review_decision/v2" : "firefly_review_decision/v1",
     packetId: packet.packetId, packetSha256: packet.packetSha256,
     bookId: packet.source.bookId, artifactId: packet.artifact.id,
-    candidateId: candidate.id, candidateSha256: candidate.sha256,
-    decision: input.decision, comment, surfaceClassifications: surfaceClassificationsJson,
+    candidateId: storedCandidateId, candidateSha256: storedCandidateSha256,
+    decision: decisionChoice, comment, surfaceClassifications: surfaceClassificationsJson,
     actorUserId: user.id, actorEmail: user.email,
     status: "pending", createdAt: new Date().toISOString(), appliedAt: null, applyReceiptPath: null,
   };
@@ -155,8 +153,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!hasApplyAuthority(request)) {
-    return Response.json({ error: "InkOS 적용 확인 권한이 필요함." }, { status: 403 });
+  if (!hasReceiptAckAuthority(request)) {
+    return Response.json({ error: "InkOS 영수증 확인 권한이 필요함." }, { status: 403 });
   }
   const input = await request.json().catch(() => null);
   const decisionId = typeof input === "object" && input !== null && "decisionId" in input
@@ -165,23 +163,32 @@ export async function PATCH(request: Request) {
   const [stored] = await getDb().select().from(fireflyReviewDecisions)
     .where(eq(fireflyReviewDecisions.id, decisionId)).limit(1);
   if (!stored) return Response.json({ error: "원판정을 찾지 못했음." }, { status: 404 });
-  const validation = validateAppliedReceipt(stored, input);
+  const packet = getFireflyReviewPacket(stored.packetId);
+  if (!packet || packet.packetSha256 !== stored.packetSha256) {
+    return Response.json({ error: "등록된 검토 패킷과 원판정이 일치하지 않음." }, { status: 409 });
+  }
+  const validation = packet.schemaVersion === "firefly_review_packet/v2"
+    ? validateEvaluationAck(stored, input, packet.comparison.pairId)
+    : validateAppliedReceipt(stored, input);
   if (!validation.ok) return Response.json({ error: validation.error }, { status: validation.status });
   const { receipt } = validation;
-  if (stored.status === "applied") {
-    if (stored.appliedAt !== receipt.appliedAt || stored.applyReceiptPath !== receipt.applyReceiptPath) {
-      return Response.json({ error: "이미 다른 InkOS 영수증으로 적용 확인된 판정임." }, { status: 409 });
+  const terminalStatus = packet.schemaVersion === "firefly_review_packet/v2" ? "acknowledged" : "applied";
+  const terminalAt = packet.schemaVersion === "firefly_review_packet/v2" ? receipt.acknowledgedAt : receipt.appliedAt;
+  const terminalPath = packet.schemaVersion === "firefly_review_packet/v2" ? receipt.ackReceiptPath : receipt.applyReceiptPath;
+  if (stored.status === terminalStatus) {
+    if (stored.appliedAt !== terminalAt || stored.applyReceiptPath !== terminalPath) {
+      return Response.json({ error: "이미 다른 영수증으로 종료 확인된 판정임." }, { status: 409 });
     }
     return Response.json({ decision: toFireflyReviewDecisionContract(stored) });
   }
   if (stored.status !== "pending") {
-    return Response.json({ error: "적용 확인할 수 없는 판정 상태임." }, { status: 409 });
+    return Response.json({ error: "종료 확인할 수 없는 판정 상태임." }, { status: 409 });
   }
 
   const [applied] = await getDb().update(fireflyReviewDecisions).set({
-    status: "applied",
-    appliedAt: receipt.appliedAt,
-    applyReceiptPath: receipt.applyReceiptPath,
+    status: terminalStatus,
+    appliedAt: terminalAt,
+    applyReceiptPath: terminalPath,
   }).where(and(
     eq(fireflyReviewDecisions.id, stored.id),
     eq(fireflyReviewDecisions.status, "pending"),
@@ -190,10 +197,10 @@ export async function PATCH(request: Request) {
 
   const [raced] = await getDb().select().from(fireflyReviewDecisions)
     .where(eq(fireflyReviewDecisions.id, stored.id)).limit(1);
-  if (raced?.status === "applied"
-    && raced.appliedAt === receipt.appliedAt
-    && raced.applyReceiptPath === receipt.applyReceiptPath) {
+  if (raced?.status === terminalStatus
+    && raced.appliedAt === terminalAt
+    && raced.applyReceiptPath === terminalPath) {
     return Response.json({ decision: toFireflyReviewDecisionContract(raced) });
   }
-  return Response.json({ error: "적용 확인 중 다른 영수증이 먼저 기록됐음." }, { status: 409 });
+  return Response.json({ error: "종료 확인 중 다른 영수증이 먼저 기록됐음." }, { status: 409 });
 }

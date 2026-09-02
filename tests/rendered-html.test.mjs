@@ -66,7 +66,7 @@ test("ships the public community and private studio navigation", async () => {
 });
 
 test("routes Firefly review packets one way and archives legacy works without deletion", async () => {
-  const [schema, migration, v2Migration, sidebar, reviewPage, reviewBoard, decisionRoute, sliceRoute, packet, packetIndex, studio, projectsRoute] = await Promise.all([
+  const [schema, migration, v2Migration, sidebar, reviewPage, reviewBoard, decisionRoute, decisionData, sliceRoute, packet, packetIndex, studio, projectsRoute] = await Promise.all([
     read("db/schema.ts"),
     read("drizzle/0012_glorious_major_mapleleaf.sql"),
     read("drizzle/0013_secret_the_spike.sql"),
@@ -74,6 +74,7 @@ test("routes Firefly review packets one way and archives legacy works without de
     read("app/review/page.tsx"),
     read("app/review/review-board.tsx"),
     read("app/api/firefly/review-decisions/route.ts"),
+    read("app/firefly-review-data.ts"),
     read("app/api/firefly/source-slices/route.ts"),
     read("data/firefly/review-packets/current.json"),
     read("data/firefly/review-packets/index.json"),
@@ -100,17 +101,24 @@ test("routes Firefly review packets one way and archives legacy works without de
   assert.match(reviewBoard, /정본은 InkOS/);
   assert.match(reviewBoard, /재미와 도파민을 먼저/);
   assert.match(reviewBoard, /독립 blind pair/);
+  assert.match(reviewBoard, /평가 전용/);
+  assert.match(reviewBoard, /원고·캐논을 적용하지 않습니다/);
   assert.match(reviewBoard, /표면 비교/);
   assert.match(decisionRoute, /status: "pending"/);
-  assert.match(decisionRoute, /후보 원고의 해시/);
+  assert.match(decisionRoute, /validateFireflyDecisionIntent/);
   assert.match(decisionRoute, /export async function PATCH/);
   assert.match(decisionRoute, /STORYYARD_APPLY_TOKEN/);
   assert.match(decisionRoute, /STORYYARD_REVIEW_SYNC_TOKEN/);
   assert.match(decisionRoute, /hasReviewSyncAuthority/);
   assert.match(decisionRoute, /validateAppliedReceipt/);
+  assert.match(decisionRoute, /validateEvaluationAck/);
   assert.match(decisionRoute, /모든 표면 일치를 사람이 분류/);
-  assert.match(decisionRoute, /캐논 유입으로 분류된 후보는 승인할 수 없음/);
+  assert.match(decisionRoute, /캐논 유입으로 분류된 후보는 선택할 수 없음/);
   assert.match(decisionRoute, /\.returning\(\)/);
+  assert.match(decisionData, /purpose: "promotion-evaluation"/);
+  assert.match(decisionData, /decisionEffect: "advisory"/);
+  assert.match(decisionData, /manuscriptApply: false/);
+  assert.match(decisionData, /acknowledgedAt/);
   assert.match(sliceRoute, /STORYYARD_SOURCE_GRANT_PRIVATE_JWK/);
   assert.match(sliceRoute, /private, no-store/);
   assert.match(sliceRoute, /packetId.*packetSha256.*matchId/);

@@ -1018,8 +1018,10 @@ a { color: inherit; text-decoration: none; }
 .decision-options label { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 8px; padding: 10px; border: 1px solid #ddd; cursor: pointer; }
 .decision-options label.selected { border-color: var(--ink); background: #f4f4f1; }
 .decision-options label.selected.approve { background: #edf8f1; }
+.decision-options label.selected.select { background: #edf8f1; }
 .decision-options label.selected.polish { background: #fff9dc; }
-.decision-options label.selected.hold, .decision-options label.selected.reject { background: #fff1ec; }
+.decision-options label.selected.hold, .decision-options label.selected.reject,
+.decision-options label.selected.tie, .decision-options label.selected.invalid { background: #fff1ec; }
 .decision-dock .black-button { width: 100%; justify-content: center; margin-top: 12px; }
 .legacy-list { max-width: 1000px; margin-top: 42px; border-top: 1px solid var(--ink); }
 .legacy-list article { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding: 22px 4px; border-bottom: 1px solid #ccc; }

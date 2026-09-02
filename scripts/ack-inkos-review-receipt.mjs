@@ -3,7 +3,7 @@ import process from "node:process";
 
 const [receiptPath, endpoint = "https://storyyard-wjjo.macximin11123.chatgpt.site/api/firefly/review-decisions"] = process.argv.slice(2);
 if (!receiptPath) {
-  console.error("사용법: npm run firefly:ack-review -- <InkOS 적용 영수증.json> [Storyyard API URL]");
+  console.error("사용법: npm run firefly:ack-review -- <InkOS 적용 또는 평가 확인 영수증.json> [Storyyard API URL]");
   process.exit(2);
 }
 const token = process.env.STORYYARD_APPLY_TOKEN?.trim();
@@ -13,7 +13,7 @@ if (!token) {
 }
 const target = new URL(endpoint);
 if (target.protocol !== "https:") {
-  console.error("Storyyard 적용 확인은 HTTPS URL만 허용함.");
+  console.error("Storyyard 영수증 확인은 HTTPS URL만 허용함.");
   process.exit(2);
 }
 const receipt = JSON.parse(await readFile(receiptPath, "utf8"));

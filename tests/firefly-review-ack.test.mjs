@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateAppliedReceipt } from "../app/firefly-review-ack.ts";
-import { hasAppliedFireflyDecision, partitionFireflyReviewPackets } from "../app/firefly-review-queue.ts";
+import {
+  expectedEvaluationAckPath,
+  reviewReceiptSelfHash,
+  validateAppliedReceipt,
+  validateEvaluationAck,
+} from "../app/firefly-review-ack.ts";
+import {
+  hasAcknowledgedFireflyEvaluation,
+  hasAppliedFireflyDecision,
+  partitionFireflyReviewPackets,
+} from "../app/firefly-review-queue.ts";
 
 const stored = {
   id: "9a63d4c0-b828-4c2e-a545-e6b3a4d583bd",
@@ -53,7 +62,7 @@ test("rejects a changed hash, path, timestamp, or missing result", () => {
   ]) assert.equal(validateAppliedReceipt(stored, changed).ok, false);
 });
 
-test("binds a v2 applied receipt to the exact human surface classifications", () => {
+test("binds a v2 evaluation acknowledgement without manuscript application", () => {
   const classifications = [{
     matchId: "fsm-1234567890abcdef12345678",
     selectorSha256: "1".repeat(64),
@@ -66,25 +75,74 @@ test("binds a v2 applied receipt to the exact human surface classifications", ()
   const v2Stored = {
     ...stored,
     schemaVersion: "firefly_review_decision/v2",
+    decision: "select",
     surfaceClassifications: JSON.stringify(classifications),
   };
-  const v2Receipt = { ...receipt, schemaVersion: "firefly_review_decision/v2", surfaceClassifications: classifications };
-  assert.equal(validateAppliedReceipt(v2Stored, v2Receipt).ok, true);
-  assert.equal(validateAppliedReceipt(v2Stored, {
-    ...v2Receipt,
+  const pairId = "pair-one";
+  const unsigned = {
+    schemaVersion: "firefly_review_evaluation_ack/v1",
+    decisionId: v2Stored.id,
+    packetId: v2Stored.packetId,
+    packetSha256: v2Stored.packetSha256,
+    workId: v2Stored.bookId,
+    artifactId: v2Stored.artifactId,
+    candidateId: v2Stored.candidateId,
+    candidateSha256: v2Stored.candidateSha256,
+    decision: v2Stored.decision,
+    comment: v2Stored.comment,
+    surfaceClassifications: classifications,
+    purpose: "promotion-evaluation",
+    decisionEffect: "advisory",
+    canonEffect: "none",
+    manuscriptApply: false,
+    status: "acknowledged",
+    createdAt: v2Stored.createdAt,
+    acknowledgedAt: "2026-08-26T05:03:39.238Z",
+    ackReceiptPath: expectedEvaluationAckPath(pairId, v2Stored.id),
+  };
+  const ack = { ...unsigned, receiptSelfHash: reviewReceiptSelfHash(unsigned) };
+  assert.equal(validateEvaluationAck(v2Stored, ack, pairId).ok, true);
+  assert.equal(validateAppliedReceipt(v2Stored, { ...receipt, schemaVersion: "firefly_review_decision/v2" }).ok, false);
+
+  const changedClassifications = {
+    ...unsigned,
     surfaceClassifications: [{ ...classifications[0], classification: "engine" }],
-  }).ok, false);
+  };
+  assert.equal(validateEvaluationAck(v2Stored, {
+    ...changedClassifications,
+    receiptSelfHash: reviewReceiptSelfHash(changedClassifications),
+  }, pairId).ok, false);
+
+  for (const unsafe of [
+    { ...unsigned, manuscriptApply: true },
+    { ...unsigned, canonEffect: "chapter-applied" },
+    { ...unsigned, status: "applied" },
+  ]) {
+    assert.equal(validateEvaluationAck(v2Stored, {
+      ...unsafe,
+      receiptSelfHash: reviewReceiptSelfHash(unsafe),
+    }, pairId).ok, false);
+  }
 });
 
-test("removes a packet from the active queue after InkOS apply acknowledgement", () => {
-  const packets = [{ packetId: "pending" }, { packetId: "terminal" }];
+test("uses applied for v1 and acknowledged for v2 queue completion", () => {
+  const packets = [
+    { packetId: "v1-pending", schemaVersion: "firefly_review_packet/v1" },
+    { packetId: "v1-terminal", schemaVersion: "firefly_review_packet/v1" },
+    { packetId: "v2-pending", schemaVersion: "firefly_review_packet/v2" },
+    { packetId: "v2-terminal", schemaVersion: "firefly_review_packet/v2" },
+  ];
   const decisions = {
-    pending: [{ status: "pending" }],
-    terminal: [{ status: "pending" }, { status: "applied" }],
+    "v1-pending": [{ status: "pending" }],
+    "v1-terminal": [{ status: "pending" }, { status: "applied" }],
+    "v2-pending": [{ status: "pending" }, { status: "applied" }],
+    "v2-terminal": [{ status: "pending" }, { status: "acknowledged" }],
   };
-  assert.equal(hasAppliedFireflyDecision(decisions.pending), false);
-  assert.equal(hasAppliedFireflyDecision(decisions.terminal), true);
+  assert.equal(hasAppliedFireflyDecision(decisions["v1-pending"]), false);
+  assert.equal(hasAppliedFireflyDecision(decisions["v1-terminal"]), true);
+  assert.equal(hasAcknowledgedFireflyEvaluation(decisions["v2-pending"]), false);
+  assert.equal(hasAcknowledgedFireflyEvaluation(decisions["v2-terminal"]), true);
   const queue = partitionFireflyReviewPackets(packets, decisions);
-  assert.deepEqual(queue.active.map((packet) => packet.packetId), ["pending"]);
-  assert.deepEqual(queue.completed.map((packet) => packet.packetId), ["terminal"]);
+  assert.deepEqual(queue.active.map((packet) => packet.packetId), ["v1-pending", "v2-pending"]);
+  assert.deepEqual(queue.completed.map((packet) => packet.packetId), ["v1-terminal", "v2-terminal"]);
 });

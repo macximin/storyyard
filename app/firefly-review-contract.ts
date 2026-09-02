@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 
-export type FireflyDecision = "approve" | "polish" | "hold" | "reject";
+export type FireflyManuscriptDecision = "approve" | "polish" | "hold" | "reject";
+export type FireflyEvaluationDecision = "select" | "tie" | "invalid";
+export type FireflyDecision = FireflyManuscriptDecision | FireflyEvaluationDecision;
 export type SurfaceClassification = "engine" | "genre-convention" | "source-surface" | "canon-leak";
 export type CandidateSpan = {
   coordinateKind: "utf8-byte";
@@ -66,7 +68,14 @@ export type FireflyReviewCandidateV1 = BaseCandidate & {
 };
 
 export type FireflyReviewCandidateV2 = BaseCandidate & {
-  applicationBindingSha256: string;
+  kind: "blind-pair-candidate";
+  evaluationBindingSha256: string;
+  canaryIsolation: {
+    receiptSha256: string;
+    receiptSelfHash: string;
+    isolationScopeSha256: string;
+    commonSnapshotSha256: string;
+  };
   commercialEvaluation: CommercialEvaluation;
   commercialEvaluationReceiptSha256: string;
   review: {
@@ -104,18 +113,19 @@ type PacketBase = {
   source: { system: "inkos"; bookId: string; sourceRevision: string };
   work: { id: string; title: string; genre: string; status: string; targetChapters: number };
   artifact: { id: string; kind?: "chapter"; chapterNumber: number; title: string; status: string; currentContent: string; currentContentSha256: string };
-  actions: ["approve", "polish", "hold", "reject"];
-  authority: { canon: "inkos"; decisionSurface: "storyyard"; apply: "inkos"; reverseSync: false };
 };
 
 export type FireflyReviewPacketV1 = PacketBase & {
   schemaVersion: "firefly_review_packet/v1";
   candidates: FireflyReviewCandidateV1[];
   recommendation: { candidateId: string; reason: string } | null;
+  actions: ["approve", "polish", "hold", "reject"];
+  authority: { canon: "inkos"; decisionSurface: "storyyard"; apply: "inkos"; reverseSync: false };
 };
 
 export type FireflyReviewPacketV2 = PacketBase & {
   schemaVersion: "firefly_review_packet/v2";
+  purpose: "promotion-evaluation";
   comparison: {
     reviewKind: "independent-blind-comparison";
     pairId: string;
@@ -126,6 +136,12 @@ export type FireflyReviewPacketV2 = PacketBase & {
     pairedGenerationReceiptSha256: string;
     labelAssignmentReceiptSha256: string;
     runtimeReceiptSha256: string;
+    canaryIsolation: {
+      receiptSha256: string;
+      receiptSelfHash: string;
+      isolationScopeSha256: string;
+      commonSnapshotSha256: string;
+    };
     candidateLabelsShuffled: true;
     generatorMetadataExcluded: true;
     runtime: {
@@ -143,13 +159,22 @@ export type FireflyReviewPacketV2 = PacketBase & {
     contentNeutralReceiptSha256s: [string, string];
   };
   recommendation: null;
+  actions: ["select", "tie", "invalid"];
+  authority: {
+    canon: "inkos";
+    decisionSurface: "storyyard";
+    decisionEffect: "advisory";
+    manuscriptApply: false;
+    reverseSync: false;
+  };
 };
 
 export type FireflyReviewPacket = FireflyReviewPacketV1 | FireflyReviewPacketV2;
 
 const SHA = /^[0-9a-f]{64}$/u;
 const PACKET_ID = /^frp-[0-9a-f]{24}$/u;
-const BLIND_ID = /^candidate-[A-Z]$/u;
+const BLIND_IDS = ["candidate-A", "candidate-B"] as const;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/u;
 const CONTENT_NEUTRAL_CODES = new Set([
   "unauthorized-softening", "unauthorized-escalation", "moral-lecture", "disclaimer",
   "forced-punishment", "forced-apology", "forced-redemption", "forced-cost",
@@ -181,6 +206,12 @@ function requireString(value: unknown, label: string): string {
   return value;
 }
 
+function requireSafeId(value: unknown, label: string): string {
+  const result = requireString(value, label);
+  if (!SAFE_ID.test(result)) throw new Error(`${label} must be a safe identifier.`);
+  return result;
+}
+
 function requireSha(value: unknown, label: string): string {
   const result = requireString(value, label);
   if (!SHA.test(result)) throw new Error(`${label} must be a full SHA-256.`);
@@ -208,6 +239,24 @@ function requireInteger(value: unknown, label: string, minimum = 0): number {
 function requireStrings(value: unknown, label: string): string[] {
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error(`${label} must be a string array.`);
   return value as string[];
+}
+
+type CanaryIsolationProjection = {
+  receiptSha256: string;
+  receiptSelfHash: string;
+  isolationScopeSha256: string;
+  commonSnapshotSha256: string;
+};
+
+function validateCanaryIsolation(value: unknown, label: string): CanaryIsolationProjection {
+  const isolation = requireRecord(value, label);
+  exactKeys(isolation, ["receiptSha256", "receiptSelfHash", "isolationScopeSha256", "commonSnapshotSha256"]);
+  return {
+    receiptSha256: requireSha(isolation.receiptSha256, `${label}.receiptSha256`),
+    receiptSelfHash: requireSha(isolation.receiptSelfHash, `${label}.receiptSelfHash`),
+    isolationScopeSha256: requireSha(isolation.isolationScopeSha256, `${label}.isolationScopeSha256`),
+    commonSnapshotSha256: requireSha(isolation.commonSnapshotSha256, `${label}.commonSnapshotSha256`),
+  };
 }
 
 function utf8Slice(body: string, startByte: number, endByte: number, label: string): Uint8Array {
@@ -264,7 +313,12 @@ function validateSurfaceMatch(value: unknown, candidateBody: string, candidateSh
   const end = requireInteger(source.endByte, "surface source end", 1);
   if (end <= start || end - start > 32_768) throw new Error("Surface source range is invalid.");
   requireSha(source.sliceSha256, "surface source slice SHA");
-  const { selectorSha256: _selectorSha256, matchId: _matchId, classification: _classification, ...selectorBody } = match;
+  const selectorBody = {
+    provenanceBridgeReceiptSha256: match.provenanceBridgeReceiptSha256,
+    matchMethod: match.matchMethod,
+    candidate: match.candidate,
+    source: match.source,
+  };
   if (sha256(JSON.stringify(selectorBody)) !== selectorSha || matchId !== `fsm-${selectorSha.slice(0, 24)}`) {
     throw new Error("Surface match selector identity is invalid.");
   }
@@ -292,17 +346,17 @@ function validateBasePacket(packet: Record<string, unknown>): void {
   requireString(artifact.status, "review artifact status");
   const currentSha = requireSha(artifact.currentContentSha256, "current manuscript SHA");
   if (sha256(artifact.currentContent) !== currentSha) throw new Error("Current manuscript SHA mismatch.");
+}
+
+function validateV1(packet: Record<string, unknown>): FireflyReviewPacketV1 {
+  exactKeys(packet, ["schemaVersion", "packetId", "packetSha256", "generatedAt", "source", "work", "artifact", "candidates", "recommendation", "actions", "authority"]);
+  validateBasePacket(packet);
   if (JSON.stringify(packet.actions) !== JSON.stringify(["approve", "polish", "hold", "reject"])) throw new Error("Review actions are invalid.");
   const authority = requireRecord(packet.authority, "review authority");
   exactKeys(authority, ["canon", "decisionSurface", "apply", "reverseSync"]);
   if (authority.canon !== "inkos" || authority.decisionSurface !== "storyyard" || authority.apply !== "inkos" || authority.reverseSync !== false) {
     throw new Error("Review authority boundary is invalid.");
   }
-}
-
-function validateV1(packet: Record<string, unknown>): FireflyReviewPacketV1 {
-  exactKeys(packet, ["schemaVersion", "packetId", "packetSha256", "generatedAt", "source", "work", "artifact", "candidates", "recommendation", "actions", "authority"]);
-  validateBasePacket(packet);
   if (!Array.isArray(packet.candidates) || packet.candidates.length < 1) throw new Error("Review packet requires candidates.");
   for (const value of packet.candidates) {
     const candidate = requireRecord(value, "v1 review candidate");
@@ -325,31 +379,37 @@ function validateV1(packet: Record<string, unknown>): FireflyReviewPacketV1 {
 }
 
 function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
-  exactKeys(packet, ["schemaVersion", "packetId", "packetSha256", "generatedAt", "source", "work", "artifact", "comparison", "candidates", "sealedGenerationEvidence", "recommendation", "actions", "authority"]);
+  exactKeys(packet, ["schemaVersion", "packetId", "packetSha256", "generatedAt", "purpose", "source", "work", "artifact", "comparison", "candidates", "sealedGenerationEvidence", "recommendation", "actions", "authority"]);
   validateBasePacket(packet);
+  if (packet.purpose !== "promotion-evaluation") throw new Error("Blind v2 packets must be promotion evaluations.");
   if (packet.recommendation !== null) throw new Error("Blind v2 packets must not recommend a candidate.");
   const comparison = requireRecord(packet.comparison, "blind comparison");
-  exactKeys(comparison, ["reviewKind", "pairId", "round", "blindRunId", "blindSessionId", "commonInputReceiptSha256", "pairedGenerationReceiptSha256", "labelAssignmentReceiptSha256", "runtimeReceiptSha256", "candidateLabelsShuffled", "generatorMetadataExcluded", "runtime"]);
+  exactKeys(comparison, ["reviewKind", "pairId", "round", "blindRunId", "blindSessionId", "commonInputReceiptSha256", "pairedGenerationReceiptSha256", "labelAssignmentReceiptSha256", "runtimeReceiptSha256", "canaryIsolation", "candidateLabelsShuffled", "generatorMetadataExcluded", "runtime"]);
   if (comparison.reviewKind !== "independent-blind-comparison" || comparison.candidateLabelsShuffled !== true || comparison.generatorMetadataExcluded !== true) throw new Error("v2 comparison is not independently blinded.");
-  requireString(comparison.pairId, "comparison pair ID");
-  if (![1, 2, 3].includes(Number(comparison.round))) throw new Error("comparison round must be 1..3.");
-  requireString(comparison.blindRunId, "blind run ID");
-  requireString(comparison.blindSessionId, "blind session ID");
+  requireSafeId(comparison.pairId, "comparison pair ID");
+  if (![1, 2, 3].includes(comparison.round as number)) throw new Error("comparison round must be the number 1, 2, or 3.");
+  requireSafeId(comparison.blindRunId, "blind run ID");
+  requireSafeId(comparison.blindSessionId, "blind session ID");
   for (const key of ["commonInputReceiptSha256", "pairedGenerationReceiptSha256", "labelAssignmentReceiptSha256", "runtimeReceiptSha256"]) requireSha(comparison[key], `comparison ${key}`);
+  const comparisonIsolation = validateCanaryIsolation(comparison.canaryIsolation, "comparison canary isolation");
   const runtime = requireRecord(comparison.runtime, "comparison runtime");
   exactKeys(runtime, ["kernel", "piWorker", "retrieval", "fts", "model", "reasoning"]);
   if (runtime.kernel !== "enforce" || runtime.piWorker !== "off" || runtime.retrieval !== "legacy" || runtime.fts !== "off" || runtime.model !== "gpt-5.6-sol" || runtime.reasoning !== "high") throw new Error("comparison runtime is not the locked Phase 7 baseline.");
 
   if (!Array.isArray(packet.candidates) || packet.candidates.length !== 2) throw new Error("v2 blind comparison requires exactly two candidates.");
-  const candidateIds = new Set<string>();
+  const candidateIds: string[] = [];
   const matchIds = new Set<string>();
   for (const value of packet.candidates) {
     const candidate = requireRecord(value, "v2 review candidate");
-    exactKeys(candidate, ["id", "applicationBindingSha256", "status", "body", "sha256", "preparedAt", "commercialScore", "commercialEvaluation", "commercialEvaluationReceiptSha256", "review"]);
+    exactKeys(candidate, ["id", "kind", "evaluationBindingSha256", "canaryIsolation", "status", "body", "sha256", "preparedAt", "commercialScore", "commercialEvaluation", "commercialEvaluationReceiptSha256", "review"]);
     const id = requireString(candidate.id, "v2 candidate ID");
-    if (!BLIND_ID.test(id) || candidateIds.has(id)) throw new Error("v2 candidate IDs must be unique blind labels.");
-    candidateIds.add(id);
-    requireSha(candidate.applicationBindingSha256, "candidate application binding SHA");
+    candidateIds.push(id);
+    if (candidate.kind !== "blind-pair-candidate") throw new Error("v2 candidates must use the blind-pair candidate kind.");
+    requireSha(candidate.evaluationBindingSha256, "candidate evaluation binding SHA");
+    const candidateIsolation = validateCanaryIsolation(candidate.canaryIsolation, "candidate canary isolation");
+    if (JSON.stringify(candidateIsolation) !== JSON.stringify(comparisonIsolation)) {
+      throw new Error("Candidate canary isolation does not match its blind comparison.");
+    }
     requireString(candidate.status, "v2 candidate status");
     if (typeof candidate.body !== "string") throw new Error("v2 candidate body is invalid.");
     const candidateSha = requireSha(candidate.sha256, "v2 candidate SHA");
@@ -399,6 +459,9 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
     if (!Array.isArray(surface.surfaceMatches)) throw new Error("Surface matches must be an array.");
     for (const match of surface.surfaceMatches) validateSurfaceMatch(match, candidate.body, candidateSha, matchIds);
   }
+  if (JSON.stringify(candidateIds) !== JSON.stringify(BLIND_IDS)) {
+    throw new Error("v2 candidate IDs must be ordered exactly as candidate-A then candidate-B.");
+  }
   const evidence = requireRecord(packet.sealedGenerationEvidence, "sealed generation evidence");
   exactKeys(evidence, ["candidateEvidenceReceiptSha256s", "contentNeutralReceiptSha256s"]);
   for (const key of ["candidateEvidenceReceiptSha256s", "contentNeutralReceiptSha256s"]) {
@@ -407,13 +470,26 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
       throw new Error(`${key} must contain two unique sorted SHA-256 values.`);
     }
   }
+  if (JSON.stringify(packet.actions) !== JSON.stringify(["select", "tie", "invalid"])) {
+    throw new Error("Blind v2 actions must be select, tie, and invalid.");
+  }
+  const authority = requireRecord(packet.authority, "blind review authority");
+  exactKeys(authority, ["canon", "decisionSurface", "decisionEffect", "manuscriptApply", "reverseSync"]);
+  if (authority.canon !== "inkos" || authority.decisionSurface !== "storyyard"
+    || authority.decisionEffect !== "advisory" || authority.manuscriptApply !== false || authority.reverseSync !== false) {
+    throw new Error("Blind v2 authority must stay advisory and non-applying.");
+  }
   return packet as unknown as FireflyReviewPacketV2;
 }
 
 export function assertFireflyReviewPacketIdentity(packet: FireflyReviewPacket): void {
-  const { schemaVersion: _schemaVersion, packetId, packetSha256, generatedAt: _generatedAt, ...body } = packet;
-  const actual = sha256(JSON.stringify(body));
-  if (actual !== packetSha256 || packetId !== `frp-${actual.slice(0, 24)}`) throw new Error("Review packet identity or SHA-256 mismatch.");
+  const unsigned = { ...packet } as Record<string, unknown>;
+  delete unsigned.schemaVersion;
+  delete unsigned.packetId;
+  delete unsigned.packetSha256;
+  if (packet.schemaVersion === "firefly_review_packet/v1") delete unsigned.generatedAt;
+  const actual = sha256(JSON.stringify(unsigned));
+  if (actual !== packet.packetSha256 || packet.packetId !== `frp-${actual.slice(0, 24)}`) throw new Error("Review packet identity or SHA-256 mismatch.");
 }
 
 export function validateFireflyReviewPacket(value: unknown): FireflyReviewPacket {
