@@ -115,6 +115,12 @@ function packet() {
   return { schemaVersion: "firefly_review_packet/v2", packetId: `frp-${packetSha256.slice(0, 24)}`, packetSha256, generatedAt: iso, ...body };
 }
 
+function rehash(value) {
+  const { schemaVersion: _schemaVersion, packetId: _packetId, packetSha256: _packetSha256, generatedAt, ...body } = value;
+  const packetSha256 = hash(JSON.stringify({ generatedAt, ...body }));
+  return { schemaVersion: "firefly_review_packet/v2", packetId: `frp-${packetSha256.slice(0, 24)}`, packetSha256, generatedAt, ...body };
+}
+
 test("accepts a strict blind v2 packet without raw source prose", () => {
   const value = packet();
   const parsed = validateFireflyReviewPacket(value);
@@ -180,4 +186,8 @@ test("requires blind candidate kind, matching canary scope, and non-applying aut
   const stringRound = structuredClone(base);
   stringRound.comparison.round = "1";
   assert.throws(() => validateFireflyReviewPacket(stringRound), /number 1, 2, or 3/u);
+
+  const crossBook = structuredClone(base);
+  crossBook.source.bookId = "another-book";
+  assert.throws(() => validateFireflyReviewPacket(rehash(crossBook)), /source Book ID differs/u);
 });

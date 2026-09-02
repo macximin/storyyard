@@ -381,6 +381,9 @@ function validateV1(packet: Record<string, unknown>): FireflyReviewPacketV1 {
 function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
   exactKeys(packet, ["schemaVersion", "packetId", "packetSha256", "generatedAt", "purpose", "source", "work", "artifact", "comparison", "candidates", "sealedGenerationEvidence", "recommendation", "actions", "authority"]);
   validateBasePacket(packet);
+  if ((packet.source as Record<string, unknown>).bookId !== (packet.work as Record<string, unknown>).id) {
+    throw new Error("Review packet source Book ID differs from its work ID.");
+  }
   if (packet.purpose !== "promotion-evaluation") throw new Error("Blind v2 packets must be promotion evaluations.");
   if (packet.recommendation !== null) throw new Error("Blind v2 packets must not recommend a candidate.");
   const comparison = requireRecord(packet.comparison, "blind comparison");
