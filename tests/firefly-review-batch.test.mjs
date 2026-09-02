@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, truncate, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,10 +12,41 @@ import {
   validateFireflyReviewPacketStaticIndex,
 } from "../app/firefly-review-packet-index.mjs";
 import { hasDistinctBearerAuthority } from "../app/firefly-review-service-auth.ts";
-import { importFireflyReviewPacketBatch } from "../scripts/firefly-review-packet-index-lib.mjs";
+import {
+  FIREFLY_REVIEW_V2_MAX_BATCH_FILES,
+  FIREFLY_REVIEW_V2_MAX_BATCH_RAW_BYTES,
+  FIREFLY_REVIEW_V2_MAX_PACKET_RAW_BYTES,
+  importFireflyReviewPacketBatch,
+} from "../scripts/firefly-review-packet-index-lib.mjs";
 import { makeFireflyReviewPacketV2 } from "./firefly-review-v2-fixture.mjs";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+
+async function writePacketSource(root, name, packet) {
+  const path = join(root, `${name}.json`);
+  await writeFile(path, `${JSON.stringify(packet, null, 2)}\n`, "utf8");
+  return path;
+}
+
+async function snapshotReviewTarget(targetDir) {
+  const indexRaw = await readFile(join(targetDir, "index.json"), "utf8");
+  const index = validateFireflyReviewPacketStaticIndex(JSON.parse(indexRaw));
+  const immutable = Object.fromEntries(await Promise.all(index.packets.map(async (packet) => [
+    packet.packetId,
+    await readFile(join(targetDir, "immutable", `${packet.packetId}.json`), "utf8"),
+  ])));
+  return { immutable, indexRaw };
+}
+
+async function assertReviewTargetUnchanged(targetDir, expected) {
+  assert.deepEqual(await snapshotReviewTarget(targetDir), expected);
+}
+
+async function seedReviewTarget(root, targetDir) {
+  const sourcePath = await writePacketSource(root, "seed", makeFireflyReviewPacketV2({ round: 1 }));
+  await importFireflyReviewPacketBatch({ sourcePaths: [sourcePath], targetDir });
+  return { sourcePath, snapshot: await snapshotReviewTarget(targetDir) };
+}
 
 test("builds a strict, canonical multi-packet v2 static index", () => {
   const second = makeFireflyReviewPacketV2({ round: 2 });
@@ -124,6 +155,77 @@ test("adds a later batch without dropping an immutable indexed packet", async (c
   assert.deepEqual(stored.packets.map((packet) => packet.comparison.round), [1, 2]);
 });
 
+test("rejects a public v2 source larger than 64 MiB before changing stored review bytes", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "storyyard-review-packet-cap-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const targetDir = join(root, "target");
+  const { snapshot } = await seedReviewTarget(root, targetDir);
+  const oversized = join(root, "oversized.json");
+  await writeFile(oversized, "{}", "utf8");
+  await truncate(oversized, FIREFLY_REVIEW_V2_MAX_PACKET_RAW_BYTES + 1);
+
+  await assert.rejects(
+    importFireflyReviewPacketBatch({ sourcePaths: [oversized], targetDir }),
+    /packet v2 input exceeds the 67108864-byte limit/u,
+  );
+  await assertReviewTargetUnchanged(targetDir, snapshot);
+});
+
+test("rejects too many public v2 inputs before changing stored review bytes", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "storyyard-review-count-cap-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const targetDir = join(root, "target");
+  const { snapshot, sourcePath } = await seedReviewTarget(root, targetDir);
+
+  await assert.rejects(
+    importFireflyReviewPacketBatch({
+      sourcePaths: Array(FIREFLY_REVIEW_V2_MAX_BATCH_FILES + 1).fill(sourcePath),
+      targetDir,
+    }),
+    /input count exceeds the 256-file limit/u,
+  );
+  await assertReviewTargetUnchanged(targetDir, snapshot);
+});
+
+test("rejects an oversized aggregate from sparse public v2 inputs before parsing or writing", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "storyyard-review-aggregate-cap-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const targetDir = join(root, "target");
+  const { snapshot } = await seedReviewTarget(root, targetDir);
+  const sourceCount = Math.floor(FIREFLY_REVIEW_V2_MAX_BATCH_RAW_BYTES / FIREFLY_REVIEW_V2_MAX_PACKET_RAW_BYTES) + 1;
+  const sourcePaths = [];
+  for (let index = 0; index < sourceCount; index += 1) {
+    const path = join(root, `sparse-${index}.json`);
+    await writeFile(path, "{}", "utf8");
+    await truncate(path, FIREFLY_REVIEW_V2_MAX_PACKET_RAW_BYTES);
+    sourcePaths.push(path);
+  }
+
+  await assert.rejects(
+    importFireflyReviewPacketBatch({ sourcePaths, targetDir }),
+    /inputs exceed the 268435456-byte aggregate limit/u,
+  );
+  await assertReviewTargetUnchanged(targetDir, snapshot);
+});
+
+test("rejects an oversized projected static index before changing stored review bytes", async (context) => {
+  const root = await mkdtemp(join(tmpdir(), "storyyard-review-index-cap-"));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  const targetDir = join(root, "target");
+  const { snapshot } = await seedReviewTarget(root, targetDir);
+  const secondSource = await writePacketSource(root, "second", makeFireflyReviewPacketV2({ round: 2 }));
+
+  await assert.rejects(
+    importFireflyReviewPacketBatch({
+      sourcePaths: [secondSource],
+      targetDir,
+      limits: { maxStaticIndexBytes: Buffer.byteLength(snapshot.indexRaw, "utf8") },
+    }),
+    /Projected Firefly review packet static index exceeds/u,
+  );
+  await assertReviewTargetUnchanged(targetDir, snapshot);
+});
+
 test("separates review-sync read authority from apply authority", () => {
   const syncToken = "sync-token-123";
   const applyToken = "apply-token-456";
@@ -140,7 +242,7 @@ test("separates review-sync read authority from apply authority", () => {
 });
 
 test("shows genre and round progress for v2 without breaking legacy metadata", async () => {
-  const v2 = makeFireflyReviewPacketV2({ genre: "무협", round: 2 });
+  const v2 = makeFireflyReviewPacketV2({ genre: "murim-ko", round: 2 });
   assert.equal(fireflyReviewQueueMetadata(v2), "무협 · blind 평가 · 2/3");
   const legacy = validateFireflyReviewPacket(JSON.parse(await readFile(
     new URL("../data/firefly/review-packets/current.json", import.meta.url),

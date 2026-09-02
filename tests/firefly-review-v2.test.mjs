@@ -4,6 +4,13 @@ import test from "node:test";
 import { allSurfaceMatches, validateFireflyReviewPacket } from "../app/firefly-review-contract.ts";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
+const canonicalHash = (value) => {
+  const sort = (item) => Array.isArray(item) ? item.map(sort)
+    : item && typeof item === "object"
+      ? Object.fromEntries(Object.entries(item).sort(([left], [right]) => left.localeCompare(right)).map(([key, child]) => [key, sort(child)]))
+      : item;
+  return hash(JSON.stringify(sort(value)));
+};
 const iso = "2026-08-28T06:00:00.000Z";
 
 function span(body, text) {
@@ -58,7 +65,7 @@ function candidate(id, body, withMatch, canaryIsolation) {
       openingPressure: 90, protagonistAgency: 88, resistanceQuality: 86, visiblePayoff: 89,
       endingPropulsion: 91, referenceEngineRetention: 85, transformationIntegrity: 87, styleFidelity: 86,
     },
-    commercialEvaluationReceiptSha256: hash(`commercial-${id}`),
+    commercialEvaluationReceiptSha256: hash("runtime"),
     review: {
       status: "unreviewed",
       retained: ["engine"],
@@ -88,24 +95,30 @@ function packet() {
     receiptSha256: hash("canary-receipt"), receiptSelfHash: hash("canary-self"),
     isolationScopeSha256: hash("canary-scope"), commonSnapshotSha256: hash("common-snapshot"),
   };
+  const candidates = [candidate("candidate-A", "첫 후보의 압박 장면", true, canaryIsolation), candidate("candidate-B", "둘째 후보의 압박 장면", false, canaryIsolation)];
   const body = {
     purpose: "promotion-evaluation",
     source: { system: "inkos", bookId: "blind-book", sourceRevision: "revision-one" },
-    work: { id: "blind-book", title: "블라인드 작품", genre: "현대판타지", status: "active", targetChapters: 200 },
+    work: { id: "blind-book", title: "블라인드 작품", genre: "modern-fantasy-ko", status: "active", targetChapters: 200 },
     artifact: { id: "chapter-0001", kind: "chapter", chapterNumber: 1, title: "첫 화", status: "ready-for-review", currentContent, currentContentSha256: hash(currentContent) },
     comparison: {
-      reviewKind: "independent-blind-comparison", pairId: "pair-one", round: 1,
-      blindRunId: "blind-run-one", blindSessionId: "blind-session-one",
+      reviewKind: "independent-blind-comparison", pairId: "bp-0123456789abcdef01234567", round: 1,
+      blindRunId: "br-111111111111111111111111", blindSessionId: "br-222222222222222222222222",
       commonInputReceiptSha256: hash("common"), pairedGenerationReceiptSha256: hash("paired"),
       labelAssignmentReceiptSha256: hash("labels"), runtimeReceiptSha256: hash("runtime"),
       canaryIsolation: { ...canaryIsolation },
       candidateLabelsShuffled: true, generatorMetadataExcluded: true,
       runtime: { kernel: "enforce", piWorker: "off", retrieval: "legacy", fts: "off", model: "gpt-5.6-sol", reasoning: "high" },
     },
-    candidates: [candidate("candidate-A", "첫 후보의 압박 장면", true, canaryIsolation), candidate("candidate-B", "둘째 후보의 압박 장면", false, canaryIsolation)],
+    candidates,
     sealedGenerationEvidence: {
       candidateEvidenceReceiptSha256s: [hash("candidate-1"), hash("candidate-2")].sort(),
-      contentNeutralReceiptSha256s: [hash("neutral-1"), hash("neutral-2")].sort(),
+      contentNeutralReceiptSha256s: candidates.map((item) => canonicalHash({
+        schemaVersion: "firefly-content-neutral-evaluation/v1",
+        candidateId: item.id,
+        candidateSha256: item.sha256,
+        contentNeutrality: item.review.contentNeutrality,
+      })).sort(),
     },
     recommendation: null,
     actions: ["select", "tie", "invalid"],
@@ -119,6 +132,15 @@ function rehash(value) {
   const { schemaVersion: _schemaVersion, packetId: _packetId, packetSha256: _packetSha256, generatedAt, ...body } = value;
   const packetSha256 = hash(JSON.stringify({ generatedAt, ...body }));
   return { schemaVersion: "firefly_review_packet/v2", packetId: `frp-${packetSha256.slice(0, 24)}`, packetSha256, generatedAt, ...body };
+}
+
+function refreshNeutralReceipts(value) {
+  value.sealedGenerationEvidence.contentNeutralReceiptSha256s = value.candidates.map((item) => canonicalHash({
+    schemaVersion: "firefly-content-neutral-evaluation/v1",
+    candidateId: item.id,
+    candidateSha256: item.sha256,
+    contentNeutrality: item.review.contentNeutrality,
+  })).sort();
 }
 
 test("accepts a strict blind v2 packet without raw source prose", () => {
@@ -154,6 +176,9 @@ test("binds generatedAt and rejects lane, internal path, or label-map leakage", 
     () => validateFireflyReviewPacket({ ...base, generatedAt: "2026-08-28T06:00:01.000Z" }),
     /identity or SHA-256 mismatch/u,
   );
+  const offsetTimestamp = structuredClone(base);
+  offsetTimestamp.generatedAt = "2026-08-28T15:00:00+09:00";
+  assert.throws(() => validateFireflyReviewPacket(rehash(offsetTimestamp)), /UTC-Z ISO timestamp/u);
   for (const [field, value] of [
     ["lane", "genre-soul"],
     ["internalPath", ".inkos/canaries/pair-one/soul"],
@@ -187,7 +212,44 @@ test("requires blind candidate kind, matching canary scope, and non-applying aut
   stringRound.comparison.round = "1";
   assert.throws(() => validateFireflyReviewPacket(stringRound), /number 1, 2, or 3/u);
 
+  const collapsedIds = structuredClone(base);
+  collapsedIds.comparison.blindSessionId = collapsedIds.comparison.blindRunId;
+  assert.throws(() => validateFireflyReviewPacket(rehash(collapsedIds)), /run and session IDs must be distinct/u);
+
+  const semanticIds = structuredClone(base);
+  semanticIds.comparison.pairId = "pair-one";
+  semanticIds.comparison.blindRunId = "blind-run-one";
+  semanticIds.comparison.blindSessionId = "blind-session-one";
+  assert.throws(() => validateFireflyReviewPacket(rehash(semanticIds)), /opaque bp identifier|opaque br identifiers/u);
+
+  const receiptDrift = structuredClone(base);
+  receiptDrift.candidates[0].commercialEvaluationReceiptSha256 = hash("other-runtime");
+  assert.throws(() => validateFireflyReviewPacket(rehash(receiptDrift)), /commercial evaluation receipt differs/u);
+
+  const emptyEvidence = structuredClone(base);
+  emptyEvidence.candidates[0].review.emotionalCoherence.evidence = [];
+  assert.throws(() => validateFireflyReviewPacket(rehash(emptyEvidence)), /non-empty array/u);
+
+  const corpusDrift = structuredClone(base);
+  corpusDrift.candidates[1].review.surfaceComparison.surfaceIndexSha256 = hash("another-index");
+  assert.throws(() => validateFireflyReviewPacket(rehash(corpusDrift)), /same public surface corpus/u);
+
+  const neutralReceiptDrift = structuredClone(base);
+  neutralReceiptDrift.sealedGenerationEvidence.contentNeutralReceiptSha256s = ["0".repeat(64), "f".repeat(64)];
+  assert.throws(() => validateFireflyReviewPacket(rehash(neutralReceiptDrift)), /content-neutral evidence does not match/u);
+
   const crossBook = structuredClone(base);
   crossBook.source.bookId = "another-book";
   assert.throws(() => validateFireflyReviewPacket(rehash(crossBook)), /source Book ID differs/u);
+
+  const wrongSoul = structuredClone(base);
+  for (const candidate of wrongSoul.candidates) candidate.review.surfaceComparison.soulId = "male-fantasy-ko";
+  assert.throws(() => validateFireflyReviewPacket(rehash(wrongSoul)), /Public surface Soul does not match/u);
+
+  const duplicate = structuredClone(base);
+  duplicate.candidates[1].body = duplicate.candidates[0].body;
+  duplicate.candidates[1].sha256 = duplicate.candidates[0].sha256;
+  duplicate.candidates[1].review.emotionalCoherence.evidence = structuredClone(duplicate.candidates[0].review.emotionalCoherence.evidence);
+  refreshNeutralReceipts(duplicate);
+  assert.throws(() => validateFireflyReviewPacket(rehash(duplicate)), /distinct manuscripts/u);
 });

@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto";
 
 export const hash = (value) => createHash("sha256").update(value).digest("hex");
+const canonicalHash = (value) => {
+  const sort = (item) => Array.isArray(item) ? item.map(sort)
+    : item && typeof item === "object"
+      ? Object.fromEntries(Object.entries(item).sort(([left], [right]) => left.localeCompare(right)).map(([key, child]) => [key, sort(child)]))
+      : item;
+  return hash(JSON.stringify(sort(value)));
+};
 const iso = "2026-08-28T06:00:00.000Z";
 
 function span(body, text) {
@@ -10,7 +17,7 @@ function span(body, text) {
   return { coordinateKind: "utf8-byte", startByte, endByte, sliceSha256: hash(text) };
 }
 
-function candidate(id, body, receiptSeed, withMatch, canaryIsolation) {
+function candidate(id, body, receiptSeed, withMatch, canaryIsolation, soulId) {
   const candidateSha256 = hash(body);
   const selected = span(body, "압박");
   const candidateSelector = {
@@ -49,7 +56,7 @@ function candidate(id, body, receiptSeed, withMatch, canaryIsolation) {
       openingPressure: 90, protagonistAgency: 88, resistanceQuality: 86, visiblePayoff: 89,
       endingPropulsion: 91, referenceEngineRetention: 85, transformationIntegrity: 87, styleFidelity: 86,
     },
-    commercialEvaluationReceiptSha256: hash(`commercial-${receiptSeed}-${id}`),
+    commercialEvaluationReceiptSha256: hash(`runtime-${receiptSeed}`),
     review: {
       status: "unreviewed",
       retained: ["engine"],
@@ -60,7 +67,7 @@ function candidate(id, body, receiptSeed, withMatch, canaryIsolation) {
       canonContradictions: [],
       surfaceComparison: {
         schemaVersion: "soul_corpus_comparison/v2",
-        soulId: "male-modern-fantasy-ko",
+        soulId,
         soulVersion: "v1",
         surfaceIndexSha256: hash(`surface-index-${receiptSeed}`),
         surfaceMatches: withMatch ? [{
@@ -81,11 +88,16 @@ function candidate(id, body, receiptSeed, withMatch, canaryIsolation) {
 export function makeFireflyReviewPacketV2({
   bookId = "blind-book",
   title = "블라인드 작품",
-  genre = "현대판타지",
+  genre = "modern-fantasy-ko",
   round = 1,
-  pairId = `pair-${round}`,
+  pairId = `bp-${hash(`${bookId}:${round}:pair`).slice(0, 24)}`,
 } = {}) {
   const receiptSeed = `${bookId}-${round}-${pairId}`;
+  const soulId = ({
+    "modern-fantasy-ko": "male-modern-fantasy-ko",
+    "fantasy-ko": "male-fantasy-ko",
+    "murim-ko": "male-murim-ko",
+  })[genre] ?? "male-modern-fantasy-ko";
   const currentContent = `현재 원고 ${receiptSeed}`;
   const canaryIsolation = {
     receiptSha256: hash(`canary-receipt-${receiptSeed}`),
@@ -93,6 +105,10 @@ export function makeFireflyReviewPacketV2({
     isolationScopeSha256: hash(`canary-scope-${receiptSeed}`),
     commonSnapshotSha256: hash(`common-snapshot-${receiptSeed}`),
   };
+  const candidates = [
+    candidate("candidate-A", `첫 후보의 압박 장면 ${receiptSeed}`, receiptSeed, true, canaryIsolation, soulId),
+    candidate("candidate-B", `둘째 후보의 압박 장면 ${receiptSeed}`, receiptSeed, false, canaryIsolation, soulId),
+  ];
   const body = {
     purpose: "promotion-evaluation",
     source: { system: "inkos", bookId, sourceRevision: `revision-${receiptSeed}` },
@@ -100,20 +116,22 @@ export function makeFireflyReviewPacketV2({
     artifact: { id: "chapter-0001", kind: "chapter", chapterNumber: 1, title: "첫 화", status: "ready-for-review", currentContent, currentContentSha256: hash(currentContent) },
     comparison: {
       reviewKind: "independent-blind-comparison", pairId, round,
-      blindRunId: `blind-run-${receiptSeed}`, blindSessionId: `blind-session-${receiptSeed}`,
+      blindRunId: `br-${hash(`run-${receiptSeed}`).slice(0, 24)}`, blindSessionId: `br-${hash(`session-${receiptSeed}`).slice(0, 24)}`,
       commonInputReceiptSha256: hash(`common-${receiptSeed}`), pairedGenerationReceiptSha256: hash(`paired-${receiptSeed}`),
       labelAssignmentReceiptSha256: hash(`labels-${receiptSeed}`), runtimeReceiptSha256: hash(`runtime-${receiptSeed}`),
       canaryIsolation: { ...canaryIsolation },
       candidateLabelsShuffled: true, generatorMetadataExcluded: true,
       runtime: { kernel: "enforce", piWorker: "off", retrieval: "legacy", fts: "off", model: "gpt-5.6-sol", reasoning: "high" },
     },
-    candidates: [
-      candidate("candidate-A", `첫 후보의 압박 장면 ${receiptSeed}`, receiptSeed, true, canaryIsolation),
-      candidate("candidate-B", `둘째 후보의 압박 장면 ${receiptSeed}`, receiptSeed, false, canaryIsolation),
-    ],
+    candidates,
     sealedGenerationEvidence: {
       candidateEvidenceReceiptSha256s: [hash(`candidate-1-${receiptSeed}`), hash(`candidate-2-${receiptSeed}`)].sort(),
-      contentNeutralReceiptSha256s: [hash(`neutral-1-${receiptSeed}`), hash(`neutral-2-${receiptSeed}`)].sort(),
+      contentNeutralReceiptSha256s: candidates.map((item) => canonicalHash({
+        schemaVersion: "firefly-content-neutral-evaluation/v1",
+        candidateId: item.id,
+        candidateSha256: item.sha256,
+        contentNeutrality: item.review.contentNeutrality,
+      })).sort(),
     },
     recommendation: null,
     actions: ["select", "tie", "invalid"],

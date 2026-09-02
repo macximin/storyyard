@@ -173,8 +173,16 @@ export type FireflyReviewPacket = FireflyReviewPacketV1 | FireflyReviewPacketV2;
 
 const SHA = /^[0-9a-f]{64}$/u;
 const PACKET_ID = /^frp-[0-9a-f]{24}$/u;
+const OPAQUE_PAIR_ID = /^bp-[0-9a-f]{24}$/u;
+const OPAQUE_BLIND_ID = /^br-[0-9a-f]{24}$/u;
+const UTC_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/u;
 const BLIND_IDS = ["candidate-A", "candidate-B"] as const;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$/u;
+const GENRE_SOUL_IDS: Readonly<Record<string, string>> = Object.freeze({
+  "modern-fantasy-ko": "male-modern-fantasy-ko",
+  "fantasy-ko": "male-fantasy-ko",
+  "murim-ko": "male-murim-ko",
+});
 const CONTENT_NEUTRAL_CODES = new Set([
   "unauthorized-softening", "unauthorized-escalation", "moral-lecture", "disclaimer",
   "forced-punishment", "forced-apology", "forced-redemption", "forced-cost",
@@ -184,6 +192,19 @@ const MATCH_METHODS = new Set(["exact-token-12", "exact-byte-120", "long-common-
 
 function sha256(value: string | Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function canonicalSha256(value: unknown): string {
+  const sort = (item: unknown): unknown => {
+    if (Array.isArray(item)) return item.map(sort);
+    if (item && typeof item === "object") {
+      return Object.fromEntries(Object.entries(item as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, child]) => [key, sort(child)]));
+    }
+    return item;
+  };
+  return sha256(JSON.stringify(sort(value)));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -220,7 +241,7 @@ function requireSha(value: unknown, label: string): string {
 
 function requireIso(value: unknown, label: string): string {
   const result = requireString(value, label);
-  if (!Number.isFinite(Date.parse(result))) throw new Error(`${label} must be an ISO timestamp.`);
+  if (!UTC_DATETIME.test(result) || !Number.isFinite(Date.parse(result))) throw new Error(`${label} must be a UTC-Z ISO timestamp.`);
   return result;
 }
 
@@ -390,9 +411,14 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
   exactKeys(comparison, ["reviewKind", "pairId", "round", "blindRunId", "blindSessionId", "commonInputReceiptSha256", "pairedGenerationReceiptSha256", "labelAssignmentReceiptSha256", "runtimeReceiptSha256", "canaryIsolation", "candidateLabelsShuffled", "generatorMetadataExcluded", "runtime"]);
   if (comparison.reviewKind !== "independent-blind-comparison" || comparison.candidateLabelsShuffled !== true || comparison.generatorMetadataExcluded !== true) throw new Error("v2 comparison is not independently blinded.");
   requireSafeId(comparison.pairId, "comparison pair ID");
+  if (!OPAQUE_PAIR_ID.test(String(comparison.pairId))) throw new Error("Comparison pair ID must be an opaque bp identifier.");
   if (![1, 2, 3].includes(comparison.round as number)) throw new Error("comparison round must be the number 1, 2, or 3.");
   requireSafeId(comparison.blindRunId, "blind run ID");
   requireSafeId(comparison.blindSessionId, "blind session ID");
+  if (!OPAQUE_BLIND_ID.test(String(comparison.blindRunId)) || !OPAQUE_BLIND_ID.test(String(comparison.blindSessionId))) {
+    throw new Error("Blind run and session IDs must be opaque br identifiers.");
+  }
+  if (comparison.blindRunId === comparison.blindSessionId) throw new Error("Blind comparison run and session IDs must be distinct.");
   for (const key of ["commonInputReceiptSha256", "pairedGenerationReceiptSha256", "labelAssignmentReceiptSha256", "runtimeReceiptSha256"]) requireSha(comparison[key], `comparison ${key}`);
   const comparisonIsolation = validateCanaryIsolation(comparison.canaryIsolation, "comparison canary isolation");
   const runtime = requireRecord(comparison.runtime, "comparison runtime");
@@ -402,6 +428,10 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
   if (!Array.isArray(packet.candidates) || packet.candidates.length !== 2) throw new Error("v2 blind comparison requires exactly two candidates.");
   const candidateIds: string[] = [];
   const matchIds = new Set<string>();
+  let surfaceCorpus: string | null = null;
+  const work = packet.work as Record<string, unknown>;
+  const expectedSoulId = GENRE_SOUL_IDS[String(work.genre)];
+  if (!expectedSoulId) throw new Error("Review packet genre is outside the locked male genre-Soul set.");
   for (const value of packet.candidates) {
     const candidate = requireRecord(value, "v2 review candidate");
     exactKeys(candidate, ["id", "kind", "evaluationBindingSha256", "canaryIsolation", "status", "body", "sha256", "preparedAt", "commercialScore", "commercialEvaluation", "commercialEvaluationReceiptSha256", "review"]);
@@ -425,6 +455,9 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
     const expectedScore = Math.round(((front * 0.7) + (reference * 0.3)) * 10) / 10;
     if (commercialScore !== expectedScore) throw new Error("v2 commercial score does not match dopamine70-reference30-v1.");
     requireSha(candidate.commercialEvaluationReceiptSha256, "v2 commercial evaluation receipt SHA");
+    if (candidate.commercialEvaluationReceiptSha256 !== comparison.runtimeReceiptSha256) {
+      throw new Error("Candidate commercial evaluation receipt differs from the comparison runtime receipt.");
+    }
     const review = requireRecord(candidate.review, "v2 candidate review");
     exactKeys(review, ["status", "retained", "variedSurface", "linkedConsequences", "emotionalCoherence", "contentNeutrality", "canonContradictions", "surfaceComparison"]);
     requireString(review.status, "v2 review status");
@@ -434,7 +467,7 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
     const emotional = requireRecord(review.emotionalCoherence, "emotional coherence");
     exactKeys(emotional, ["score", "evidence"]);
     requireNumber(emotional.score, "emotional coherence score");
-    if (!Array.isArray(emotional.evidence)) throw new Error("Emotional coherence evidence must be an array.");
+    if (!Array.isArray(emotional.evidence) || emotional.evidence.length < 1) throw new Error("Emotional coherence evidence must be a non-empty array.");
     for (const span of emotional.evidence) validateCandidateSpan(span, candidate.body, "emotional evidence");
     const neutrality = requireRecord(review.contentNeutrality, "content neutrality");
     exactKeys(neutrality, ["passed", "violations"]);
@@ -442,7 +475,7 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
     for (const rawViolation of neutrality.violations) {
       const violation = requireRecord(rawViolation, "content neutrality violation");
       exactKeys(violation, ["code", "evidence"]);
-      if (!CONTENT_NEUTRAL_CODES.has(String(violation.code)) || !Array.isArray(violation.evidence)) throw new Error("Content neutrality violation is invalid.");
+      if (!CONTENT_NEUTRAL_CODES.has(String(violation.code)) || !Array.isArray(violation.evidence) || violation.evidence.length < 1) throw new Error("Content neutrality violation is invalid.");
       for (const span of violation.evidence) validateCandidateSpan(span, candidate.body, "content neutrality evidence");
     }
     if (neutrality.passed !== (neutrality.violations.length === 0)) throw new Error("Content neutrality pass flag contradicts violations.");
@@ -450,7 +483,7 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
     for (const rawContradiction of review.canonContradictions) {
       const contradiction = requireRecord(rawContradiction, "canon contradiction");
       exactKeys(contradiction, ["code", "evidence"]);
-      if (contradiction.code !== "hard-canon-contradiction" || !Array.isArray(contradiction.evidence)) throw new Error("Canon contradiction is invalid.");
+      if (contradiction.code !== "hard-canon-contradiction" || !Array.isArray(contradiction.evidence) || contradiction.evidence.length < 1) throw new Error("Canon contradiction is invalid.");
       for (const span of contradiction.evidence) validateCandidateSpan(span, candidate.body, "canon contradiction evidence");
     }
     const surface = requireRecord(review.surfaceComparison, "surface comparison");
@@ -458,12 +491,27 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
     if (surface.schemaVersion !== "soul_corpus_comparison/v2" || surface.similarityPenaltyApplied !== false || surface.automaticRewriteApplied !== false || surface.automaticRejectApplied !== false || surface.humanDecision !== "pending") throw new Error("Surface comparison changed the candidate automatically.");
     requireString(surface.soulId, "surface Soul ID");
     requireString(surface.soulVersion, "surface Soul version");
+    if (surface.soulId !== expectedSoulId || surface.soulVersion !== "v1") {
+      throw new Error("Public surface Soul does not match the work genre.");
+    }
     requireSha(surface.surfaceIndexSha256, "surface index SHA");
     if (!Array.isArray(surface.surfaceMatches)) throw new Error("Surface matches must be an array.");
     for (const match of surface.surfaceMatches) validateSurfaceMatch(match, candidate.body, candidateSha, matchIds);
+    const candidateCorpus = JSON.stringify({
+      soulId: surface.soulId,
+      soulVersion: surface.soulVersion,
+      surfaceIndexSha256: surface.surfaceIndexSha256,
+    });
+    if (surfaceCorpus !== null && surfaceCorpus !== candidateCorpus) {
+      throw new Error("Blind candidates must use the same public surface corpus.");
+    }
+    surfaceCorpus = candidateCorpus;
   }
   if (JSON.stringify(candidateIds) !== JSON.stringify(BLIND_IDS)) {
     throw new Error("v2 candidate IDs must be ordered exactly as candidate-A then candidate-B.");
+  }
+  if ((packet.candidates as Array<Record<string, unknown>>)[0].sha256 === (packet.candidates as Array<Record<string, unknown>>)[1].sha256) {
+    throw new Error("Blind comparison candidates must contain distinct manuscripts.");
   }
   const evidence = requireRecord(packet.sealedGenerationEvidence, "sealed generation evidence");
   exactKeys(evidence, ["candidateEvidenceReceiptSha256s", "contentNeutralReceiptSha256s"]);
@@ -472,6 +520,18 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
     if (!Array.isArray(values) || values.length !== 2 || values.some((item) => typeof item !== "string" || !SHA.test(item)) || values[0] >= values[1]) {
       throw new Error(`${key} must contain two unique sorted SHA-256 values.`);
     }
+  }
+  const expectedNeutralEvidence = (packet.candidates as Array<Record<string, unknown>>).map((rawCandidate) => {
+    const candidate = rawCandidate as unknown as FireflyReviewCandidateV2;
+    return canonicalSha256({
+      schemaVersion: "firefly-content-neutral-evaluation/v1",
+      candidateId: candidate.id,
+      candidateSha256: candidate.sha256,
+      contentNeutrality: candidate.review.contentNeutrality,
+    });
+  }).sort();
+  if (JSON.stringify(evidence.contentNeutralReceiptSha256s) !== JSON.stringify(expectedNeutralEvidence)) {
+    throw new Error("Sealed content-neutral evidence does not match the public candidate evaluations.");
   }
   if (JSON.stringify(packet.actions) !== JSON.stringify(["select", "tie", "invalid"])) {
     throw new Error("Blind v2 actions must be select, tie, and invalid.");
