@@ -5,7 +5,7 @@ import { importFireflyReviewPacketBatch } from "./firefly-review-packet-index-li
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const sourcePaths = process.argv.slice(2).map((path) => resolve(path));
 if (sourcePaths.length === 0) {
-  console.error("사용법: npm run firefly:import-review-v2-batch -- <packet-v2.json> [packet-v2.json ...]");
+  console.error("사용법: npm run firefly:import-review-batch -- <packet-v2-or-v3.json> [packet.json ...]");
   process.exit(2);
 }
 

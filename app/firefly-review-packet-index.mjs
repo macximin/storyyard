@@ -18,18 +18,21 @@ function compareText(left, right) {
 }
 
 function comparePackets(left, right) {
+  const leftPlanning = left.schemaVersion === "firefly_review_packet/v3" ? 0 : 1;
+  const rightPlanning = right.schemaVersion === "firefly_review_packet/v3" ? 0 : 1;
+  if (leftPlanning !== rightPlanning) return leftPlanning - rightPlanning;
   return compareText(left.work.genre, right.work.genre)
     || compareText(left.work.id, right.work.id)
-    || left.comparison.round - right.comparison.round
-    || compareText(left.comparison.pairId, right.comparison.pairId)
+    || ((left.comparison?.round ?? 0) - (right.comparison?.round ?? 0))
+    || compareText(left.comparison?.pairId ?? "", right.comparison?.pairId ?? "")
     || compareText(left.packetId, right.packetId);
 }
 
 export function buildFireflyReviewPacketStaticIndex(values) {
   const packets = values.map((value) => {
     const packet = validateFireflyReviewPacket(value);
-    if (packet.schemaVersion !== "firefly_review_packet/v2") {
-      throw new Error("The generated static index accepts immutable Firefly review packet v2 values only.");
+    if (!["firefly_review_packet/v2", "firefly_review_packet/v3"].includes(packet.schemaVersion)) {
+      throw new Error("The generated static index accepts immutable Firefly review packet v2 or v3 values only.");
     }
     return packet;
   }).sort(comparePackets);

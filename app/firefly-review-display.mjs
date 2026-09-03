@@ -8,5 +8,8 @@ export function fireflyReviewQueueMetadata(packet) {
   if (packet.schemaVersion === "firefly_review_packet/v2") {
     return [genre, "blind 평가", `${packet.comparison.round}/3`].filter(Boolean).join(" · ");
   }
+  if (packet.schemaVersion === "firefly_review_packet/v3") {
+    return [genre, "기획 HIL", `${packet.candidates.length}개 후보`].filter(Boolean).join(" · ");
+  }
   return [genre, `${packet.candidates.length}개 후보`].filter(Boolean).join(" · ");
 }

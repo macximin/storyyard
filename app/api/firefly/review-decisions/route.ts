@@ -11,6 +11,12 @@ import { fireflyReviewDecisions } from "@/db/schema";
 
 const allowedSurfaceClassifications = new Set<SurfaceClassification>(["engine", "genre-convention", "source-surface", "canon-leak"]);
 
+function decisionSchemaForPacket(schemaVersion: string): string {
+  if (schemaVersion === "firefly_review_packet/v3") return "firefly_review_decision/v3";
+  if (schemaVersion === "firefly_review_packet/v2") return "firefly_review_decision/v2";
+  return "firefly_review_decision/v1";
+}
+
 async function requireAdmin() {
   const user = await getChatGPTUser();
   return user?.role === "admin" ? user : null;
@@ -120,14 +126,14 @@ export async function POST(request: Request) {
       return Response.json({ error: "캐논 유입으로 분류된 후보는 선택할 수 없음. 동률·페어 무효를 검토해 줘." }, { status: 400 });
     }
   } else if (input.surfaceClassifications !== undefined) {
-    return Response.json({ error: "v1 패킷에는 v2 표면 분류를 기록할 수 없음." }, { status: 400 });
+    return Response.json({ error: "이 패킷에는 v2 표면 분류를 기록할 수 없음." }, { status: 400 });
   }
   const surfaceClassificationsJson = JSON.stringify(surfaceClassifications);
 
   await ensureFireflyReviewSnapshot(packet);
   const [duplicate] = await getDb().select().from(fireflyReviewDecisions).where(and(
     eq(fireflyReviewDecisions.actorUserId, user.id),
-    eq(fireflyReviewDecisions.schemaVersion, packet.schemaVersion === "firefly_review_packet/v2" ? "firefly_review_decision/v2" : "firefly_review_decision/v1"),
+    eq(fireflyReviewDecisions.schemaVersion, decisionSchemaForPacket(packet.schemaVersion)),
     eq(fireflyReviewDecisions.packetId, packet.packetId),
     eq(fireflyReviewDecisions.candidateId, storedCandidateId),
     eq(fireflyReviewDecisions.decision, decisionChoice),
@@ -140,9 +146,9 @@ export async function POST(request: Request) {
   }
   const decision = {
     id: crypto.randomUUID(),
-    schemaVersion: packet.schemaVersion === "firefly_review_packet/v2" ? "firefly_review_decision/v2" : "firefly_review_decision/v1",
+    schemaVersion: decisionSchemaForPacket(packet.schemaVersion),
     packetId: packet.packetId, packetSha256: packet.packetSha256,
-    bookId: packet.source.bookId, artifactId: packet.artifact.id,
+    bookId: packet.schemaVersion === "firefly_review_packet/v3" ? packet.source.slateId : packet.source.bookId,
     candidateId: storedCandidateId, candidateSha256: storedCandidateSha256,
     decision: decisionChoice, comment, surfaceClassifications: surfaceClassificationsJson,
     actorUserId: user.id, actorEmail: user.email,
@@ -166,6 +172,9 @@ export async function PATCH(request: Request) {
   const packet = getFireflyReviewPacket(stored.packetId);
   if (!packet || packet.packetSha256 !== stored.packetSha256) {
     return Response.json({ error: "등록된 검토 패킷과 원판정이 일치하지 않음." }, { status: 409 });
+  }
+  if (packet.schemaVersion === "firefly_review_packet/v3") {
+    return Response.json({ error: "기획 판정 적용 영수증은 InkOS 기획 승격 경로에서 처리해야 함." }, { status: 409 });
   }
   const validation = packet.schemaVersion === "firefly_review_packet/v2"
     ? validateEvaluationAck(stored, input, packet.comparison.pairId)

@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { ArrowRight, Check, Clock, Eye, LockKey, MagicWand, Pause, ShieldCheck, X } from "@phosphor-icons/react";
 import { GlobalSidebar, SidebarUser } from "@/app/global-sidebar";
 import { fireflyReviewQueueMetadata } from "@/app/firefly-review-display.mjs";
-import type { FireflyDecision, FireflyReviewPacket, FireflySurfaceMatch, SurfaceClassification } from "@/app/firefly-review-packets";
+import type { FireflyDecision, FireflyPitchReviewCandidateV3, FireflyReviewPacket, FireflySurfaceMatch, SurfaceClassification } from "@/app/firefly-review-packets";
 
 type DecisionRow = { decisionId: string; candidateId: string | null; decision: string; comment: string; status: string; createdAt: string };
 type DecisionChoice = FireflyDecision | "";
@@ -35,6 +35,12 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
   const packet = packets[packetIndex] ?? null;
   const [candidateId, setCandidateId] = useState(packets[0]?.candidates[0]?.id ?? "");
   const candidate = packet?.candidates.find((item) => item.id === candidateId) ?? packet?.candidates[0] ?? null;
+  const v2Candidate = packet?.schemaVersion === "firefly_review_packet/v2"
+    ? packet.candidates.find((item) => item.id === candidateId) ?? packet.candidates[0]
+    : null;
+  const v3Candidate = packet?.schemaVersion === "firefly_review_packet/v3"
+    ? packet.candidates.find((item) => item.id === candidateId) ?? packet.candidates[0]
+    : null;
   const [decision, setDecision] = useState<DecisionChoice>(defaultDecision(packets[0]));
   const [comment, setComment] = useState("");
   const [histories, setHistories] = useState(initialDecisions);
@@ -129,7 +135,9 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
       setDecision(defaultDecision(packet));
       setMessage(packet.schemaVersion === "firefly_review_packet/v2"
         ? "사람 평가를 pending으로 기록했음. 원고와 캐논은 바뀌지 않음."
-        : "InkOS 적용 대기 영수증으로 기록했음. 원고는 아직 바뀌지 않음.");
+        : packet.schemaVersion === "firefly_review_packet/v3"
+          ? "기획 판정을 pending으로 기록했음. InkOS 승인 전에는 집필이 시작되지 않음."
+          : "InkOS 적용 대기 영수증으로 기록했음. 원고는 아직 바뀌지 않음.");
     } catch { setMessage("연결 문제로 판정을 기록하지 못했음."); }
     finally { setPending(false); }
   }
@@ -143,37 +151,42 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
       </header>
       <nav className="review-queue" aria-label="검토 패킷">
         {packets.map((item, index) => <button key={item.packetId} className={index === packetIndex ? "active" : ""} onClick={() => selectPacket(index)}>
-          <span>{item.work.title}</span><strong>{item.artifact.chapterNumber}화 · {item.artifact.title}</strong><small>{fireflyReviewQueueMetadata(item)}</small>
+          <span>{item.work.title}</span><strong>{item.schemaVersion === "firefly_review_packet/v3" ? `기획 · ${item.artifact.title}` : `${item.artifact.chapterNumber}화 · ${item.artifact.title}`}</strong><small>{fireflyReviewQueueMetadata(item)}</small>
         </button>)}
       </nav>
       <div className="firefly-review-grid">
         <section className="candidate-reader">
-          <div className="candidate-reader-head"><div><p className="kicker">CANDIDATE</p><h2>{packet.work.title}</h2><span>{packet.artifact.chapterNumber}화 · {packet.artifact.title}</span></div>
-            <div className="score-chip"><span>상업성</span><strong>{candidate.commercialScore?.toFixed(1) ?? "—"}</strong></div></div>
+          <div className="candidate-reader-head"><div><p className="kicker">{packet.schemaVersion === "firefly_review_packet/v3" ? "PLANNING CANDIDATE" : "CANDIDATE"}</p><h2>{packet.work.title}</h2><span>{packet.schemaVersion === "firefly_review_packet/v3" ? `기획 HIL · ${packet.work.targetChapters}화 목표` : `${packet.artifact.chapterNumber}화 · ${packet.artifact.title}`}</span></div>
+            <div className="score-chip"><span>상업성</span><strong>{candidateCommercialScore(packet, candidate.id)}</strong></div></div>
           <nav className="candidate-tabs" aria-label="후보 선택">{packet.candidates.map((item, index) => <button key={item.id} className={item.id === candidate.id ? "active" : ""} onClick={() => setCandidateId(item.id)}>
-            후보 {String.fromCharCode(65 + index)} <span>{item.commercialScore?.toFixed(1) ?? "미평가"}</span>
+            후보 {String.fromCharCode(65 + index)} <span>{candidateCommercialScore(packet, item.id)}</span>
           </button>)}</nav>
+          {v3Candidate && <section className="planning-entry-banner">
+            <div><ShieldCheck size={18} /><strong>기획 Entry Contract · 승인 전 집필 차단</strong></div>
+            <p>인간 욕망, 당장 벌어진 상황, 주인공의 행동 목적과 첫 결제를 먼저 확인합니다. 선택 전에는 Book·Arc·원고를 만들지 않습니다.</p>
+          </section>}
           {packet.schemaVersion === "firefly_review_packet/v2" && <section className="blind-comparison-banner">
             <div><ShieldCheck size={18} /><strong>독립 blind pair · {packet.comparison.round}/3 · 평가 전용</strong></div>
             <p>생성 경로와 label 매핑은 숨겼습니다. 선택은 승자 평가 영수증만 남기며 원고·캐논을 적용하지 않습니다.</p>
             <dl><div><dt>Kernel</dt><dd>{packet.comparison.runtime.kernel}</dd></div><div><dt>Model</dt><dd>{packet.comparison.runtime.model} / {packet.comparison.runtime.reasoning}</dd></div><div><dt>Pair receipt</dt><dd>{shortSha(packet.comparison.pairedGenerationReceiptSha256)}</dd></div></dl>
           </section>}
           {packet.recommendation?.candidateId === candidate.id && <p className="recommendation"><Check size={15} /> 추천 후보 · {packet.recommendation.reason}</p>}
-          {packet.schemaVersion === "firefly_review_packet/v2" && <section className="commercial-dimensions">
-            <header><div><p className="kicker">INDEPENDENT REVIEW</p><h3>상업성·감정적 정합성</h3></div><strong>{candidate.review.emotionalCoherence.score.toFixed(1)}</strong></header>
-            <div>{Object.entries(candidate.commercialEvaluation).map(([key, value]) => <dl key={key}><dt>{commercialLabels[key] ?? key}</dt><dd>{value.toFixed(1)}</dd></dl>)}</div>
-            <p className={candidate.review.contentNeutrality.passed ? "neutrality-pass" : "neutrality-alert"}>허구 내용 중립 {candidate.review.contentNeutrality.passed ? "PASS" : `${candidate.review.contentNeutrality.violations.length}건 확인 필요`} · hard contradiction {candidate.review.canonContradictions.length}건</p>
+          {v2Candidate && <section className="commercial-dimensions">
+            <header><div><p className="kicker">INDEPENDENT REVIEW</p><h3>상업성·감정적 정합성</h3></div><strong>{v2Candidate.review.emotionalCoherence.score.toFixed(1)}</strong></header>
+            <div>{Object.entries(v2Candidate.commercialEvaluation).map(([key, value]) => <dl key={key}><dt>{commercialLabels[key] ?? key}</dt><dd>{value.toFixed(1)}</dd></dl>)}</div>
+            <p className={v2Candidate.review.contentNeutrality.passed ? "neutrality-pass" : "neutrality-alert"}>허구 내용 중립 {v2Candidate.review.contentNeutrality.passed ? "PASS" : `${v2Candidate.review.contentNeutrality.violations.length}건 확인 필요`} · hard contradiction {v2Candidate.review.canonContradictions.length}건</p>
           </section>}
-          <article className="candidate-prose">{candidate.body}</article>
-          {packet.schemaVersion === "firefly_review_packet/v2" && <section className="surface-review">
+          {v3Candidate && <PlanningEntryReview candidate={v3Candidate} />}
+          {packet.schemaVersion !== "firefly_review_packet/v3" && <article className="candidate-prose">{candidate.body}</article>}
+          {v2Candidate && <section className="surface-review">
             <header><div><p className="kicker">SURFACE HIL</p><h3>표면 비교</h3></div><span>{classifiedCount}/{allMatches.length} 분류</span></header>
-            {candidate.review.surfaceComparison.surfaceMatches.length === 0
+            {v2Candidate.review.surfaceComparison.surfaceMatches.length === 0
               ? <p className="surface-empty">검출된 표면 일치 없음 · 자동 감점·재작성·거절 없음</p>
-              : candidate.review.surfaceComparison.surfaceMatches.map((match) => {
+              : v2Candidate.review.surfaceComparison.surfaceMatches.map((match) => {
                 const source = sourceSlices[match.matchId];
                 return <article key={match.matchId} className="surface-match-card">
                   <header><strong>{match.matchMethod}</strong><code>{shortSha(match.selectorSha256)}</code></header>
-                  <div className="surface-pair"><div><span>후보 구간</span><blockquote>{decodeCandidateSlice(candidate.body, match)}</blockquote></div><div><span>원문 구간 · 일회성 조회</span>
+                  <div className="surface-pair"><div><span>후보 구간</span><blockquote>{decodeCandidateSlice(v2Candidate.body, match)}</blockquote></div><div><span>원문 구간 · 일회성 조회</span>
                     {source?.status === "ready" ? <><blockquote>{source.body}</blockquote><button type="button" onClick={() => setSourceSlices((current) => { const next = { ...current }; delete next[match.matchId]; return next; })}>닫고 지우기</button></>
                       : source?.status === "error" ? <p>{source.message}</p>
                         : <button type="button" disabled={source?.status === "loading"} onClick={() => openSourceSlice(match)}><Eye size={15} /> {source?.status === "loading" ? "불러오는 중…" : "원문 열기"}</button>}
@@ -185,18 +198,20 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
                 </article>;
               })}
           </section>}
-          <details className="baseline-details"><summary>현재 InkOS 원고와 비교</summary><article>{packet.artifact.currentContent}</article></details>
+          {packet.schemaVersion !== "firefly_review_packet/v3" && <details className="baseline-details"><summary>현재 InkOS 원고와 비교</summary><article>{packet.artifact.currentContent}</article></details>}
         </section>
         <aside className="decision-dock"><form onSubmit={submit}>
           <p className="kicker">DECISION RECEIPT</p><h2>판정 남기기</h2>
-          <div className="decision-options">{packet.actions.map((value) => { const Icon = icons[value]; return <label key={value} className={decision === value ? `selected ${value}` : ""}><input type="radio" checked={decision === value} onChange={() => setDecision(value)} /><Icon size={17} /><span>{labels[value]}</span></label>; })}</div>
+          <div className="decision-options">{packet.actions.map((value) => { const Icon = icons[value]; return <label key={value} className={decision === value ? `selected ${value}` : ""}><input type="radio" checked={decision === value} onChange={() => setDecision(value)} /><Icon size={17} /><span>{decisionLabel(packet, value)}</span></label>; })}</div>
           <label className="review-comment"><span>{decision === "approve" || decision === "select" ? "메모 (선택)" : "근거 (필수)"}</span><textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={2000} placeholder={decision === "polish" ? "살릴 부분과 다듬을 부분을 짧게 적어 주세요." : "판정 이유를 적어 주세요."} /></label>
           {packet.schemaVersion === "firefly_review_packet/v2" && allMatches.length > classifiedCount && <p className="classification-required">표면 일치 {allMatches.length - classifiedCount}건을 먼저 분류해 주세요.</p>}
-          <button className="black-button" disabled={pending || !decision || (packet.schemaVersion === "firefly_review_packet/v2" && allMatches.length > classifiedCount)}>{pending ? "기록 중…" : decision ? <>{labels[decision]} <ArrowRight size={15} /></> : "사람 판정 선택"}</button>
+          <button className="black-button" disabled={pending || !decision || (packet.schemaVersion === "firefly_review_packet/v2" && allMatches.length > classifiedCount)}>{pending ? "기록 중…" : decision ? <>{decisionLabel(packet, decision)} <ArrowRight size={15} /></> : "사람 판정 선택"}</button>
           {message && <p className="review-message">{message}</p>}
           <p className="pending-notice"><Clock size={16} /><span>{packet.schemaVersion === "firefly_review_packet/v2"
             ? "이 평가는 pending으로 저장됩니다. 수신 확인 뒤에도 원고·캐논에는 적용되지 않습니다."
-            : "이 판정은 pending으로 저장됩니다. InkOS가 해시를 다시 확인하고 적용해야 정본이 바뀝니다."}</span></p>
+            : packet.schemaVersion === "firefly_review_packet/v3"
+              ? "이 기획 판정은 pending으로 저장됩니다. InkOS가 선택 영수증을 확인하기 전에는 집필할 수 없습니다."
+              : "이 판정은 pending으로 저장됩니다. InkOS가 해시를 다시 확인하고 적용해야 정본이 바뀝니다."}</span></p>
         </form>
         <section className="decision-history"><h3>최근 판정</h3>{(histories[packet.packetId] ?? []).map((row) => <article key={row.decisionId}><header><strong>{labels[row.decision as FireflyDecision] ?? row.decision}</strong><span>{row.status}</span></header>{row.candidateId && <p>{row.candidateId}</p>}{row.comment && <blockquote>{row.comment}</blockquote>}</article>)}</section>
         </aside>
@@ -209,6 +224,49 @@ function shortSha(value: string): string { return `${value.slice(0, 10)}…`; }
 
 function defaultDecision(packet: FireflyReviewPacket | undefined): DecisionChoice {
   return packet?.schemaVersion === "firefly_review_packet/v1" ? "approve" : "";
+}
+
+function candidateCommercialScore(packet: FireflyReviewPacket, candidateId: string): string {
+  if (packet.schemaVersion === "firefly_review_packet/v3") {
+    return packet.candidates.find((item) => item.id === candidateId)?.independentReview.independentScore.total.toFixed(0) ?? "—";
+  }
+  const candidate = packet.candidates.find((item) => item.id === candidateId) ?? packet.candidates[0];
+  return candidate?.commercialScore?.toFixed(1) ?? "미평가";
+}
+
+function decisionLabel(packet: FireflyReviewPacket, decision: FireflyDecision): string {
+  if (packet.schemaVersion === "firefly_review_packet/v3" && decision === "reject") return "이 기획 탈락";
+  if (packet.schemaVersion === "firefly_review_packet/v3" && decision === "hold") return "기획 보류";
+  return labels[decision];
+}
+
+function PlanningEntryReview({ candidate }: { candidate: FireflyPitchReviewCandidateV3 }) {
+  const { entryContract, independentReview } = candidate;
+  const scoreLabels: Record<string, string> = {
+    promise: "약속", earlyPayoff: "초반 결제", repeatEngine: "반복 엔진",
+    railConversion: "관계 전환", longRunSupply: "장기 공급력",
+  };
+  return <div className="planning-entry-review">
+    <section className="planning-promise">
+      <p className="kicker">ONE-LINE PROMISE</p>
+      <h3>{candidate.titleCandidates[0]}</h3>
+      <blockquote>{candidate.oneLinePromise}</blockquote>
+      <p><strong>주인공 반복 동사</strong>{candidate.protagonist.repeatedVerb}</p>
+    </section>
+    <section className="entry-gate-card">
+      <header><div><p className="kicker">INDEPENDENT ENTRY GATE</p><h3>{independentReview.verdict}</h3></div><strong className={independentReview.entryGate.passed ? "gate-pass" : "gate-fail"}>{independentReview.entryGate.passed ? "PASS" : "FAIL"}</strong></header>
+      <dl><div><dt>지금 누구인가</dt><dd>{independentReview.entryGate.protagonistNow}</dd></div><div><dt>개인 욕망</dt><dd>{independentReview.entryGate.personalWant}</dd></div><div><dt>왜 지금인가</dt><dd>{independentReview.entryGate.whyNow}</dd></div><div><dt>반복 판타지</dt><dd>{independentReview.entryGate.repeatableFantasy}</dd></div><div><dt>1화 목표</dt><dd>{independentReview.entryGate.chapterGoal}</dd></div></dl>
+      {independentReview.entryGate.failureReasons.length > 0 && <ul>{independentReview.entryGate.failureReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
+    </section>
+    <section className="planning-contract-grid">
+      <article><p className="kicker">HUMAN DRIVE</p><h3>욕망과 정서 비용</h3><dl><div><dt>결핍·모욕</dt><dd>{entryContract.humanDrive.lackOrHumiliation}</dd></div><div><dt>개인 욕망</dt><dd>{entryContract.humanDrive.personalDesire}</dd></div><div><dt>사익</dt><dd>{entryContract.humanDrive.selfInterest}</dd></div><div><dt>정서 비용 상한</dt><dd>{entryContract.humanDrive.emotionalCostLimit}</dd></div></dl></article>
+      <article><p className="kicker">PURPOSE</p><h3>작품·Arc·1화 목적</h3><dl><div><dt>작품 WHAT</dt><dd>{entryContract.purpose.seriesWhat}</dd></div><div><dt>Arc WHAT</dt><dd>{entryContract.purpose.arcWhat}</dd></div><div><dt>1화 WANT</dt><dd>{entryContract.purpose.chapterWant}</dd></div><div><dt>왜 지금</dt><dd>{entryContract.purpose.whyNow}</dd></div></dl></article>
+    </section>
+    <section className="commercial-promise-card"><p className="kicker">COMMERCIAL PROMISE</p><h3>상황 → 우위 → 결제</h3><dl><div><dt>현재 상황</dt><dd>{entryContract.commercialPromise.currentSituation}</dd></div><div><dt>독자 판타지</dt><dd>{entryContract.commercialPromise.repeatableReaderFantasy}</dd></div><div><dt>우위의 작동</dt><dd>{entryContract.commercialPromise.howAdvantage}</dd></div><div><dt>첫 결제</dt><dd>{entryContract.commercialPromise.firstPayoff}</dd></div><div><dt>목격자</dt><dd>{entryContract.commercialPromise.payoffWitness}</dd></div><div><dt>다음 결제 질문</dt><dd>{entryContract.commercialPromise.nextPaymentQuestion}</dd></div></dl></section>
+    <section className="opening-payment-grid">{candidate.openingEpisodes.map((episode) => <article key={episode.episode}><span>{episode.episode}화</span><strong>{episode.event}</strong><p>{episode.visiblePayoff}</p></article>)}</section>
+    <section className="planning-review-notes"><div><strong>강점</strong><p>{independentReview.decisiveStrength}</p></div><div><strong>위험</strong><p>{independentReview.decisiveRisk}</p></div><div><strong>필수 수선</strong><p>{independentReview.requiredRepair}</p></div></section>
+    <section className="planning-score-grid">{Object.entries(independentReview.independentScore).filter(([key]) => key !== "total").map(([key, value]) => <dl key={key}><dt>{scoreLabels[key] ?? key}</dt><dd>{value}/20</dd></dl>)}</section>
+  </div>;
 }
 
 function decodeCandidateSlice(body: string, match: FireflySurfaceMatch): string {

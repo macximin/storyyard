@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 
 export type FireflyManuscriptDecision = "approve" | "polish" | "hold" | "reject";
 export type FireflyEvaluationDecision = "select" | "tie" | "invalid";
-export type FireflyDecision = FireflyManuscriptDecision | FireflyEvaluationDecision;
+export type FireflyPlanningDecision = "select" | "hold" | "reject";
+export type FireflyDecision = FireflyManuscriptDecision | FireflyEvaluationDecision | FireflyPlanningDecision;
 export type SurfaceClassification = "engine" | "genre-convention" | "source-surface" | "canon-leak";
 export type CandidateSpan = {
   coordinateKind: "utf8-byte";
@@ -169,7 +170,89 @@ export type FireflyReviewPacketV2 = PacketBase & {
   };
 };
 
-export type FireflyReviewPacket = FireflyReviewPacketV1 | FireflyReviewPacketV2;
+export type FireflyEntryContract = {
+  humanDrive: {
+    lackOrHumiliation: string;
+    personalDesire: string;
+    selfInterest: string;
+    emotionalCostLimit: string;
+  };
+  purpose: {
+    seriesWhat: string;
+    arcWhat: string;
+    chapterWant: string;
+    whyNow: string;
+  };
+  commercialPromise: {
+    currentSituation: string;
+    repeatableReaderFantasy: string;
+    howAdvantage: string;
+    firstPayoff: string;
+    payoffWitness: string;
+    nextPaymentQuestion: string;
+  };
+};
+
+export type FireflyPitchReviewCandidateV3 = {
+  id: string;
+  sha256: string;
+  titleCandidates: string[];
+  oneLinePromise: string;
+  entryContract: FireflyEntryContract;
+  protagonist: { startingIdentity: string; repeatedVerb: string; firstAsset: string };
+  openingEpisodes: Array<{ episode: number; event: string; visiblePayoff: string }>;
+  firstReward: string;
+  railA: string[];
+  railB: string[];
+  arcLadder: Array<{ arc: number; externalMove: string; visibleReward: string; relationshipConversion: string }>;
+  longRunRisk: string;
+  independentReview: {
+    verdict: "SURVIVE" | "HOLD" | "KILL";
+    independentScore: {
+      promise: number;
+      earlyPayoff: number;
+      repeatEngine: number;
+      railConversion: number;
+      longRunSupply: number;
+      total: number;
+    };
+    entryGate: {
+      passed: boolean;
+      protagonistNow: string;
+      personalWant: string;
+      whyNow: string;
+      repeatableFantasy: string;
+      chapterGoal: string;
+      failureReasons: string[];
+    };
+    decisiveStrength: string;
+    decisiveRisk: string;
+    requiredRepair: string;
+  };
+};
+
+export type FireflyReviewPacketV3 = {
+  schemaVersion: "firefly_review_packet/v3";
+  packetId: string;
+  packetSha256: string;
+  generatedAt: string;
+  purpose: "planning-entry";
+  source: { system: "inkos"; slateId: string; sourceRevision: string };
+  work: { id: string; title: string; genre: string; status: "non-canonical"; targetChapters: number };
+  artifact: { id: string; kind: "pitch-slate"; title: string; status: "human-decision-pending" };
+  candidates: FireflyPitchReviewCandidateV3[];
+  recommendation: { candidateId: string; reason: string } | null;
+  actions: ["select", "hold", "reject"];
+  authority: {
+    canon: "inkos";
+    decisionSurface: "storyyard";
+    decisionEffect: "planning-selection";
+    manuscriptApply: false;
+    reverseSync: false;
+  };
+};
+
+export type FireflyReviewPacket = FireflyReviewPacketV1 | FireflyReviewPacketV2 | FireflyReviewPacketV3;
 
 const SHA = /^[0-9a-f]{64}$/u;
 const PACKET_ID = /^frp-[0-9a-f]{24}$/u;
@@ -545,13 +628,156 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
   return packet as unknown as FireflyReviewPacketV2;
 }
 
+function validateEntryContract(value: unknown): void {
+  const contract = requireRecord(value, "planning entry contract");
+  exactKeys(contract, ["humanDrive", "purpose", "commercialPromise"]);
+  const humanDrive = requireRecord(contract.humanDrive, "planning human drive");
+  exactKeys(humanDrive, ["lackOrHumiliation", "personalDesire", "selfInterest", "emotionalCostLimit"]);
+  for (const key of ["lackOrHumiliation", "personalDesire", "selfInterest", "emotionalCostLimit"]) {
+    requireString(humanDrive[key], `planning human drive ${key}`);
+  }
+  const purpose = requireRecord(contract.purpose, "planning purpose");
+  exactKeys(purpose, ["seriesWhat", "arcWhat", "chapterWant", "whyNow"]);
+  for (const key of ["seriesWhat", "arcWhat", "chapterWant", "whyNow"]) {
+    requireString(purpose[key], `planning purpose ${key}`);
+  }
+  const promise = requireRecord(contract.commercialPromise, "planning commercial promise");
+  exactKeys(promise, ["currentSituation", "repeatableReaderFantasy", "howAdvantage", "firstPayoff", "payoffWitness", "nextPaymentQuestion"]);
+  for (const key of ["currentSituation", "repeatableReaderFantasy", "howAdvantage", "firstPayoff", "payoffWitness", "nextPaymentQuestion"]) {
+    requireString(promise[key], `planning commercial promise ${key}`);
+  }
+}
+
+function validatePitchScore(value: unknown): void {
+  const score = requireRecord(value, "planning independent score");
+  const keys = ["promise", "earlyPayoff", "repeatEngine", "railConversion", "longRunSupply"];
+  exactKeys(score, [...keys, "total"]);
+  for (const key of keys) requireInteger(score[key], `planning score ${key}`);
+  const total = requireInteger(score.total, "planning score total");
+  if (keys.reduce((sum, key) => sum + Number(score[key]), 0) !== total || total > 100) {
+    throw new Error("Planning score total must equal its five components and stay within 100.");
+  }
+}
+
+function validateV3(packet: Record<string, unknown>): FireflyReviewPacketV3 {
+  exactKeys(packet, ["schemaVersion", "packetId", "packetSha256", "generatedAt", "purpose", "source", "work", "artifact", "candidates", "recommendation", "actions", "authority"]);
+  if (!PACKET_ID.test(String(packet.packetId))) throw new Error("Review packet ID is invalid.");
+  requireSha(packet.packetSha256, "review packet SHA");
+  requireIso(packet.generatedAt, "review packet generatedAt");
+  if (packet.purpose !== "planning-entry") throw new Error("v3 packets must be planning-entry reviews.");
+
+  const source = requireRecord(packet.source, "planning review source");
+  exactKeys(source, ["system", "slateId", "sourceRevision"]);
+  if (source.system !== "inkos") throw new Error("Planning review source must be InkOS.");
+  requireSafeId(source.slateId, "planning slate ID");
+  requireSha(source.sourceRevision, "planning source revision");
+
+  const work = requireRecord(packet.work, "planning review work");
+  exactKeys(work, ["id", "title", "genre", "status", "targetChapters"]);
+  requireSafeId(work.id, "planning work ID");
+  requireString(work.title, "planning work title");
+  requireString(work.genre, "planning work genre");
+  if (work.status !== "non-canonical") throw new Error("Planning review work must remain non-canonical.");
+  requireInteger(work.targetChapters, "planning target chapters", 1);
+  if (source.slateId !== work.id) throw new Error("Planning source slate ID differs from its work ID.");
+
+  const artifact = requireRecord(packet.artifact, "planning review artifact");
+  exactKeys(artifact, ["id", "kind", "title", "status"]);
+  requireSafeId(artifact.id, "planning artifact ID");
+  requireString(artifact.title, "planning artifact title");
+  if (artifact.kind !== "pitch-slate" || artifact.status !== "human-decision-pending") {
+    throw new Error("Planning artifact must be a pending pitch slate.");
+  }
+  if (artifact.id !== source.slateId) throw new Error("Planning artifact ID differs from its source slate ID.");
+
+  if (!Array.isArray(packet.candidates) || packet.candidates.length < 1 || packet.candidates.length > 20) {
+    throw new Error("Planning review requires between one and twenty candidates.");
+  }
+  const candidateIds = new Set<string>();
+  const survivorIds: string[] = [];
+  for (const rawCandidate of packet.candidates) {
+    const candidate = requireRecord(rawCandidate, "planning candidate");
+    exactKeys(candidate, ["id", "sha256", "titleCandidates", "oneLinePromise", "entryContract", "protagonist", "openingEpisodes", "firstReward", "railA", "railB", "arcLadder", "longRunRisk", "independentReview"]);
+    const id = requireString(candidate.id, "planning candidate ID");
+    if (!/^p\d{2}$/u.test(id) || candidateIds.has(id)) throw new Error("Planning candidate IDs must be unique pNN values.");
+    candidateIds.add(id);
+    const candidateSha = requireSha(candidate.sha256, "planning candidate SHA");
+    const unsigned = { ...candidate };
+    delete unsigned.sha256;
+    if (canonicalSha256(unsigned) !== candidateSha) throw new Error("Planning candidate SHA mismatch.");
+    const titles = requireStrings(candidate.titleCandidates, "planning candidate titles");
+    if (titles.length < 1 || titles.length > 3 || titles.some((title) => !title)) throw new Error("Planning candidate requires one to three titles.");
+    requireString(candidate.oneLinePromise, "planning one-line promise");
+    validateEntryContract(candidate.entryContract);
+    const protagonist = requireRecord(candidate.protagonist, "planning protagonist");
+    exactKeys(protagonist, ["startingIdentity", "repeatedVerb", "firstAsset"]);
+    for (const key of ["startingIdentity", "repeatedVerb", "firstAsset"]) requireString(protagonist[key], `planning protagonist ${key}`);
+    if (!Array.isArray(candidate.openingEpisodes) || candidate.openingEpisodes.length !== 4) throw new Error("Planning candidate requires exactly four opening episodes.");
+    candidate.openingEpisodes.forEach((rawEpisode, index) => {
+      const episode = requireRecord(rawEpisode, "planning opening episode");
+      exactKeys(episode, ["episode", "event", "visiblePayoff"]);
+      if (requireInteger(episode.episode, "opening episode number", 1) !== index + 1) throw new Error("Opening episodes must be ordered 1 through 4.");
+      requireString(episode.event, "opening episode event");
+      requireString(episode.visiblePayoff, "opening episode payoff");
+    });
+    requireString(candidate.firstReward, "planning first reward");
+    for (const [key, minimum] of [["railA", 3], ["railB", 3]] as const) {
+      const values = requireStrings(candidate[key], `planning ${key}`);
+      if (values.length < minimum || values.some((item) => !item)) throw new Error(`Planning ${key} is too short.`);
+    }
+    if (!Array.isArray(candidate.arcLadder) || candidate.arcLadder.length < 6) throw new Error("Planning candidate requires at least six Arc steps.");
+    candidate.arcLadder.forEach((rawArc) => {
+      const arc = requireRecord(rawArc, "planning Arc");
+      exactKeys(arc, ["arc", "externalMove", "visibleReward", "relationshipConversion"]);
+      requireInteger(arc.arc, "planning Arc number", 1);
+      requireString(arc.externalMove, "planning Arc move");
+      requireString(arc.visibleReward, "planning Arc reward");
+      requireString(arc.relationshipConversion, "planning Arc relationship conversion");
+    });
+    requireString(candidate.longRunRisk, "planning long-run risk");
+    const review = requireRecord(candidate.independentReview, "planning independent review");
+    exactKeys(review, ["verdict", "independentScore", "entryGate", "decisiveStrength", "decisiveRisk", "requiredRepair"]);
+    if (!["SURVIVE", "HOLD", "KILL"].includes(String(review.verdict))) throw new Error("Planning review verdict is invalid.");
+    validatePitchScore(review.independentScore);
+    const gate = requireRecord(review.entryGate, "planning entry gate");
+    exactKeys(gate, ["passed", "protagonistNow", "personalWant", "whyNow", "repeatableFantasy", "chapterGoal", "failureReasons"]);
+    if (typeof gate.passed !== "boolean") throw new Error("Planning entry gate pass flag is invalid.");
+    for (const key of ["protagonistNow", "personalWant", "whyNow", "repeatableFantasy", "chapterGoal"]) requireString(gate[key], `planning entry gate ${key}`);
+    const failures = requireStrings(gate.failureReasons, "planning entry gate failures");
+    if (gate.passed !== (failures.length === 0)) throw new Error("Planning entry gate pass flag contradicts its failures.");
+    if (gate.passed === false && review.verdict === "SURVIVE") throw new Error("A failed planning entry gate cannot SURVIVE.");
+    for (const key of ["decisiveStrength", "decisiveRisk", "requiredRepair"]) requireString(review[key], `planning independent review ${key}`);
+    if (review.verdict === "SURVIVE") survivorIds.push(id);
+  }
+
+  const recommendation = packet.recommendation === null ? null : requireRecord(packet.recommendation, "planning recommendation");
+  if (recommendation) {
+    exactKeys(recommendation, ["candidateId", "reason"]);
+    requireString(recommendation.candidateId, "planning recommendation candidate ID");
+    requireString(recommendation.reason, "planning recommendation reason");
+    if (!candidateIds.has(String(recommendation.candidateId))) throw new Error("Planning recommendation candidate is absent.");
+  }
+  if (survivorIds.length > 1 || (recommendation?.candidateId ?? null) !== (survivorIds[0] ?? null)) {
+    throw new Error("Planning recommendation must match the sole SURVIVE candidate.");
+  }
+  if (JSON.stringify(packet.actions) !== JSON.stringify(["select", "hold", "reject"])) throw new Error("Planning actions must be select, hold, and reject.");
+  const authority = requireRecord(packet.authority, "planning review authority");
+  exactKeys(authority, ["canon", "decisionSurface", "decisionEffect", "manuscriptApply", "reverseSync"]);
+  if (authority.canon !== "inkos" || authority.decisionSurface !== "storyyard" || authority.decisionEffect !== "planning-selection" || authority.manuscriptApply !== false || authority.reverseSync !== false) {
+    throw new Error("Planning review authority boundary is invalid.");
+  }
+  return packet as unknown as FireflyReviewPacketV3;
+}
+
 export function assertFireflyReviewPacketIdentity(packet: FireflyReviewPacket): void {
   const unsigned = { ...packet } as Record<string, unknown>;
   delete unsigned.schemaVersion;
   delete unsigned.packetId;
   delete unsigned.packetSha256;
   if (packet.schemaVersion === "firefly_review_packet/v1") delete unsigned.generatedAt;
-  const actual = sha256(JSON.stringify(unsigned));
+  const actual = packet.schemaVersion === "firefly_review_packet/v3"
+    ? canonicalSha256(unsigned)
+    : sha256(JSON.stringify(unsigned));
   if (actual !== packet.packetSha256 || packet.packetId !== `frp-${actual.slice(0, 24)}`) throw new Error("Review packet identity or SHA-256 mismatch.");
 }
 
@@ -561,6 +787,8 @@ export function validateFireflyReviewPacket(value: unknown): FireflyReviewPacket
     ? validateV1(packet)
     : packet.schemaVersion === "firefly_review_packet/v2"
       ? validateV2(packet)
+      : packet.schemaVersion === "firefly_review_packet/v3"
+        ? validateV3(packet)
       : (() => { throw new Error("Unsupported Firefly review packet schema."); })();
   assertFireflyReviewPacketIdentity(parsed);
   return parsed;

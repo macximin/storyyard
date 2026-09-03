@@ -2,6 +2,7 @@ import type {
   FireflyDecision,
   FireflyEvaluationDecision,
   FireflyManuscriptDecision,
+  FireflyPlanningDecision,
   FireflyReviewPacket,
 } from "./firefly-review-contract";
 
@@ -22,6 +23,7 @@ export type ValidatedDecisionIntent = {
 
 const manuscriptDecisions = new Set<FireflyManuscriptDecision>(["approve", "polish", "hold", "reject"]);
 const evaluationDecisions = new Set<FireflyEvaluationDecision>(["select", "tie", "invalid"]);
+const planningDecisions = new Set<FireflyPlanningDecision>(["select", "hold", "reject"]);
 
 export function validateFireflyDecisionIntent(
   packet: FireflyReviewPacket,
@@ -41,6 +43,30 @@ export function validateFireflyDecisionIntent(
     }
     if (decision !== "approve" && !comment) {
       return { ok: false, status: 400, error: "폴리싱·보류·반려에는 작업 지시나 근거가 필요함." };
+    }
+    return {
+      ok: true,
+      value: {
+        decision,
+        comment,
+        candidate,
+        storedCandidateId: candidate.id,
+        storedCandidateSha256: candidate.sha256,
+      },
+    };
+  }
+
+  if (packet.schemaVersion === "firefly_review_packet/v3") {
+    const decision = input?.decision;
+    if (!decision || !planningDecisions.has(decision as FireflyPlanningDecision)) {
+      return { ok: false, status: 400, error: "기획 판정은 후보 선택·보류·탈락 중 하나여야 함." };
+    }
+    const candidate = packet.candidates.find((item) => item.id === input?.candidateId);
+    if (!candidate || candidate.sha256 !== input?.candidateSha256) {
+      return { ok: false, status: 409, error: "기획 후보의 해시가 검토 패킷과 다름." };
+    }
+    if (decision !== "select" && !comment) {
+      return { ok: false, status: 400, error: "기획 보류·탈락에는 근거가 필요함." };
     }
     return {
       ok: true,
