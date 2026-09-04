@@ -100,3 +100,46 @@ test("rejects score drift and a SURVIVE verdict behind a failed entry gate", () 
   failedGate.candidates[0].sha256 = canonicalSha256(unsigned);
   assert.throws(() => validateFireflyReviewPacket(failedGate), /cannot SURVIVE/);
 });
+
+test("accepts and verifies source-spine proof on an expanded planning candidate", () => {
+  const packet = makePacket();
+  const candidate = packet.candidates[0];
+  candidate.sourcePremise = {
+    slateId: "premise-canary", candidateId: "p01", candidateSha256: "b".repeat(64),
+    privateWant: "할아버지에게 자기 편이라는 말을 듣고 싶다.", firstChoice: "오늘 거짓을 직접 폭로한다.", emotionalPayment: "할아버지가 손을 잡는다.",
+  };
+  candidate.spineRetention = {
+    schemaVersion: "firefly_spine_retention/v1",
+    primaryReference: { packId: "doksik", packSha256: "c".repeat(64), sourceSha256: "d".repeat(64) },
+    referenceDisclosure: {
+      workSlug: "doksik-chaebol3", workTitle: "독식하는 재벌 3세",
+      usageRoles: ["commercial-engine", "opening-event", "relationship", "payoff", "style"],
+      selectionReason: "기업 성장과 가족 대우 지급이 함께 반복되는 주축 작품이다.",
+      preservedElements: ["기업 인수", "반복 정상화", "성장 사다리", "물질과 관계의 동시 지급"],
+      transformedElements: ["인명과 회사, 첫 공장의 위치를 변경한다."],
+    },
+    preservedEngine: { industry: "기업 인수", repeatedVerb: "싸게 사고 정상화한다", progressionLadder: "공장에서 그룹으로", rewardGrammar: "돈과 대우를 함께 지급한다" },
+    openingEpisodeMappings: [1, 2, 3, 4].map((episode) => ({ episode, sourceBeatSequence: episode < 3 ? 1 : 2, sourceArcId: "DCA-N01", retainedFunction: "위기를 실행으로 뒤집는다", transformedEvent: `${episode}화 인수 행동` })),
+    relationshipConversion: { sourceFunction: "무시에서 인정으로", transformedExpression: "직원이 대표라고 부른다" },
+    hookProgression: [{ sourceArcId: "DCA-N01", retainedFunction: "첫 지급", transformedHook: "다음 인수" }, { sourceArcId: "DCA-N02", retainedFunction: "상대 반격", transformedHook: "가족 대응" }],
+    surfaceChanges: [{ layer: "people", change: "가족 역할 변경", causalAdjustment: "승계 순서 조정" }],
+    payoffPair: { material: "공장 소유권", emotional: "가족 인정", witness: "직원과 가족" },
+  };
+  const unsignedCandidate = { ...candidate }; delete unsignedCandidate.sha256;
+  candidate.sha256 = canonicalSha256(unsignedCandidate);
+  const unsignedPacket = { ...packet }; delete unsignedPacket.schemaVersion; delete unsignedPacket.packetId; delete unsignedPacket.packetSha256;
+  packet.packetSha256 = canonicalSha256(unsignedPacket); packet.packetId = `frp-${packet.packetSha256.slice(0, 24)}`;
+  assert.equal(validateFireflyReviewPacket(packet).candidates[0].spineRetention?.openingEpisodeMappings.length, 4);
+
+  const missingDisclosure = structuredClone(packet);
+  delete missingDisclosure.candidates[0].spineRetention.referenceDisclosure;
+  const missingUnsignedCandidate = { ...missingDisclosure.candidates[0] }; delete missingUnsignedCandidate.sha256;
+  missingDisclosure.candidates[0].sha256 = canonicalSha256(missingUnsignedCandidate);
+  const missingUnsignedPacket = { ...missingDisclosure }; delete missingUnsignedPacket.schemaVersion; delete missingUnsignedPacket.packetId; delete missingUnsignedPacket.packetSha256;
+  missingDisclosure.packetSha256 = canonicalSha256(missingUnsignedPacket); missingDisclosure.packetId = `frp-${missingDisclosure.packetSha256.slice(0, 24)}`;
+  assert.throws(() => validateFireflyReviewPacket(missingDisclosure), /referenceDisclosure/);
+
+  candidate.spineRetention.openingEpisodeMappings = candidate.spineRetention.openingEpisodeMappings.map((item) => ({ ...item, sourceBeatSequence: 1 }));
+  const invalidUnsigned = { ...candidate }; delete invalidUnsigned.sha256; candidate.sha256 = canonicalSha256(invalidUnsigned);
+  assert.throws(() => validateFireflyReviewPacket(packet), /at least two source beats/);
+});

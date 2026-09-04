@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { ArrowRight, Check, Clock, Eye, LockKey, MagicWand, Pause, ShieldCheck, X } from "@phosphor-icons/react";
 import { GlobalSidebar, SidebarUser } from "@/app/global-sidebar";
 import { fireflyReviewQueueMetadata } from "@/app/firefly-review-display.mjs";
-import type { FireflyDecision, FireflyPitchReviewCandidateV3, FireflyReviewPacket, FireflySurfaceMatch, SurfaceClassification } from "@/app/firefly-review-packets";
+import type { FireflyDecision, FireflyHumanPremiseCandidateV4, FireflyPitchReviewCandidateV3, FireflyReviewPacket, FireflySurfaceMatch, SurfaceClassification } from "@/app/firefly-review-packets";
 
 type DecisionRow = { decisionId: string; candidateId: string | null; decision: string; comment: string; status: string; createdAt: string };
 type DecisionChoice = FireflyDecision | "";
@@ -39,6 +39,9 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
     ? packet.candidates.find((item) => item.id === candidateId) ?? packet.candidates[0]
     : null;
   const v3Candidate = packet?.schemaVersion === "firefly_review_packet/v3"
+    ? packet.candidates.find((item) => item.id === candidateId) ?? packet.candidates[0]
+    : null;
+  const v4Candidate = packet?.schemaVersion === "firefly_review_packet/v4"
     ? packet.candidates.find((item) => item.id === candidateId) ?? packet.candidates[0]
     : null;
   const [decision, setDecision] = useState<DecisionChoice>(defaultDecision(packets[0]));
@@ -135,6 +138,8 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
       setDecision(defaultDecision(packet));
       setMessage(packet.schemaVersion === "firefly_review_packet/v2"
         ? "사람 평가를 pending으로 기록했음. 원고와 캐논은 바뀌지 않음."
+        : packet.schemaVersion === "firefly_review_packet/v4"
+          ? "Human Premise 판정을 pending으로 기록했음. 아직 기획 확장·Book·원고는 생성되지 않음."
         : packet.schemaVersion === "firefly_review_packet/v3"
           ? "기획 판정을 pending으로 기록했음. InkOS 승인 전에는 집필이 시작되지 않음."
           : "InkOS 적용 대기 영수증으로 기록했음. 원고는 아직 바뀌지 않음.");
@@ -151,12 +156,12 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
       </header>
       <nav className="review-queue" aria-label="검토 패킷">
         {packets.map((item, index) => <button key={item.packetId} className={index === packetIndex ? "active" : ""} onClick={() => selectPacket(index)}>
-          <span>{item.work.title}</span><strong>{item.schemaVersion === "firefly_review_packet/v3" ? `기획 · ${item.artifact.title}` : `${item.artifact.chapterNumber}화 · ${item.artifact.title}`}</strong><small>{fireflyReviewQueueMetadata(item)}</small>
+          <span>{item.work.title}</span><strong>{item.schemaVersion === "firefly_review_packet/v4" ? `전제 · ${item.artifact.title}` : item.schemaVersion === "firefly_review_packet/v3" ? `기획 · ${item.artifact.title}` : `${item.artifact.chapterNumber}화 · ${item.artifact.title}`}</strong><small>{fireflyReviewQueueMetadata(item)}</small>
         </button>)}
       </nav>
       <div className="firefly-review-grid">
         <section className="candidate-reader">
-          <div className="candidate-reader-head"><div><p className="kicker">{packet.schemaVersion === "firefly_review_packet/v3" ? "PLANNING CANDIDATE" : "CANDIDATE"}</p><h2>{packet.work.title}</h2><span>{packet.schemaVersion === "firefly_review_packet/v3" ? `기획 HIL · ${packet.work.targetChapters}화 목표` : `${packet.artifact.chapterNumber}화 · ${packet.artifact.title}`}</span></div>
+          <div className="candidate-reader-head"><div><p className="kicker">{packet.schemaVersion === "firefly_review_packet/v4" ? "HUMAN PREMISE" : packet.schemaVersion === "firefly_review_packet/v3" ? "PLANNING CANDIDATE" : "CANDIDATE"}</p><h2>{packet.work.title}</h2><span>{packet.schemaVersion === "firefly_review_packet/v4" ? "기획 확장 전 사람 욕망 HIL" : packet.schemaVersion === "firefly_review_packet/v3" ? `기획 HIL · ${packet.work.targetChapters}화 목표` : `${packet.artifact.chapterNumber}화 · ${packet.artifact.title}`}</span></div>
             <div className="score-chip"><span>상업성</span><strong>{candidateCommercialScore(packet, candidate.id)}</strong></div></div>
           <nav className="candidate-tabs" aria-label="후보 선택">{packet.candidates.map((item, index) => <button key={item.id} className={item.id === candidate.id ? "active" : ""} onClick={() => setCandidateId(item.id)}>
             후보 {String.fromCharCode(65 + index)} <span>{candidateCommercialScore(packet, item.id)}</span>
@@ -164,6 +169,10 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
           {v3Candidate && <section className="planning-entry-banner">
             <div><ShieldCheck size={18} /><strong>기획 Entry Contract · 승인 전 집필 차단</strong></div>
             <p>인간 욕망, 당장 벌어진 상황, 주인공의 행동 목적과 첫 결제를 먼저 확인합니다. 선택 전에는 Book·Arc·원고를 만들지 않습니다.</p>
+          </section>}
+          {v4Candidate && <section className="planning-entry-banner">
+            <div><ShieldCheck size={18} /><strong>Human Premise · 상업 기획 확장 전 필수 HIL</strong></div>
+            <p>회사·돈·지분·권한을 지워도 남는 사람의 욕망, 오늘의 선택, 감정적 지급을 먼저 확인합니다. 선택해도 Book·Arc·Rail·원고는 만들지 않습니다.</p>
           </section>}
           {packet.schemaVersion === "firefly_review_packet/v2" && <section className="blind-comparison-banner">
             <div><ShieldCheck size={18} /><strong>독립 blind pair · {packet.comparison.round}/3 · 평가 전용</strong></div>
@@ -177,7 +186,8 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
             <p className={v2Candidate.review.contentNeutrality.passed ? "neutrality-pass" : "neutrality-alert"}>허구 내용 중립 {v2Candidate.review.contentNeutrality.passed ? "PASS" : `${v2Candidate.review.contentNeutrality.violations.length}건 확인 필요`} · hard contradiction {v2Candidate.review.canonContradictions.length}건</p>
           </section>}
           {v3Candidate && <PlanningEntryReview candidate={v3Candidate} />}
-          {packet.schemaVersion !== "firefly_review_packet/v3" && <article className="candidate-prose">{candidate.body}</article>}
+          {v4Candidate && <HumanPremiseReview candidate={v4Candidate} packet={packet} />}
+          {packet.schemaVersion !== "firefly_review_packet/v3" && packet.schemaVersion !== "firefly_review_packet/v4" && <article className="candidate-prose">{candidate.body}</article>}
           {v2Candidate && <section className="surface-review">
             <header><div><p className="kicker">SURFACE HIL</p><h3>표면 비교</h3></div><span>{classifiedCount}/{allMatches.length} 분류</span></header>
             {v2Candidate.review.surfaceComparison.surfaceMatches.length === 0
@@ -198,7 +208,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
                 </article>;
               })}
           </section>}
-          {packet.schemaVersion !== "firefly_review_packet/v3" && <details className="baseline-details"><summary>현재 InkOS 원고와 비교</summary><article>{packet.artifact.currentContent}</article></details>}
+          {packet.schemaVersion !== "firefly_review_packet/v3" && packet.schemaVersion !== "firefly_review_packet/v4" && <details className="baseline-details"><summary>현재 InkOS 원고와 비교</summary><article>{packet.artifact.currentContent}</article></details>}
         </section>
         <aside className="decision-dock"><form onSubmit={submit}>
           <p className="kicker">DECISION RECEIPT</p><h2>판정 남기기</h2>
@@ -209,6 +219,8 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
           {message && <p className="review-message">{message}</p>}
           <p className="pending-notice"><Clock size={16} /><span>{packet.schemaVersion === "firefly_review_packet/v2"
             ? "이 평가는 pending으로 저장됩니다. 수신 확인 뒤에도 원고·캐논에는 적용되지 않습니다."
+            : packet.schemaVersion === "firefly_review_packet/v4"
+              ? "이 Human Premise 판정은 pending입니다. 선택해도 상업 기획·Book·Arc·Rail·원고는 생성되지 않습니다."
             : packet.schemaVersion === "firefly_review_packet/v3"
               ? "이 기획 판정은 pending으로 저장됩니다. InkOS가 선택 영수증을 확인하기 전에는 집필할 수 없습니다."
               : "이 판정은 pending으로 저장됩니다. InkOS가 해시를 다시 확인하고 적용해야 정본이 바뀝니다."}</span></p>
@@ -227,6 +239,10 @@ function defaultDecision(packet: FireflyReviewPacket | undefined): DecisionChoic
 }
 
 function candidateCommercialScore(packet: FireflyReviewPacket, candidateId: string): string {
+  if (packet.schemaVersion === "firefly_review_packet/v4") {
+    const gates = packet.candidates.find((item) => item.id === candidateId)?.independentReview.gates;
+    return gates ? `${Object.values(gates).filter(Boolean).length}/5` : "—";
+  }
   if (packet.schemaVersion === "firefly_review_packet/v3") {
     return packet.candidates.find((item) => item.id === candidateId)?.independentReview.independentScore.total.toFixed(0) ?? "—";
   }
@@ -235,9 +251,34 @@ function candidateCommercialScore(packet: FireflyReviewPacket, candidateId: stri
 }
 
 function decisionLabel(packet: FireflyReviewPacket, decision: FireflyDecision): string {
+  if (packet.schemaVersion === "firefly_review_packet/v4" && decision === "select") return "이 전제 선택";
+  if (packet.schemaVersion === "firefly_review_packet/v4" && decision === "reject") return "이 전제 탈락";
+  if (packet.schemaVersion === "firefly_review_packet/v4" && decision === "hold") return "전제 보류";
   if (packet.schemaVersion === "firefly_review_packet/v3" && decision === "reject") return "이 기획 탈락";
   if (packet.schemaVersion === "firefly_review_packet/v3" && decision === "hold") return "기획 보류";
   return labels[decision];
+}
+
+function HumanPremiseReview({ candidate, packet }: { candidate: FireflyHumanPremiseCandidateV4; packet: Extract<FireflyReviewPacket, { schemaVersion: "firefly_review_packet/v4" }> }) {
+  const labels: Record<string, string> = { humanDesire: "사람 욕망", sourceGrounded: "원문 근거", sceneableToday: "오늘 장면화", nonMechanical: "기계 욕망 아님", voiceGrounded: "문체 근거" };
+  return <div className="planning-entry-review">
+    <section className="planning-promise">
+      <p className="kicker">ONE-LINE HUMAN PROMISE</p><h3>{candidate.titleCandidates[0]}</h3><blockquote>{candidate.oneLineHumanPromise}</blockquote>
+      <p><strong>주축 참고작</strong>{packet.sourceBinding.sourceWork?.workTitle ?? packet.sourceBinding.packId}</p>
+      <p><strong>원문 결속</strong>{packet.sourceBinding.sourceWork?.workSlug ?? packet.sourceBinding.packId} · beat {candidate.sourceBeatSequences.join(", ")} · style {candidate.styleExampleIds.join(", ")}</p>
+    </section>
+    <section className="entry-gate-card">
+      <header><div><p className="kicker">INDEPENDENT HUMAN GROUNDING</p><h3>{candidate.independentReview.verdict}</h3></div><strong className={Object.values(candidate.independentReview.gates).every(Boolean) ? "gate-pass" : "gate-fail"}>{Object.values(candidate.independentReview.gates).every(Boolean) ? "PASS" : "FAIL"}</strong></header>
+      <dl>{Object.entries(candidate.independentReview.gates).map(([key, passed]) => <div key={key}><dt>{labels[key] ?? key}</dt><dd>{passed ? "PASS" : "FAIL"}</dd></div>)}</dl>
+    </section>
+    <section className="planning-contract-grid">
+      <article><p className="kicker">PERSON</p><h3>권력보다 먼저인 사람</h3><dl><div><dt>현재의 사람</dt><dd>{candidate.humanPremise.protagonistAsPerson}</dd></div><div><dt>사적 욕망</dt><dd>{candidate.humanPremise.privateWant}</dd></div><div><dt>체감 결핍</dt><dd>{candidate.humanPremise.feltLack}</dd></div><div><dt>대상</dt><dd>{candidate.humanPremise.targetPerson}</dd></div></dl></article>
+      <article><p className="kicker">CHOICE & PAYMENT</p><h3>오늘의 선택과 정서 지급</h3><dl><div><dt>왜 오늘</dt><dd>{candidate.humanPremise.whyToday}</dd></div><div><dt>첫 선택</dt><dd>{candidate.humanPremise.firstChoice}</dd></div><div><dt>감정 지급</dt><dd>{candidate.humanPremise.emotionalPayment}</dd></div><div><dt>권력 제거 후</dt><dd>{candidate.humanPremise.stillHumanWithoutPower}</dd></div></dl></article>
+    </section>
+    <section className="commercial-promise-card"><p className="kicker">FIRST SCENE</p><h3>상황 → 압박 → 행동 → 목격 변화</h3><dl><div><dt>상황</dt><dd>{candidate.firstScene.currentSituation}</dd></div><div><dt>압박</dt><dd>{candidate.firstScene.pressure}</dd></div><div><dt>행동</dt><dd>{candidate.firstScene.action}</dd></div><div><dt>목격 변화</dt><dd>{candidate.firstScene.witnessedChange}</dd></div></dl></section>
+    <section className="planning-review-notes"><div><strong>강점</strong><p>{candidate.independentReview.decisiveStrength}</p></div><div><strong>위험</strong><p>{candidate.independentReview.decisiveRisk}</p></div><div><strong>필수 수선</strong><p>{candidate.independentReview.requiredRepair}</p></div></section>
+    <section className="planning-review-notes"><div><strong>보존한 원문 기능</strong><p>{candidate.retainedReferenceTraits.join(" · ")}</p></div><div><strong>표면 변주</strong><p>{candidate.surfaceVariation}</p></div><div><strong>런타임</strong><p>{packet.runtimeReceipt.model}/{packet.runtimeReceipt.reasoning} · {packet.runtimeReceipt.soul.soulId}</p></div></section>
+  </div>;
 }
 
 function PlanningEntryReview({ candidate }: { candidate: FireflyPitchReviewCandidateV3 }) {
@@ -263,6 +304,26 @@ function PlanningEntryReview({ candidate }: { candidate: FireflyPitchReviewCandi
       <article><p className="kicker">PURPOSE</p><h3>작품·Arc·1화 목적</h3><dl><div><dt>작품 WHAT</dt><dd>{entryContract.purpose.seriesWhat}</dd></div><div><dt>Arc WHAT</dt><dd>{entryContract.purpose.arcWhat}</dd></div><div><dt>1화 WANT</dt><dd>{entryContract.purpose.chapterWant}</dd></div><div><dt>왜 지금</dt><dd>{entryContract.purpose.whyNow}</dd></div></dl></article>
     </section>
     <section className="commercial-promise-card"><p className="kicker">COMMERCIAL PROMISE</p><h3>상황 → 우위 → 결제</h3><dl><div><dt>현재 상황</dt><dd>{entryContract.commercialPromise.currentSituation}</dd></div><div><dt>독자 판타지</dt><dd>{entryContract.commercialPromise.repeatableReaderFantasy}</dd></div><div><dt>우위의 작동</dt><dd>{entryContract.commercialPromise.howAdvantage}</dd></div><div><dt>첫 결제</dt><dd>{entryContract.commercialPromise.firstPayoff}</dd></div><div><dt>목격자</dt><dd>{entryContract.commercialPromise.payoffWitness}</dd></div><div><dt>다음 결제 질문</dt><dd>{entryContract.commercialPromise.nextPaymentQuestion}</dd></div></dl></section>
+    {candidate.sourcePremise && candidate.spineRetention && <section className="commercial-promise-card">
+      <p className="kicker">REFERENCE DISCLOSURE</p><h3>무엇을 보고 어떻게 변주했는가</h3>
+      <dl>
+        <div><dt>주축 참고작</dt><dd>{candidate.spineRetention.referenceDisclosure.workTitle}</dd></div>
+        <div><dt>작품 ID</dt><dd>{candidate.spineRetention.referenceDisclosure.workSlug}</dd></div>
+        <div><dt>참고 역할</dt><dd>{candidate.spineRetention.referenceDisclosure.usageRoles.join(" · ")}</dd></div>
+        <div><dt>선정 이유</dt><dd>{candidate.spineRetention.referenceDisclosure.selectionReason}</dd></div>
+        <div><dt>보존 요소</dt><dd>{candidate.spineRetention.referenceDisclosure.preservedElements.join(" · ")}</dd></div>
+        <div><dt>표면 변주</dt><dd>{candidate.spineRetention.referenceDisclosure.transformedElements.join(" · ")}</dd></div>
+        <div><dt>선택 전제</dt><dd>{candidate.sourcePremise.slateId}/{candidate.sourcePremise.candidateId}</dd></div>
+        <div><dt>사적 욕망</dt><dd>{candidate.sourcePremise.privateWant}</dd></div>
+        <div><dt>보존 업종</dt><dd>{candidate.spineRetention.preservedEngine.industry}</dd></div>
+        <div><dt>반복 동사</dt><dd>{candidate.spineRetention.preservedEngine.repeatedVerb}</dd></div>
+        <div><dt>성장 사다리</dt><dd>{candidate.spineRetention.preservedEngine.progressionLadder}</dd></div>
+        <div><dt>물질 지급</dt><dd>{candidate.spineRetention.payoffPair.material}</dd></div>
+        <div><dt>감정 지급</dt><dd>{candidate.spineRetention.payoffPair.emotional}</dd></div>
+        <div><dt>목격자</dt><dd>{candidate.spineRetention.payoffPair.witness}</dd></div>
+      </dl>
+      <div className="opening-payment-grid">{candidate.spineRetention.openingEpisodeMappings.map((mapping) => <article key={mapping.episode}><span>{mapping.episode}화 ← {mapping.sourceBeatSequence}/{mapping.sourceArcId}</span><strong>{mapping.retainedFunction}</strong><p>{mapping.transformedEvent}</p></article>)}</div>
+    </section>}
     <section className="opening-payment-grid">{candidate.openingEpisodes.map((episode) => <article key={episode.episode}><span>{episode.episode}화</span><strong>{episode.event}</strong><p>{episode.visiblePayoff}</p></article>)}</section>
     <section className="planning-review-notes"><div><strong>강점</strong><p>{independentReview.decisiveStrength}</p></div><div><strong>위험</strong><p>{independentReview.decisiveRisk}</p></div><div><strong>필수 수선</strong><p>{independentReview.requiredRepair}</p></div></section>
     <section className="planning-score-grid">{Object.entries(independentReview.independentScore).filter(([key]) => key !== "total").map(([key, value]) => <dl key={key}><dt>{scoreLabels[key] ?? key}</dt><dd>{value}/20</dd></dl>)}</section>

@@ -206,6 +206,25 @@ export type FireflyPitchReviewCandidateV3 = {
   railB: string[];
   arcLadder: Array<{ arc: number; externalMove: string; visibleReward: string; relationshipConversion: string }>;
   longRunRisk: string;
+  sourcePremise?: {
+    slateId: string; candidateId: string; candidateSha256: string;
+    privateWant: string; firstChoice: string; emotionalPayment: string;
+  };
+  spineRetention?: {
+    schemaVersion: "firefly_spine_retention/v1";
+    primaryReference: { packId: string; packSha256: string; sourceSha256: string };
+    referenceDisclosure: {
+      workSlug: string; workTitle: string;
+      usageRoles: Array<"commercial-engine" | "opening-event" | "relationship" | "payoff" | "style">;
+      selectionReason: string; preservedElements: string[]; transformedElements: string[];
+    };
+    preservedEngine: { industry: string; repeatedVerb: string; progressionLadder: string; rewardGrammar: string };
+    openingEpisodeMappings: Array<{ episode: number; sourceBeatSequence: number; sourceArcId: string; retainedFunction: string; transformedEvent: string }>;
+    relationshipConversion: { sourceFunction: string; transformedExpression: string };
+    hookProgression: Array<{ sourceArcId: string; retainedFunction: string; transformedHook: string }>;
+    surfaceChanges: Array<{ layer: "people" | "organization" | "object" | "location" | "local-cause" | "number" | "scene-dressing"; change: string; causalAdjustment: string }>;
+    payoffPair: { material: string; emotional: string; witness: string };
+  };
   independentReview: {
     verdict: "SURVIVE" | "HOLD" | "KILL";
     independentScore: {
@@ -252,7 +271,70 @@ export type FireflyReviewPacketV3 = {
   };
 };
 
-export type FireflyReviewPacket = FireflyReviewPacketV1 | FireflyReviewPacketV2 | FireflyReviewPacketV3;
+export type FireflyHumanPremiseCandidateV4 = {
+  id: string;
+  sha256: string;
+  titleCandidates: string[];
+  oneLineHumanPromise: string;
+  humanPremise: {
+    protagonistAsPerson: string;
+    privateWant: string;
+    feltLack: string;
+    targetPerson: string;
+    whyToday: string;
+    firstChoice: string;
+    emotionalPayment: string;
+    stillHumanWithoutPower: string;
+  };
+  firstScene: { currentSituation: string; pressure: string; action: string; witnessedChange: string };
+  sourceBeatSequences: number[];
+  styleExampleIds: string[];
+  retainedReferenceTraits: string[];
+  surfaceVariation: string;
+  independentReview: {
+    candidateId: string;
+    verdict: "SURVIVE" | "HOLD" | "KILL";
+    gates: { humanDesire: boolean; sourceGrounded: boolean; sceneableToday: boolean; nonMechanical: boolean; voiceGrounded: boolean };
+    decisiveStrength: string;
+    decisiveRisk: string;
+    requiredRepair: string;
+  };
+};
+
+export type FireflyReviewPacketV4 = {
+  schemaVersion: "firefly_review_packet/v4";
+  packetId: string;
+  packetSha256: string;
+  generatedAt: string;
+  purpose: "human-premise";
+  source: { system: "inkos"; slateId: string; sourceRevision: string };
+  work: { id: string; title: string; genre: "modern-fantasy-ko"; status: "non-canonical" };
+  artifact: { id: string; kind: "human-premise-slate"; title: string; status: "human-decision-pending" };
+  sourceBinding: {
+    schemaVersion: "firefly_pitch_source_binding/v1";
+    packId: string; packSha256: string; sourceSha256: string;
+    sourceWork?: { workSlug: string; workTitle: string };
+    storyIndex: { path: string; sha256: string; selected: Array<{ sequence: number; arcId: string; sourceLineRange: { start: number; end: number }; sourceCharacterRange: { start: number; end: number }; rawProseSha256: string }> };
+    styleExamples: { path: string; sha256: string; selected: Array<{ id: string; sequence: number; arcId: string; rawProseSha256: string }> };
+    structureInputs: Array<{ role: "project-bible" | "chapter-map" | "arc-atlas"; path: string; sha256: string }>;
+  };
+  runtimeReceipt: FireflyPitchRuntimeReceiptV4;
+  reviewerRuntimeReceipt: FireflyPitchRuntimeReceiptV4;
+  candidates: FireflyHumanPremiseCandidateV4[];
+  recommendation: { candidateId: string; reason: string } | null;
+  actions: ["select", "hold", "reject"];
+  authority: { canon: "inkos"; decisionSurface: "storyyard"; decisionEffect: "human-premise-selection"; commercialExpansion: false; bookCreation: false; manuscriptApply: false; reverseSync: false };
+};
+
+type FireflyPitchRuntimeReceiptV4 = {
+  schemaVersion: "firefly_pitch_runtime/v1";
+  provider: "codex-cli";
+  model: "gpt-5.6-sol";
+  reasoning: "high";
+  soul: { mode: "canary-scoped"; soulId: "male-modern-fantasy-ko"; version: "v1"; manifestSha256: string; promptSha256: string; resourceSha256: string };
+};
+
+export type FireflyReviewPacket = FireflyReviewPacketV1 | FireflyReviewPacketV2 | FireflyReviewPacketV3 | FireflyReviewPacketV4;
 
 const SHA = /^[0-9a-f]{64}$/u;
 const PACKET_ID = /^frp-[0-9a-f]{24}$/u;
@@ -697,7 +779,7 @@ function validateV3(packet: Record<string, unknown>): FireflyReviewPacketV3 {
   const survivorIds: string[] = [];
   for (const rawCandidate of packet.candidates) {
     const candidate = requireRecord(rawCandidate, "planning candidate");
-    exactKeys(candidate, ["id", "sha256", "titleCandidates", "oneLinePromise", "entryContract", "protagonist", "openingEpisodes", "firstReward", "railA", "railB", "arcLadder", "longRunRisk", "independentReview"]);
+    exactKeys(candidate, ["id", "sha256", "titleCandidates", "oneLinePromise", "entryContract", "protagonist", "openingEpisodes", "firstReward", "railA", "railB", "arcLadder", "longRunRisk", "independentReview"], ["sourcePremise", "spineRetention"]);
     const id = requireString(candidate.id, "planning candidate ID");
     if (!/^p\d{2}$/u.test(id) || candidateIds.has(id)) throw new Error("Planning candidate IDs must be unique pNN values.");
     candidateIds.add(id);
@@ -735,6 +817,62 @@ function validateV3(packet: Record<string, unknown>): FireflyReviewPacketV3 {
       requireString(arc.relationshipConversion, "planning Arc relationship conversion");
     });
     requireString(candidate.longRunRisk, "planning long-run risk");
+    if ((candidate.sourcePremise === undefined) !== (candidate.spineRetention === undefined)) throw new Error("Planning source premise and spine retention must appear together.");
+    if (candidate.sourcePremise !== undefined && candidate.spineRetention !== undefined) {
+      const premise = requireRecord(candidate.sourcePremise, "planning source premise");
+      exactKeys(premise, ["slateId", "candidateId", "candidateSha256", "privateWant", "firstChoice", "emotionalPayment"]);
+      requireSafeId(premise.slateId, "source premise slate ID");
+      if (!/^p\d{2}$/u.test(requireString(premise.candidateId, "source premise candidate ID"))) throw new Error("Source premise candidate ID is invalid.");
+      requireSha(premise.candidateSha256, "source premise candidate SHA");
+      for (const key of ["privateWant", "firstChoice", "emotionalPayment"]) requireString(premise[key], `source premise ${key}`);
+
+      const spine = requireRecord(candidate.spineRetention, "spine retention");
+      exactKeys(spine, ["schemaVersion", "primaryReference", "referenceDisclosure", "preservedEngine", "openingEpisodeMappings", "relationshipConversion", "hookProgression", "surfaceChanges", "payoffPair"]);
+      if (spine.schemaVersion !== "firefly_spine_retention/v1") throw new Error("Spine retention schema is invalid.");
+      const primary = requireRecord(spine.primaryReference, "spine primary reference");
+      exactKeys(primary, ["packId", "packSha256", "sourceSha256"]);
+      requireString(primary.packId, "spine pack ID"); requireSha(primary.packSha256, "spine pack SHA"); requireSha(primary.sourceSha256, "spine source SHA");
+      const disclosure = requireRecord(spine.referenceDisclosure, "reference disclosure");
+      exactKeys(disclosure, ["workSlug", "workTitle", "usageRoles", "selectionReason", "preservedElements", "transformedElements"]);
+      requireString(disclosure.workSlug, "reference work slug"); requireString(disclosure.workTitle, "reference work title");
+      const usageRoles = requireStrings(disclosure.usageRoles, "reference usage roles");
+      const allowedRoles = new Set(["commercial-engine", "opening-event", "relationship", "payoff", "style"]);
+      if (usageRoles.length < 1 || usageRoles.some((role) => !allowedRoles.has(role))) throw new Error("Reference usage role is invalid.");
+      const preserved = requireStrings(disclosure.preservedElements, "reference preserved elements");
+      const transformed = requireStrings(disclosure.transformedElements, "reference transformed elements");
+      if (preserved.length < 4 || transformed.length < 1) throw new Error("Reference disclosure must name preserved and transformed elements.");
+      requireString(disclosure.selectionReason, "reference selection reason");
+      const engine = requireRecord(spine.preservedEngine, "preserved engine");
+      exactKeys(engine, ["industry", "repeatedVerb", "progressionLadder", "rewardGrammar"]);
+      for (const key of ["industry", "repeatedVerb", "progressionLadder", "rewardGrammar"]) requireString(engine[key], `preserved engine ${key}`);
+      if (!Array.isArray(spine.openingEpisodeMappings) || spine.openingEpisodeMappings.length !== 4) throw new Error("Spine retention requires four opening mappings.");
+      const mappedBeats = new Set<number>();
+      spine.openingEpisodeMappings.forEach((rawMapping, index) => {
+        const mapping = requireRecord(rawMapping, "spine opening mapping");
+        exactKeys(mapping, ["episode", "sourceBeatSequence", "sourceArcId", "retainedFunction", "transformedEvent"]);
+        if (requireInteger(mapping.episode, "spine episode", 1) !== index + 1) throw new Error("Spine mappings must be ordered 1 through 4.");
+        mappedBeats.add(requireInteger(mapping.sourceBeatSequence, "source beat sequence", 1));
+        for (const key of ["sourceArcId", "retainedFunction", "transformedEvent"]) requireString(mapping[key], `spine mapping ${key}`);
+      });
+      if (mappedBeats.size < 2) throw new Error("Spine retention must use at least two source beats.");
+      const relation = requireRecord(spine.relationshipConversion, "spine relationship conversion");
+      exactKeys(relation, ["sourceFunction", "transformedExpression"]);
+      requireString(relation.sourceFunction, "source relationship function"); requireString(relation.transformedExpression, "transformed relationship expression");
+      if (!Array.isArray(spine.hookProgression) || spine.hookProgression.length < 2) throw new Error("Spine retention requires hook progression.");
+      for (const rawHook of spine.hookProgression) {
+        const hook = requireRecord(rawHook, "spine hook"); exactKeys(hook, ["sourceArcId", "retainedFunction", "transformedHook"]);
+        for (const key of ["sourceArcId", "retainedFunction", "transformedHook"]) requireString(hook[key], `spine hook ${key}`);
+      }
+      if (!Array.isArray(spine.surfaceChanges) || spine.surfaceChanges.length < 1) throw new Error("Spine retention requires surface changes.");
+      const allowedLayers = new Set(["people", "organization", "object", "location", "local-cause", "number", "scene-dressing"]);
+      for (const rawChange of spine.surfaceChanges) {
+        const change = requireRecord(rawChange, "spine surface change"); exactKeys(change, ["layer", "change", "causalAdjustment"]);
+        if (!allowedLayers.has(String(change.layer))) throw new Error("Spine surface layer is invalid.");
+        requireString(change.change, "spine surface change"); requireString(change.causalAdjustment, "spine causal adjustment");
+      }
+      const payoff = requireRecord(spine.payoffPair, "spine payoff pair"); exactKeys(payoff, ["material", "emotional", "witness"]);
+      for (const key of ["material", "emotional", "witness"]) requireString(payoff[key], `spine payoff ${key}`);
+    }
     const review = requireRecord(candidate.independentReview, "planning independent review");
     exactKeys(review, ["verdict", "independentScore", "entryGate", "decisiveStrength", "decisiveRisk", "requiredRepair"]);
     if (!["SURVIVE", "HOLD", "KILL"].includes(String(review.verdict))) throw new Error("Planning review verdict is invalid.");
@@ -769,13 +907,170 @@ function validateV3(packet: Record<string, unknown>): FireflyReviewPacketV3 {
   return packet as unknown as FireflyReviewPacketV3;
 }
 
+function validatePremiseRuntime(value: unknown, label: string): void {
+  const runtime = requireRecord(value, label);
+  exactKeys(runtime, ["schemaVersion", "provider", "model", "reasoning", "soul"]);
+  if (runtime.schemaVersion !== "firefly_pitch_runtime/v1" || runtime.provider !== "codex-cli"
+    || runtime.model !== "gpt-5.6-sol" || runtime.reasoning !== "high") {
+    throw new Error(`${label} must be the locked codex/sol/high runtime.`);
+  }
+  const soul = requireRecord(runtime.soul, `${label} Soul`);
+  exactKeys(soul, ["mode", "soulId", "version", "manifestSha256", "promptSha256", "resourceSha256"]);
+  if (soul.mode !== "canary-scoped" || soul.soulId !== "male-modern-fantasy-ko" || soul.version !== "v1") {
+    throw new Error(`${label} must use the candidate-scoped male modern-fantasy Soul.`);
+  }
+  for (const key of ["manifestSha256", "promptSha256", "resourceSha256"]) requireSha(soul[key], `${label} Soul ${key}`);
+}
+
+function validatePremiseSourceBinding(value: unknown): void {
+  const binding = requireRecord(value, "Human Premise source binding");
+  exactKeys(binding, ["schemaVersion", "packId", "packSha256", "sourceSha256", "storyIndex", "styleExamples", "structureInputs"], ["sourceWork"]);
+  if (binding.schemaVersion !== "firefly_pitch_source_binding/v1") throw new Error("Human Premise source binding schema is invalid.");
+  requireSafeId(binding.packId, "Human Premise pack ID");
+  requireSha(binding.packSha256, "Human Premise pack SHA");
+  requireSha(binding.sourceSha256, "Human Premise source SHA");
+  if (binding.sourceWork !== undefined) {
+    const sourceWork = requireRecord(binding.sourceWork, "Human Premise source work");
+    exactKeys(sourceWork, ["workSlug", "workTitle"]);
+    requireString(sourceWork.workSlug, "Human Premise source work slug");
+    requireString(sourceWork.workTitle, "Human Premise source work title");
+  }
+  for (const key of ["storyIndex", "styleExamples"] as const) {
+    const collection = requireRecord(binding[key], `Human Premise ${key}`);
+    exactKeys(collection, ["path", "sha256", "selected"]);
+    requireString(collection.path, `Human Premise ${key} path`);
+    requireSha(collection.sha256, `Human Premise ${key} SHA`);
+    if (!Array.isArray(collection.selected) || collection.selected.length < 1) throw new Error(`Human Premise ${key} selection is empty.`);
+    const ids = new Set<string>();
+    for (const raw of collection.selected) {
+      const item = requireRecord(raw, `Human Premise ${key} item`);
+      const fields = key === "storyIndex" ? ["sequence", "arcId", "rawProseSha256"] : ["id", "sequence", "arcId", "rawProseSha256"];
+      exactKeys(item, fields, key === "storyIndex" ? ["sourceLineRange", "sourceCharacterRange"] : []);
+      requireInteger(item.sequence, `Human Premise ${key} sequence`, 1);
+      requireString(item.arcId, `Human Premise ${key} Arc ID`);
+      requireSha(item.rawProseSha256, `Human Premise ${key} prose SHA`);
+      if (key === "storyIndex" && (item.sourceLineRange === undefined) !== (item.sourceCharacterRange === undefined)) {
+        throw new Error("Human Premise source line and character ranges must appear together.");
+      }
+      if (key === "storyIndex" && item.sourceLineRange !== undefined && item.sourceCharacterRange !== undefined) {
+        for (const rangeKey of ["sourceLineRange", "sourceCharacterRange"] as const) {
+          const range = requireRecord(item[rangeKey], `Human Premise ${rangeKey}`);
+          exactKeys(range, ["start", "end"]);
+          const minimum = rangeKey === "sourceLineRange" ? 1 : 0;
+          const start = requireInteger(range.start, `Human Premise ${rangeKey} start`, minimum);
+          const end = requireInteger(range.end, `Human Premise ${rangeKey} end`, 1);
+          if ((rangeKey === "sourceCharacterRange" && end <= start) || (rangeKey === "sourceLineRange" && end < start)) throw new Error(`Human Premise ${rangeKey} is invalid.`);
+        }
+      }
+      const id = key === "storyIndex" ? String(item.sequence) : requireString(item.id, `Human Premise ${key} ID`);
+      if (ids.has(id)) throw new Error(`Human Premise ${key} selection contains duplicates.`);
+      ids.add(id);
+    }
+  }
+  if (!Array.isArray(binding.structureInputs) || binding.structureInputs.length !== 3) throw new Error("Human Premise requires three structure inputs.");
+  const roles = new Set<string>();
+  for (const raw of binding.structureInputs) {
+    const item = requireRecord(raw, "Human Premise structure input");
+    exactKeys(item, ["role", "path", "sha256"]);
+    if (!["project-bible", "chapter-map", "arc-atlas"].includes(String(item.role)) || roles.has(String(item.role))) {
+      throw new Error("Human Premise structure roles must be unique and complete.");
+    }
+    roles.add(String(item.role));
+    requireString(item.path, "Human Premise structure path");
+    requireSha(item.sha256, "Human Premise structure SHA");
+  }
+}
+
+function validateV4(packet: Record<string, unknown>): FireflyReviewPacketV4 {
+  exactKeys(packet, ["schemaVersion", "packetId", "packetSha256", "generatedAt", "purpose", "source", "work", "artifact", "sourceBinding", "runtimeReceipt", "reviewerRuntimeReceipt", "candidates", "recommendation", "actions", "authority"]);
+  if (!PACKET_ID.test(String(packet.packetId))) throw new Error("Review packet ID is invalid.");
+  requireSha(packet.packetSha256, "Human Premise packet SHA");
+  requireIso(packet.generatedAt, "Human Premise generatedAt");
+  if (packet.purpose !== "human-premise") throw new Error("v4 packets must be Human Premise reviews.");
+  const source = requireRecord(packet.source, "Human Premise source");
+  exactKeys(source, ["system", "slateId", "sourceRevision"]);
+  if (source.system !== "inkos") throw new Error("Human Premise source must be InkOS.");
+  requireSafeId(source.slateId, "Human Premise slate ID");
+  requireSha(source.sourceRevision, "Human Premise source revision");
+  const work = requireRecord(packet.work, "Human Premise work");
+  exactKeys(work, ["id", "title", "genre", "status"]);
+  if (work.id !== source.slateId || work.genre !== "modern-fantasy-ko" || work.status !== "non-canonical") throw new Error("Human Premise work boundary is invalid.");
+  requireString(work.title, "Human Premise work title");
+  const artifact = requireRecord(packet.artifact, "Human Premise artifact");
+  exactKeys(artifact, ["id", "kind", "title", "status"]);
+  if (artifact.id !== source.slateId || artifact.kind !== "human-premise-slate" || artifact.status !== "human-decision-pending") throw new Error("Human Premise artifact boundary is invalid.");
+  requireString(artifact.title, "Human Premise artifact title");
+  validatePremiseSourceBinding(packet.sourceBinding);
+  validatePremiseRuntime(packet.runtimeReceipt, "Human Premise generator runtime");
+  validatePremiseRuntime(packet.reviewerRuntimeReceipt, "Human Premise reviewer runtime");
+  if (!Array.isArray(packet.candidates) || packet.candidates.length < 1 || packet.candidates.length > 6) throw new Error("Human Premise review requires one to six candidates.");
+  const sourceBinding = packet.sourceBinding as FireflyReviewPacketV4["sourceBinding"];
+  const sourceSequences = new Set(sourceBinding.storyIndex.selected.map((item) => item.sequence));
+  const styleIds = new Set(sourceBinding.styleExamples.selected.map((item) => item.id));
+  const ids = new Set<string>();
+  const survivors: string[] = [];
+  for (const raw of packet.candidates) {
+    const candidate = requireRecord(raw, "Human Premise candidate");
+    exactKeys(candidate, ["id", "sha256", "titleCandidates", "oneLineHumanPromise", "humanPremise", "firstScene", "sourceBeatSequences", "styleExampleIds", "retainedReferenceTraits", "surfaceVariation", "independentReview"]);
+    const id = requireString(candidate.id, "Human Premise candidate ID");
+    if (!/^p\d{2}$/u.test(id) || ids.has(id)) throw new Error("Human Premise candidate IDs must be unique pNN values.");
+    ids.add(id);
+    const candidateSha = requireSha(candidate.sha256, "Human Premise candidate SHA");
+    const unsigned = { ...candidate };
+    delete unsigned.id;
+    delete unsigned.sha256;
+    delete unsigned.independentReview;
+    if (canonicalSha256({ candidateId: id, ...unsigned }) !== candidateSha) throw new Error("Human Premise candidate SHA mismatch.");
+    const titles = requireStrings(candidate.titleCandidates, "Human Premise titles");
+    if (titles.length < 1 || titles.length > 3 || titles.some((title) => !title)) throw new Error("Human Premise requires one to three titles.");
+    requireString(candidate.oneLineHumanPromise, "Human Premise promise");
+    const premise = requireRecord(candidate.humanPremise, "Human Premise");
+    const premiseKeys = ["protagonistAsPerson", "privateWant", "feltLack", "targetPerson", "whyToday", "firstChoice", "emotionalPayment", "stillHumanWithoutPower"];
+    exactKeys(premise, premiseKeys);
+    for (const key of premiseKeys) requireString(premise[key], `Human Premise ${key}`);
+    const scene = requireRecord(candidate.firstScene, "Human Premise first scene");
+    exactKeys(scene, ["currentSituation", "pressure", "action", "witnessedChange"]);
+    for (const key of ["currentSituation", "pressure", "action", "witnessedChange"]) requireString(scene[key], `Human Premise scene ${key}`);
+    if (!Array.isArray(candidate.sourceBeatSequences) || candidate.sourceBeatSequences.length < 1 || candidate.sourceBeatSequences.some((sequence) => !sourceSequences.has(Number(sequence)))) throw new Error("Human Premise candidate cites an unbound source beat.");
+    const candidateStyleIds = requireStrings(candidate.styleExampleIds, "Human Premise style IDs");
+    if (candidateStyleIds.length < 1 || candidateStyleIds.some((styleId) => !styleIds.has(styleId))) throw new Error("Human Premise candidate cites an unbound style example.");
+    if (requireStrings(candidate.retainedReferenceTraits, "Human Premise retained traits").length < 2) throw new Error("Human Premise requires retained reference traits.");
+    requireString(candidate.surfaceVariation, "Human Premise surface variation");
+    const review = requireRecord(candidate.independentReview, "Human Premise independent review");
+    exactKeys(review, ["candidateId", "verdict", "gates", "decisiveStrength", "decisiveRisk", "requiredRepair"]);
+    if (review.candidateId !== id || !["SURVIVE", "HOLD", "KILL"].includes(String(review.verdict))) throw new Error("Human Premise review identity or verdict is invalid.");
+    const gates = requireRecord(review.gates, "Human Premise gates");
+    const gateKeys = ["humanDesire", "sourceGrounded", "sceneableToday", "nonMechanical", "voiceGrounded"];
+    exactKeys(gates, gateKeys);
+    if (gateKeys.some((key) => typeof gates[key] !== "boolean")) throw new Error("Human Premise gates must be boolean.");
+    if (review.verdict === "SURVIVE" && gateKeys.some((key) => gates[key] !== true)) throw new Error("A failed Human Premise gate cannot SURVIVE.");
+    for (const key of ["decisiveStrength", "decisiveRisk", "requiredRepair"]) requireString(review[key], `Human Premise review ${key}`);
+    if (review.verdict === "SURVIVE") survivors.push(id);
+  }
+  const recommendation = packet.recommendation === null ? null : requireRecord(packet.recommendation, "Human Premise recommendation");
+  if (recommendation) {
+    exactKeys(recommendation, ["candidateId", "reason"]);
+    if (!ids.has(requireString(recommendation.candidateId, "Human Premise recommendation ID"))) throw new Error("Human Premise recommendation candidate is absent.");
+    requireString(recommendation.reason, "Human Premise recommendation reason");
+  }
+  if (survivors.length > 1 || (survivors[0] ?? null) !== (recommendation?.candidateId ?? null)) throw new Error("Human Premise recommendation must match the sole SURVIVE candidate.");
+  if (JSON.stringify(packet.actions) !== JSON.stringify(["select", "hold", "reject"])) throw new Error("Human Premise actions are invalid.");
+  const authority = requireRecord(packet.authority, "Human Premise authority");
+  exactKeys(authority, ["canon", "decisionSurface", "decisionEffect", "commercialExpansion", "bookCreation", "manuscriptApply", "reverseSync"]);
+  if (authority.canon !== "inkos" || authority.decisionSurface !== "storyyard" || authority.decisionEffect !== "human-premise-selection"
+    || authority.commercialExpansion !== false || authority.bookCreation !== false || authority.manuscriptApply !== false || authority.reverseSync !== false) {
+    throw new Error("Human Premise authority must stop at human selection.");
+  }
+  return packet as unknown as FireflyReviewPacketV4;
+}
+
 export function assertFireflyReviewPacketIdentity(packet: FireflyReviewPacket): void {
   const unsigned = { ...packet } as Record<string, unknown>;
   delete unsigned.schemaVersion;
   delete unsigned.packetId;
   delete unsigned.packetSha256;
   if (packet.schemaVersion === "firefly_review_packet/v1") delete unsigned.generatedAt;
-  const actual = packet.schemaVersion === "firefly_review_packet/v3"
+  const actual = packet.schemaVersion === "firefly_review_packet/v3" || packet.schemaVersion === "firefly_review_packet/v4"
     ? canonicalSha256(unsigned)
     : sha256(JSON.stringify(unsigned));
   if (actual !== packet.packetSha256 || packet.packetId !== `frp-${actual.slice(0, 24)}`) throw new Error("Review packet identity or SHA-256 mismatch.");
@@ -789,6 +1084,8 @@ export function validateFireflyReviewPacket(value: unknown): FireflyReviewPacket
       ? validateV2(packet)
       : packet.schemaVersion === "firefly_review_packet/v3"
         ? validateV3(packet)
+      : packet.schemaVersion === "firefly_review_packet/v4"
+        ? validateV4(packet)
       : (() => { throw new Error("Unsupported Firefly review packet schema."); })();
   assertFireflyReviewPacketIdentity(parsed);
   return parsed;

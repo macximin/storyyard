@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "firefly_review_packet_invalidations/v1",
+  "invalidations": [
+    {
+      "packetId": "frp-984253c92d9b3bd1fb06c976",
+      "slateId": "chaebol-entry-hil-20260903-v1",
+      "reason": "P0 human-grounding failure; legacy PASS revoked and promotion blocked in InkOS"
+    },
+    {
+      "packetId": "frp-5f7d2056b4d39c9a8d2c8f88",
+      "slateId": "chaebol-human-premise-20260904-v1",
+      "reason": "Superseded canary: source beat ranges were present in model context but absent from the public receipt"
+    }
+  ]
+}

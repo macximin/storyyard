@@ -1,7 +1,793 @@
 {
   "schemaVersion": "firefly_review_packet_static_index/v1",
-  "indexSha256": "e4f750ff8930e153d214ea8f1a58bf69fe33399231824d560547cef9a2db760d",
+  "indexSha256": "8646de034527625673f11c086a10aa16b23147e79592f9e8ef6b3feb211e5ede",
   "packets": [
+    {
+      "schemaVersion": "firefly_review_packet/v4",
+      "packetId": "frp-5f7d2056b4d39c9a8d2c8f88",
+      "packetSha256": "5f7d2056b4d39c9a8d2c8f88b5449c7cfab0630a5e1312368a8914641d20d167",
+      "generatedAt": "2026-09-04T01:55:38.077Z",
+      "purpose": "human-premise",
+      "source": {
+        "system": "inkos",
+        "slateId": "chaebol-human-premise-20260904-v1",
+        "sourceRevision": "37831005ef4929b22b18f8fa86b9aad6cc5cdb4524f9e89ae39fa0f2fcd8cf10"
+      },
+      "work": {
+        "id": "chaebol-human-premise-20260904-v1",
+        "title": "Human Premise HIL · chaebol-human-premise-20260904-v1",
+        "genre": "modern-fantasy-ko",
+        "status": "non-canonical"
+      },
+      "artifact": {
+        "id": "chaebol-human-premise-20260904-v1",
+        "kind": "human-premise-slate",
+        "title": "Human Premise HIL · chaebol-human-premise-20260904-v1",
+        "status": "human-decision-pending"
+      },
+      "sourceBinding": {
+        "schemaVersion": "firefly_pitch_source_binding/v1",
+        "packId": "doksik-chaebol3-ko-v1",
+        "packSha256": "ff8365b632fd85519f4dc5e1f51e1d36b3aaba8015de23427b0bb4dee954d57d",
+        "sourceSha256": "66f3e7df3123343c14a7134108dc59940511f40372493a549cba8ae709df4b45",
+        "storyIndex": {
+          "path": ".inkos/reference-packs/doksik-chaebol3-ko-v1/story-index.jsonl",
+          "sha256": "821df0df9eb2f42dae8fac003f857c72bdcdf23cfc40c821fd19895540232043",
+          "selected": [
+            {
+              "sequence": 1,
+              "arcId": "DCA-N01",
+              "rawProseSha256": "159211f2fc89773e2f6b37655be696ccffa85daded8b92bc51c5f309c231596f"
+            },
+            {
+              "sequence": 2,
+              "arcId": "DCA-N01",
+              "rawProseSha256": "eef41e88e1afb662bcdb7c27ae8b9494e038d66cde205934d7e3632475f82c2b"
+            },
+            {
+              "sequence": 75,
+              "arcId": "DCA-N05",
+              "rawProseSha256": "231ccc1c1dc153d6fcd2a5fa29bfac4fb095be913f57ff96b1fd3cdc2023d831"
+            }
+          ]
+        },
+        "styleExamples": {
+          "path": ".inkos/reference-packs/doksik-chaebol3-ko-v1/style-examples.jsonl",
+          "sha256": "6895542335651ff5df31fe54197e5080bb5935161819347b876e37d7d97b6e9b",
+          "selected": [
+            {
+              "id": "phase-1-entry-1",
+              "sequence": 1,
+              "arcId": "DCA-N01",
+              "rawProseSha256": "159211f2fc89773e2f6b37655be696ccffa85daded8b92bc51c5f309c231596f"
+            },
+            {
+              "id": "phase-1-escalation-75",
+              "sequence": 75,
+              "arcId": "DCA-N05",
+              "rawProseSha256": "231ccc1c1dc153d6fcd2a5fa29bfac4fb095be913f57ff96b1fd3cdc2023d831"
+            },
+            {
+              "id": "phase-1-payoff-150",
+              "sequence": 150,
+              "arcId": "DCA-N15",
+              "rawProseSha256": "ca478372b4a42cf996043ade59027beaa17fcfd7e15d0e0584178ac802fc1371"
+            }
+          ]
+        },
+        "structureInputs": [
+          {
+            "role": "project-bible",
+            "path": "../firefly_reference_lab/analyses/doksik-chaebol3/project_bible.md",
+            "sha256": "7f9e87f885fc3c5e01ae9c4db40c7aa1fd033a0aa574fb502ab0fc6fd0181572"
+          },
+          {
+            "role": "chapter-map",
+            "path": "../firefly_reference_lab/analyses/doksik-chaebol3/chapter_map.csv",
+            "sha256": "3e6ade1b048df571a4bd327f4c699751eabbe4e403761b4b17f1e54610dd5167"
+          },
+          {
+            "role": "arc-atlas",
+            "path": "../firefly_reference_lab/analyses/doksik-chaebol3/arc_atlas.md",
+            "sha256": "90f1eb72082f2853bf23f96a644eb7fa78ac0d90f536c04f0aec817091140c4f"
+          }
+        ]
+      },
+      "runtimeReceipt": {
+        "schemaVersion": "firefly_pitch_runtime/v1",
+        "provider": "codex-cli",
+        "model": "gpt-5.6-sol",
+        "reasoning": "high",
+        "soul": {
+          "mode": "canary-scoped",
+          "soulId": "male-modern-fantasy-ko",
+          "version": "v1",
+          "manifestSha256": "a55be6440d3cb18885ccdd7935f11a976a6b61d6b7ce2a26d96a8695963ec459",
+          "promptSha256": "0c4b0a7074ab1534d0a0426d9d7fa0cc4d7e7c6fdd8220bde732c24ef4c9fdcc",
+          "resourceSha256": "95bf542d085903129a1966fcc2c6dc8cde456caed11fd1eac8d220cd373a5b38"
+        }
+      },
+      "reviewerRuntimeReceipt": {
+        "schemaVersion": "firefly_pitch_runtime/v1",
+        "provider": "codex-cli",
+        "model": "gpt-5.6-sol",
+        "reasoning": "high",
+        "soul": {
+          "mode": "canary-scoped",
+          "soulId": "male-modern-fantasy-ko",
+          "version": "v1",
+          "manifestSha256": "a55be6440d3cb18885ccdd7935f11a976a6b61d6b7ce2a26d96a8695963ec459",
+          "promptSha256": "0c4b0a7074ab1534d0a0426d9d7fa0cc4d7e7c6fdd8220bde732c24ef4c9fdcc",
+          "resourceSha256": "95bf542d085903129a1966fcc2c6dc8cde456caed11fd1eac8d220cd373a5b38"
+        }
+      },
+      "candidates": [
+        {
+          "sha256": "ed61b7c307495916add67331f898994159ad1233e73027003a62c0054a1af050",
+          "titleCandidates": [
+            "회귀한 재벌 막내는 누나부터 지킨다",
+            "사람을 읽는 은강가 막내"
+          ],
+          "oneLineHumanPromise": "누나를 버리고 혼자 살아남았던 재벌가 막내가 열아홉으로 돌아와, 이번에는 자기 몫의 벌을 받더라도 누나에게 다시 ‘내 동생’으로 선택받으려 한다.",
+          "humanPremise": {
+            "protagonistAsPerson": "서진우는 겁이 날 때마다 누나 뒤에 숨었고, 그 대가로 가장 사랑한 사람을 잃은 남자다. 몰락 뒤 십오 년을 누나의 마지막 음성메시지만 들으며 버티다 죽은 그는 자신이 비겁해지기 직전의 열아홉 살로 돌아온다.",
+            "privateWant": "서진우는 서해원이 자신을 보호해야 할 철없는 막내로 여기길 바라지 않는다. 누나가 위험한 순간에도 곁에 둘 수 있는 가족으로 자신을 다시 선택해 주길 원한다.",
+            "feltLack": "첫 생의 서진우는 누나의 출입카드를 훔쳐 쓰고도 입을 다물었다. 누명을 쓴 서해원은 집에서 쫓겨났고, 몇 년 뒤 동생의 전화를 끝내 받지 않은 채 죽었다. 진우는 장례식에서도 관을 붙잡을 자격이 없다는 말을 들었다.",
+            "targetPerson": "자신을 대신해 매번 꾸중과 책임을 떠안았던 여섯 살 위 누나 서해원.",
+            "whyToday": "오늘 자정까지 서해원이 식품 오염 사고의 책임을 인정하는 각서에 서명하면 집을 떠난다. 진우가 이번에도 침묵하면 누나는 다시는 그의 말을 믿지 않는다.",
+            "firstChoice": "진우는 가족들이 모인 만찬장에서 누나의 각서를 찢고, 출입카드를 훔친 사람이 자신이라고 고백한다. 얼굴을 보면 그 사람의 가장 뛰어난 재주와 당장 숨기려는 한 가지가 떠오르는 능력으로 봉인을 바꾼 연회 책임자를 알아본 뒤, 직접 냉장창고 폐기통을 뒤져 일련번호가 다른 봉인을 가져온다.",
+            "emotionalPayment": "모두가 진우를 꾸짖는 가운데 서해원은 피가 밴 그의 손을 먼저 감싼다. 줄곧 ‘도련님’이라고 선을 긋던 누나가 가족들 앞에서 ‘진우야, 내 옆에 있어’라고 말한다.",
+            "stillHumanWithoutPower": "재산과 회사가 사라져도 진우에게는 자신이 버렸던 누나 앞에서 이번에는 도망치지 않고, 보호받던 아이가 아닌 함께 견딜 가족으로 인정받고 싶은 욕망이 남는다."
+          },
+          "firstScene": {
+            "currentSituation": "은강호텔의 칠순 만찬장. 신제품 시식 음식에서 변질된 원료가 발견됐고, 서해원은 자정 전까지 책임 각서에 서명하라는 요구를 받는다.",
+            "pressure": "문제가 된 냉장창고에는 서해원의 카드 사용 기록이 남아 있다. 작은아버지와 임원들은 집안 망신을 끝내자며 서명을 재촉하고, 서해원은 진우에게 눈길조차 주지 않는다.",
+            "action": "진우는 각서를 낚아채 찢고 카드 절도를 자백한다. 이어 연회 책임자의 얼굴에서 ‘숨기는 일: 냉장창고 봉인 교체’를 읽고 창고로 달려가 손이 찢어질 때까지 폐기 봉투를 뒤진 끝에 바뀐 봉인을 찾아 만찬 탁자 위에 올려놓는다.",
+            "witnessedChange": "서해원은 진우가 자기 체면과 상속 가능성을 스스로 내던지는 모습을 본다. 증거가 드러난 뒤에도 진우가 변명하지 않자, 누나는 그의 다친 손을 감싸고 처음으로 자기 옆자리를 내준다."
+          },
+          "sourceBeatSequences": [
+            1
+          ],
+          "styleExampleIds": [
+            "phase-1-entry-1"
+          ],
+          "retainedReferenceTraits": [
+            "가족을 외면한 죄책감 속에서 비참하게 죽은 주인공이 가족을 잃기 전으로 돌아와 첫날부터 과거와 다른 선택을 한다.",
+            "가족 행사에 끼어든 기만을 구체적인 물증으로 벗기고, 상대가 주인공을 부르는 말과 대하는 태도가 달라지는 장면으로 즉시 지급한다.",
+            "짧은 문장과 자문, 생활감 있는 물건, 주인공의 약간 뻔뻔한 속말을 섞어 무거운 상실 뒤 행동 속도를 빠르게 올린다."
+          ],
+          "surfaceVariation": "자동차·증권 중심 대기업은 식품·호텔·냉장유통을 거느린 은강가로 바꿨다. 지켜야 할 할아버지는 누명을 쓰고 떠나는 누나로, 명품 시계의 거짓말은 출입카드와 냉장창고 봉인 교체로, 사람의 종합 능력치는 가장 뛰어난 재주와 현재 숨기는 한 가지를 읽는 능력으로 바꿨다.",
+          "id": "p01",
+          "independentReview": {
+            "candidateId": "p01",
+            "verdict": "HOLD",
+            "gates": {
+              "humanDesire": true,
+              "sourceGrounded": true,
+              "sceneableToday": true,
+              "nonMechanical": true,
+              "voiceGrounded": true
+            },
+            "decisiveStrength": "보호받던 막내가 자신이 버렸던 누나 곁에서 함께 책임지는 가족으로 다시 선택받고 싶다는 욕망이 구체적이다. 자정 전 각서, 공개 자백, 다친 손, 호칭 변화가 즉시 장면화되며 원천의 회귀·가족 상실·물증 폭로·태도 변화 리듬도 분명히 반영했다.",
+            "decisiveRisk": "첫 선택에서 자백보다 얼굴 판독 능력과 봉인 증거 회수가 더 강하게 작동해, 인간적 속죄가 ‘정답을 알려 주는 능력으로 누명을 해결한 사건’에 묻힐 위험이 있다. 누나가 곧바로 곁자리를 내주는 지급도 과거 배신의 무게에 비해 다소 빠르다.",
+            "requiredRepair": "능력이 범인을 직접 지목하지 못하게 제한하고, 진우가 불확실한 상태에서도 먼저 자백해 실제 손실을 감수하도록 순서를 강화할 것. 누나의 지급은 완전한 용서가 아니라 ‘이번 한 번은 옆에 있으라’는 조건부 선택으로 낮추면 인간 관계의 긴장이 오래 간다."
+          }
+        },
+        {
+          "sha256": "6afb8d8bcb616df3e63484f0d21b4a76a6ad495ad10f232e8b87af57b79e56fe",
+          "titleCandidates": [
+            "재벌가 사생아는 어머니를 선택했다",
+            "이번 생엔 도련님이 아닙니다"
+          ],
+          "oneLineHumanPromise": "어머니를 하인처럼 외면한 대가로 평생 혼자였던 남자가 그날로 돌아와 모두 앞에서 어머니의 손을 잡고, 다시 한번 ‘내 아들’이라는 말을 얻으려 한다.",
+          "humanPremise": {
+            "protagonistAsPerson": "재벌가의 성을 얻으려고 친어머니를 가사도우미처럼 대했다가, 어머니의 죽음 뒤 누구에게도 아들이지 못한 채 늙어 죽은 남자다.",
+            "privateWant": "어머니가 생존을 위해 삼켜 온 호칭인 ‘도련님’을 버리고, 자신을 부끄러워하지 않는 아들로 다시 불러 주기를 바란다.",
+            "feltLack": "어머니가 교통사고로 죽던 밤에도 가족사진 속 자기 자리부터 지켰고, 장례식조차 가지 못했다. 이후 수십 년 동안 식탁 맞은편에서 밥을 챙겨 줄 사람이 없다는 사실을 끼니마다 체감했다.",
+            "targetPerson": "대저택의 가사도우미로 숨어 지내며 친아들을 ‘도련님’이라 불러야 했던 어머니 윤선희.",
+            "whyToday": "오늘 밤 윤선희는 도둑으로 몰려 저택에서 쫓겨나고, 폭설 속에서 아들의 전화만 기다리다가 사고로 죽는다. 연회가 끝나기 전에 누명을 벗기고 붙잡지 못하면 같은 마지막이 반복된다.",
+            "firstChoice": "열여덟 살로 돌아온 주인공은 후계자 인정을 잃을 줄 알면서도 회장 생일연회 한복판에서 윤선희의 가방을 빼앗아 뒤지는 고모를 막고, 자신이 윤선희의 친아들이라고 먼저 밝힌다. 이어 전생에 보았던 장면을 되짚어 고모의 지팡이 손잡이 안에서 사라진 에메랄드 브로치를 꺼낸다.",
+            "emotionalPayment": "손님들이 보는 앞에서 윤선희는 처음으로 허리를 펴고 주인공의 젖은 머리를 닦아 준다. 주인공이 함께 나가자고 손을 내밀자 그녀는 ‘도련님’ 대신 떨리는 목소리로 ‘우리 아들, 집에 가자’고 답한다.",
+            "stillHumanWithoutPower": "재산과 후계 구도를 모두 지워도, 한 번 외면해 죽게 만든 어머니에게 이번에는 남들 앞에서도 아들로 선택받고 싶은 마음이 남는다."
+          },
+          "firstScene": {
+            "currentSituation": "폭설이 시작된 저녁, 해원호텔 창업주의 생일연회장이다. 윤선희는 사라진 브로치가 자기 가방에서 나오면 즉시 쫓겨나며, 주인공에게는 축하 건배가 끝나기 전까지 몇 분밖에 없다.",
+            "pressure": "전생의 주인공은 친자 관계가 드러날까 두려워 고개를 돌렸다. 지금도 입을 열면 막 얻은 해원가의 성과 가족 자리를 잃지만, 침묵하면 어머니가 다시 혼자 눈길로 나간다.",
+            "action": "주인공은 윤선희 앞을 몸으로 막고 자신이 그녀의 아들이라고 선언한다. 고모가 경비를 부르자 지팡이를 바닥에 내리쳐 손잡이를 깨고, 그 안에서 브로치를 꺼내 연회 탁자 위에 올려놓는다.",
+            "witnessedChange": "창업주와 일가, 호텔 임직원들이 누명을 벗는 순간을 지켜본다. 늘 고개 숙이던 윤선희는 아들의 뺨을 감싸고 처음으로 ‘우리 아들’이라 부르며, 주인공은 그 한마디를 듣고 그녀와 함께 연회장을 나선다."
+          },
+          "sourceBeatSequences": [
+            1
+          ],
+          "styleExampleIds": [
+            "phase-1-entry-1"
+          ],
+          "retainedReferenceTraits": [
+            "가족을 외면한 채 비참하게 죽은 주인공이 상실이 시작된 날로 돌아와, 연회장의 공개 기만을 직접 폭로하고 가족을 지키는 선택으로 첫 장면을 결산하는 사건 기능을 보존했다.",
+            "좁고 구체적인 생활 결핍에서 출발해 짧은 독백과 소품 중심의 폭로로 속도를 올리고, 상대 가족의 말과 손길을 즉시 지급하는 문체·정서 리듬을 보존했다."
+          ],
+          "surfaceVariation": "조손 관계를 숨겨진 모자로, 중공업 중심 재벌을 호텔·면세 유통 가문으로, 파텍필립 시계를 에메랄드 브로치와 속 빈 지팡이로, 납품업체 사장의 기만을 친족의 절도 누명으로, 입학 선물 계좌를 어머니의 공개 호명과 동행 선택으로 바꿨다.",
+          "id": "p02",
+          "independentReview": {
+            "candidateId": "p02",
+            "verdict": "SURVIVE",
+            "gates": {
+              "humanDesire": true,
+              "sourceGrounded": true,
+              "sceneableToday": true,
+              "nonMechanical": true,
+              "voiceGrounded": true
+            },
+            "decisiveStrength": "재벌가의 성을 포기해서라도 어머니에게 다시 아들로 불리고 싶다는 욕망이 선명하다. 신분과 재산을 제거해도 모자 관계의 수치심·후회·그리움이 그대로 남으며, 공개 고백과 ‘우리 아들’이라는 호명이 한 장면 안에서 강한 감정적 회수를 만든다.",
+            "decisiveRisk": "누명 폭로와 모자 화해가 첫 장면에서 지나치게 완결되면 이후의 반복 엔진이 약해질 수 있다. 어머니가 곧바로 전적인 용서와 동행을 선택할 경우 장기적인 관계 회복의 긴장도 줄어든다.",
+            "requiredRepair": "없음. 후속 전개에서는 ‘우리 아들’이라는 첫 인정과 별개로, 버림받았던 어머니의 불신과 주인공의 공개적인 선택이 계속 시험받도록 관계 회복의 잔여 과제를 남길 것."
+          }
+        }
+      ],
+      "recommendation": {
+        "candidateId": "p02",
+        "reason": "두 후보 모두 다섯 gate를 통과하지만 p02가 더 강하다. p02는 핵심 선택이 능력이나 회사 문제 없이도 성립하고, 공개적으로 어머니를 선택하는 행위 자체가 욕망·대가·지급을 모두 수행한다. p01도 인간적 중심은 살아 있으나 초능력 기반의 증거 발견이 장면의 주도권을 가져가므로, 현재 형태에서는 p02만 SURVIVE로 선정한다."
+      },
+      "actions": [
+        "select",
+        "hold",
+        "reject"
+      ],
+      "authority": {
+        "canon": "inkos",
+        "decisionSurface": "storyyard",
+        "decisionEffect": "human-premise-selection",
+        "commercialExpansion": false,
+        "bookCreation": false,
+        "manuscriptApply": false,
+        "reverseSync": false
+      }
+    },
+    {
+      "schemaVersion": "firefly_review_packet/v4",
+      "packetId": "frp-326a79098a01aabd990f4abb",
+      "packetSha256": "326a79098a01aabd990f4abbc90b4f5348fdd6fa5f0982b06f09b02ac6490dc0",
+      "generatedAt": "2026-09-04T02:02:40.942Z",
+      "purpose": "human-premise",
+      "source": {
+        "system": "inkos",
+        "slateId": "chaebol-human-premise-20260904-v2",
+        "sourceRevision": "6d6cb92111e011a83f183c5368719ddb8cbef6eab237f9537823d5a169bd91a4"
+      },
+      "work": {
+        "id": "chaebol-human-premise-20260904-v2",
+        "title": "Human Premise HIL · chaebol-human-premise-20260904-v2",
+        "genre": "modern-fantasy-ko",
+        "status": "non-canonical"
+      },
+      "artifact": {
+        "id": "chaebol-human-premise-20260904-v2",
+        "kind": "human-premise-slate",
+        "title": "Human Premise HIL · chaebol-human-premise-20260904-v2",
+        "status": "human-decision-pending"
+      },
+      "sourceBinding": {
+        "schemaVersion": "firefly_pitch_source_binding/v1",
+        "packId": "doksik-chaebol3-ko-v1",
+        "packSha256": "ff8365b632fd85519f4dc5e1f51e1d36b3aaba8015de23427b0bb4dee954d57d",
+        "sourceSha256": "66f3e7df3123343c14a7134108dc59940511f40372493a549cba8ae709df4b45",
+        "storyIndex": {
+          "path": ".inkos/reference-packs/doksik-chaebol3-ko-v1/story-index.jsonl",
+          "sha256": "821df0df9eb2f42dae8fac003f857c72bdcdf23cfc40c821fd19895540232043",
+          "selected": [
+            {
+              "sequence": 1,
+              "arcId": "DCA-N01",
+              "sourceLineRange": {
+                "start": 1,
+                "end": 255
+              },
+              "sourceCharacterRange": {
+                "start": 0,
+                "end": 6008
+              },
+              "rawProseSha256": "159211f2fc89773e2f6b37655be696ccffa85daded8b92bc51c5f309c231596f"
+            },
+            {
+              "sequence": 2,
+              "arcId": "DCA-N01",
+              "sourceLineRange": {
+                "start": 256,
+                "end": 497
+              },
+              "sourceCharacterRange": {
+                "start": 6008,
+                "end": 11942
+              },
+              "rawProseSha256": "eef41e88e1afb662bcdb7c27ae8b9494e038d66cde205934d7e3632475f82c2b"
+            },
+            {
+              "sequence": 75,
+              "arcId": "DCA-N05",
+              "sourceLineRange": {
+                "start": 13787,
+                "end": 13971
+              },
+              "sourceCharacterRange": {
+                "start": 412470,
+                "end": 417825
+              },
+              "rawProseSha256": "231ccc1c1dc153d6fcd2a5fa29bfac4fb095be913f57ff96b1fd3cdc2023d831"
+            }
+          ]
+        },
+        "styleExamples": {
+          "path": ".inkos/reference-packs/doksik-chaebol3-ko-v1/style-examples.jsonl",
+          "sha256": "6895542335651ff5df31fe54197e5080bb5935161819347b876e37d7d97b6e9b",
+          "selected": [
+            {
+              "id": "phase-1-entry-1",
+              "sequence": 1,
+              "arcId": "DCA-N01",
+              "rawProseSha256": "159211f2fc89773e2f6b37655be696ccffa85daded8b92bc51c5f309c231596f"
+            },
+            {
+              "id": "phase-1-escalation-75",
+              "sequence": 75,
+              "arcId": "DCA-N05",
+              "rawProseSha256": "231ccc1c1dc153d6fcd2a5fa29bfac4fb095be913f57ff96b1fd3cdc2023d831"
+            },
+            {
+              "id": "phase-1-payoff-150",
+              "sequence": 150,
+              "arcId": "DCA-N15",
+              "rawProseSha256": "ca478372b4a42cf996043ade59027beaa17fcfd7e15d0e0584178ac802fc1371"
+            }
+          ]
+        },
+        "structureInputs": [
+          {
+            "role": "project-bible",
+            "path": "../firefly_reference_lab/analyses/doksik-chaebol3/project_bible.md",
+            "sha256": "7f9e87f885fc3c5e01ae9c4db40c7aa1fd033a0aa574fb502ab0fc6fd0181572"
+          },
+          {
+            "role": "chapter-map",
+            "path": "../firefly_reference_lab/analyses/doksik-chaebol3/chapter_map.csv",
+            "sha256": "3e6ade1b048df571a4bd327f4c699751eabbe4e403761b4b17f1e54610dd5167"
+          },
+          {
+            "role": "arc-atlas",
+            "path": "../firefly_reference_lab/analyses/doksik-chaebol3/arc_atlas.md",
+            "sha256": "90f1eb72082f2853bf23f96a644eb7fa78ac0d90f536c04f0aec817091140c4f"
+          }
+        ]
+      },
+      "runtimeReceipt": {
+        "schemaVersion": "firefly_pitch_runtime/v1",
+        "provider": "codex-cli",
+        "model": "gpt-5.6-sol",
+        "reasoning": "high",
+        "soul": {
+          "mode": "canary-scoped",
+          "soulId": "male-modern-fantasy-ko",
+          "version": "v1",
+          "manifestSha256": "a55be6440d3cb18885ccdd7935f11a976a6b61d6b7ce2a26d96a8695963ec459",
+          "promptSha256": "0c4b0a7074ab1534d0a0426d9d7fa0cc4d7e7c6fdd8220bde732c24ef4c9fdcc",
+          "resourceSha256": "95bf542d085903129a1966fcc2c6dc8cde456caed11fd1eac8d220cd373a5b38"
+        }
+      },
+      "reviewerRuntimeReceipt": {
+        "schemaVersion": "firefly_pitch_runtime/v1",
+        "provider": "codex-cli",
+        "model": "gpt-5.6-sol",
+        "reasoning": "high",
+        "soul": {
+          "mode": "canary-scoped",
+          "soulId": "male-modern-fantasy-ko",
+          "version": "v1",
+          "manifestSha256": "a55be6440d3cb18885ccdd7935f11a976a6b61d6b7ce2a26d96a8695963ec459",
+          "promptSha256": "0c4b0a7074ab1534d0a0426d9d7fa0cc4d7e7c6fdd8220bde732c24ef4c9fdcc",
+          "resourceSha256": "95bf542d085903129a1966fcc2c6dc8cde456caed11fd1eac8d220cd373a5b38"
+        }
+      },
+      "candidates": [
+        {
+          "sha256": "48e10167fc56e42c9b63d343d0752785a583972912eb7dabffe2a765229580f5",
+          "titleCandidates": [
+            "재벌 장손, 이번엔 동생을 버리지 않는다",
+            "오늘부터 내가 네 오빠다"
+          ],
+          "oneLineHumanPromise": "살기 위해 이복동생을 외면했던 재벌가 장손이 그녀가 쫓겨나는 저녁으로 돌아와 모두 앞에서 ‘내 동생’이라 선언하고, 겁먹은 아이가 처음 내민 손과 ‘오빠’라는 한마디를 받아 낸다.",
+          "humanPremise": {
+            "protagonistAsPerson": "윤도겸은 적통 장손으로 살아남으려고 아버지가 데려온 어린 이복동생 윤하린을 모른 척했다. 하린이 사라진 뒤에는 ‘한 번만 오빠라고 불러도 돼?’라는 마지막 음성을 붙들고 살다가, 가족도 이름도 잃은 채 반지하 방에서 죽었다. 열여덟 살로 돌아온 지금, 손댄 물건의 마지막 주인이 감추고 싶어 한 짧은 장면이 보인다.",
+            "privateWant": "도겸은 하린이 자신을 무서운 도련님이 아니라, 버리지 않을 오빠로 믿어 주기를 바란다.",
+            "feltLack": "첫 생의 도겸은 하린이 실려 간 차를 창문 너머로 보고도 내려가지 않았다. 그날 이후 하린의 손을 잡아 본 적도, 직접 ‘오빠’라는 말을 들어 본 적도 없다.",
+            "targetPerson": "아홉 살 이복동생 윤하린. 가족 식탁에서 이름 대신 ‘그 애’로 불리며 도겸에게도 고개를 들지 못한다.",
+            "whyToday": "할머니의 생일 가족사진을 찍고 나면 하린은 도둑으로 몰려 지방 기숙학교로 보내진다. 첫 생처럼 차가 대문을 나가면 도겸은 다시는 하린의 행방을 찾지 못한다.",
+            "firstChoice": "도겸은 침묵하면 지킬 수 있는 장손 체면을 버리고, 하린의 가방을 빼앗는 친척들 앞을 막아선다. 그는 ‘제 동생 물건에 손대지 마세요’라고 선언한 뒤 비녀 상자에서 본 잔상을 이용해 사촌이 숨긴 장소로 먼저 달려가 증거를 꺼낸다.",
+            "emotionalPayment": "누명을 벗은 하린은 한동안 도겸을 올려다보다가 그의 소매를 두 손으로 잡고 처음으로 ‘오빠, 나도 여기 있어도 돼?’라고 묻는다. 도겸이 손을 내밀자 하린이 먼저 깍지를 끼고, 할머니는 가족사진의 빈 의자를 도겸 옆으로 옮긴다.",
+            "stillHumanWithoutPower": "잔상을 보는 능력도, 재벌가의 이름도 없다 해도 도겸은 이번에는 차 앞을 몸으로 막고 하린에게 자신이 오빠라고 말해야 한다. 독자가 기다리는 것은 승계가 아니라, 버렸던 아이가 다시 그의 손을 잡는 순간이다."
+          },
+          "firstScene": {
+            "currentSituation": "성북동 저택의 유리 온실. 할머니의 칠순 가족사진 촬영까지 20분이 남았고, 대문 밖에는 하린을 지방 기숙학교로 데려갈 승용차가 시동을 켠 채 기다린다.",
+            "pressure": "가보인 비녀가 하린의 첼로 가방에서 발견된다. 친척들은 어린 하린을 세워 둔 채 자백을 재촉하고, 첫 생의 도겸은 바로 이 자리에서 눈을 돌렸다.",
+            "action": "도겸은 하린과 친남매가 아니라고 선을 그으라는 큰아버지의 말을 끊고 하린 앞에 선다. 비녀 상자에 손을 대 사촌이 온실 화분에 포장 천을 묻는 장면을 본 그는 CCTV가 복구됐다고 미끼를 던진다. 사촌이 화분으로 달려가자 도겸이 먼저 포장 천과 훔친 열쇠를 꺼내 모두에게 보인다.",
+            "witnessedChange": "사용인들은 하린의 여행가방을 차에서 다시 내리고, 할머니는 하린을 끌어내던 친척의 손을 직접 떼어 낸다. 무엇보다 바닥만 보던 하린이 도겸을 똑바로 보고 그의 손을 잡는다."
+          },
+          "sourceBeatSequences": [
+            1
+          ],
+          "styleExampleIds": [
+            "phase-1-entry-1"
+          ],
+          "retainedReferenceTraits": [
+            "가족을 외면한 죄책감과 비참한 죽음에서 미성년 시절로 돌아와, 가족 행사에서 되풀이될 첫 상실을 주인공이 직접 막는 사건 기능",
+            "초자연적 정보 능력을 공개하지 않고 구체적인 소품과 상대의 말실수로 거짓을 벗긴 뒤, 즉시 달라진 가족의 대우와 다음 선택을 부르는 지급을 보여 주는 리듬",
+            "짧은 문장, 생활감 있는 공간과 물건, 자조적인 속말, 대화 직후 눈에 보이는 반전으로 결산하는 문체 감각"
+          ],
+          "surfaceVariation": "조손 관계를 적통 장손과 버림받은 어린 이복동생 관계로, 자동차·전자 중심 대기업을 냉장물류·식품유통으로 성장한 선록가로 바꿨다. 호텔 연회장은 성북동 저택의 유리 온실과 가족사진 촬영으로, 고가 손목시계의 허세 폭로는 가보 비녀·첼로 가방·화분을 이용한 절도 누명으로, 인물 신상과 업무 등급을 읽는 능력은 물건에 남은 은폐 장면을 보는 능력으로 변주했다. 첫 지급도 해외계좌 대신 동생이 먼저 잡은 손, ‘오빠’라는 호칭, 도겸 옆으로 옮겨진 가족사진 의자로 바꿨다.",
+          "id": "p01",
+          "independentReview": {
+            "candidateId": "p01",
+            "verdict": "SURVIVE",
+            "gates": {
+              "humanDesire": true,
+              "sourceGrounded": true,
+              "sceneableToday": true,
+              "nonMechanical": true,
+              "voiceGrounded": true
+            },
+            "decisiveStrength": "도겸이 원하는 것은 승계나 누명 해결 자체가 아니라 자신이 버렸던 아이에게 ‘버리지 않을 오빠’로 다시 선택받는 일이다. 가족 행사에서 첫 상실을 막고, 숨긴 정보 능력을 소품과 말실수로 우회해 거짓을 벗기며, 손잡기·호칭·사진 속 자리로 즉시 결산하는 구조가 1화 원천 비트와 문체 증거를 모두 실질적으로 변환했다. 재벌가와 능력을 지워도 차를 몸으로 막고 동생을 공개적으로 인정해야 한다는 욕망이 온전히 남는다.",
+            "decisiveRisk": "사촌이 미끼를 듣자 곧장 화분으로 달려가는 해결은 다소 편의적이라, 강한 남매 감정선에 비해 누명 반전이 어린 악역의 자백 장치처럼 보일 수 있다.",
+            "requiredRepair": "SURVIVE를 막는 결함은 없다. 집필 단계에서 사촌이 화분을 확인할 수밖에 없는 구체적 촉발과 도겸이 틀릴 경우 잃을 대가만 한 박자 보강하면 된다."
+          }
+        },
+        {
+          "sha256": "4d8eb872e1beb080adc20902de6f085169be4d8d44764b3b5438661cd9a83685",
+          "titleCandidates": [
+            "후계자 발표를 버리고 아버지를 살렸다",
+            "회귀한 재벌 장남은 아버지를 따라간다"
+          ],
+          "oneLineHumanPromise": "아버지의 마지막 전화를 외면하고 후계자가 됐던 남자가 그날로 돌아와 왕관을 버리고 옥상 난간에 함께 앉자, 죽으려던 아버지가 처음으로 아들의 손을 붙잡고 ‘집에 가자’고 말한다.",
+          "humanPremise": {
+            "protagonistAsPerson": "쉰 살까지 유통재벌의 회장으로 살았지만, 누명을 쓴 아버지의 구조 요청을 외면했다는 기억 때문에 전화 진동만 울려도 숨이 막히는 남자다. 스물넷의 후계자 발표일로 돌아온 뒤에도 아버지가 남긴 세 통의 부재중 전화부터 확인한다.",
+            "privateWant": "아버지에게 용서받겠다는 말보다 먼저, 이번에는 자신을 믿고 함께 살아 달라는 선택을 받고 싶다.",
+            "feltLack": "첫 삶에서 그는 후계자 자리를 지키느라 아버지의 전화를 세 번 끊었다. 한 시간 뒤 옥상에서 시신을 확인했고, 장례식이 끝난 뒤에도 손바닥에 남은 휴대전화 진동을 평생 떨쳐 내지 못했다.",
+            "targetPerson": "횡령 누명을 쓰고 가문에서 쫓겨난 아버지 윤정호와, 끝내 가져 보지 못했던 평범한 부자 관계다.",
+            "whyToday": "후계자 발표가 시작되기까지 일곱 분 남았다. 아버지는 이미 옥상 난간을 넘었고, 윤도하가 또 단상으로 돌아가면 첫 삶과 같은 죽음이 되풀이된다.",
+            "firstChoice": "윤도하는 자신을 부르는 생중계 전화를 끄고 후계자 배지를 난간 아래로 던진다. 아버지를 억지로 끌어내리는 대신 그 옆에 걸터앉아, 자신도 함께 내려갈 때까지 한 발짝도 움직이지 않겠다고 버틴다.",
+            "emotionalPayment": "아버지는 아들의 뺨을 때리고 혼자 살라고 악을 쓴다. 그러나 윤도하가 난간 쪽으로 몸을 기울이자 창백해진 얼굴로 그의 손목을 움켜쥔다. 아버지는 처음으로 울음을 보이며 ‘도하야, 집에 가자’고 말하고 직접 아들을 안쪽으로 끌어당긴다.",
+            "stillHumanWithoutPower": "한 번 외면했던 아버지에게 이번에는 버려지지 않을 아들이 되고 싶고, 아버지가 자기 손을 잡고 살아 있는 사람들의 집으로 돌아오기를 바라는 마음이 남는다."
+          },
+          "firstScene": {
+            "currentSituation": "해진백화점 창립기념식과 후계자 발표 생중계를 일곱 분 앞둔 밤, 본점 옥상에서 윤도하는 횡령범으로 몰려 쫓겨난 아버지가 난간 밖에 서 있는 모습을 발견한다.",
+            "pressure": "행사장에서는 윤도하가 내려오지 않으면 후계 지명을 취소하겠다고 재촉한다. 아버지는 아들에게 자기를 모른 척하고 단상으로 돌아가라고 명령하며 손을 놓으려 한다.",
+            "action": "윤도하는 휴대전화를 끄고 후계자 배지를 버린 뒤 아버지 옆 난간에 앉는다. 첫 삶에서 세 통의 전화를 끊었다고 고백하고, 이번에는 아버지와 같은 방향으로만 내려가겠다고 말한다.",
+            "witnessedChange": "윤정호는 아들이 자리 욕심 때문에 찾아왔다고 의심하다가, 버려진 배지와 떨리는 손을 차례로 본다. 그는 아들의 손목을 붙잡아 난간 안으로 끌어내리고 자신도 내려온다. 옥상 문 앞까지 따라온 경비원은 늘 아들을 밀어내던 윤정호가 윤도하의 어깨를 감싸고 ‘내 아들부터 집에 데려간다’고 말하는 모습을 목격한다."
+          },
+          "sourceBeatSequences": [
+            1
+          ],
+          "styleExampleIds": [
+            "phase-1-entry-1"
+          ],
+          "retainedReferenceTraits": [
+            "가족의 죽음을 홀로 견딘 주인공이 죽기 직전 과거로 돌아오고, 같은 날의 짧은 선택으로 첫 상실부터 뒤집는 사건 기능을 보존했다.",
+            "주인공이 가족을 외면했던 자기 잘못을 숨기지 않은 채 직접 움직이고, 상대가 손을 잡고 호칭을 되돌려 주는 장면으로 감정적 지급을 확인하게 했다.",
+            "좁고 위태로운 공간, 신체 반응, 짧은 독백과 대사, 자책 속에 섞인 건조한 판단을 활용해 phase-1-entry-1의 빠른 진입과 문장 호흡을 따랐다."
+          ],
+          "surfaceVariation": "창업주와 손자의 생일연회, 자동차 중심 복합그룹, 명품시계 폭로, 스위스 계좌 지급을 유통·면세점 가문의 부자 관계, 후계자 생중계 직전의 옥상, 조작된 횡령 누명, 버려진 후계자 배지와 부자의 귀가로 바꾸었다.",
+          "id": "p02",
+          "independentReview": {
+            "candidateId": "p02",
+            "verdict": "HOLD",
+            "gates": {
+              "humanDesire": true,
+              "sourceGrounded": true,
+              "sceneableToday": true,
+              "nonMechanical": true,
+              "voiceGrounded": true
+            },
+            "decisiveStrength": "후계자 발표를 버리고 아버지의 마지막 전화를 받는 선택은 즉시 장면화되며, 아버지가 아들의 손을 붙잡고 ‘집에 가자’고 말하는 지급도 선명하다. 지위와 배지를 삭제해도 외면했던 아버지에게 이번에는 함께 살아 달라는 선택을 받고 싶은 욕망이 남고, 죽음·회귀·가족 구원·손으로 확인되는 관계 회수라는 원천 기능도 분명히 반영됐다.",
+            "decisiveRisk": "아버지를 살리기 위해 아들이 난간 쪽으로 몸을 기울이는 행동이 감정적 진실보다 자해 위협을 이용한 강제 선택으로 읽힐 위험이 크다. 첫 장면의 감정 최고점은 강하지만, 이후 부자가 어떤 반복 행동으로 관계를 회복할지 보이지 않아 장편 상업 엔진이 p01보다 빨리 소진될 수 있다.",
+            "requiredRepair": "도하가 자기 몸을 추가 인질로 삼지 않고도 아버지의 선택을 끌어내게 바꾸고, 아버지의 누명보다 먼저 두 사람이 함께 살아가며 회복해야 할 구체적인 관계 과제 하나를 첫 장면 끝에 열어야 한다."
+          }
+        }
+      ],
+      "recommendation": {
+        "candidateId": "p01",
+        "reason": "두 후보 모두 다섯 gate를 통과한다. 다만 p01은 ‘버렸던 동생에게 오빠로 선택받기’라는 사적 욕망이 첫 선택, 반전, 감정 지급뿐 아니라 이후 가족 안에서 아이의 자리를 지키는 반복 갈등으로 자연스럽게 이어진다. p02는 순간적인 감정 강도는 더 높지만 해결 행동이 위험한 강압으로 보일 수 있고, 귀가 이후의 연재 동력이 아직 얇다. 따라서 현재 상태에서는 p01만 SURVIVE로 선정한다."
+      },
+      "actions": [
+        "select",
+        "hold",
+        "reject"
+      ],
+      "authority": {
+        "canon": "inkos",
+        "decisionSurface": "storyyard",
+        "decisionEffect": "human-premise-selection",
+        "commercialExpansion": false,
+        "bookCreation": false,
+        "manuscriptApply": false,
+        "reverseSync": false
+      }
+    },
+    {
+      "schemaVersion": "firefly_review_packet/v4",
+      "packetId": "frp-643e0fc8422a6ba2f6962176",
+      "packetSha256": "643e0fc8422a6ba2f69621766c47ec655cbe9a6d5ce717750210466679a97af9",
+      "generatedAt": "2026-09-04T04:18:35.332Z",
+      "purpose": "human-premise",
+      "source": {
+        "system": "inkos",
+        "slateId": "chaebol-human-premise-20260904-v3",
+        "sourceRevision": "cb6b6cb84348493d9d20db321bd7fcf39c5a60adcfaff6bb20e78b838b9ce52c"
+      },
+      "work": {
+        "id": "chaebol-human-premise-20260904-v3",
+        "title": "Human Premise HIL · chaebol-human-premise-20260904-v3",
+        "genre": "modern-fantasy-ko",
+        "status": "non-canonical"
+      },
+      "artifact": {
+        "id": "chaebol-human-premise-20260904-v3",
+        "kind": "human-premise-slate",
+        "title": "Human Premise HIL · chaebol-human-premise-20260904-v3",
+        "status": "human-decision-pending"
+      },
+      "sourceBinding": {
+        "schemaVersion": "firefly_pitch_source_binding/v1",
+        "packId": "doksik-chaebol3-ko-v1",
+        "packSha256": "ff8365b632fd85519f4dc5e1f51e1d36b3aaba8015de23427b0bb4dee954d57d",
+        "sourceSha256": "66f3e7df3123343c14a7134108dc59940511f40372493a549cba8ae709df4b45",
+        "sourceWork": {
+          "workSlug": "doksik-chaebol3",
+          "workTitle": "독식하는 재벌 3세"
+        },
+        "storyIndex": {
+          "path": ".inkos/reference-packs/doksik-chaebol3-ko-v1/story-index.jsonl",
+          "sha256": "821df0df9eb2f42dae8fac003f857c72bdcdf23cfc40c821fd19895540232043",
+          "selected": [
+            {
+              "sequence": 1,
+              "arcId": "DCA-N01",
+              "sourceLineRange": {
+                "start": 1,
+                "end": 255
+              },
+              "sourceCharacterRange": {
+                "start": 0,
+                "end": 6008
+              },
+              "rawProseSha256": "159211f2fc89773e2f6b37655be696ccffa85daded8b92bc51c5f309c231596f"
+            },
+            {
+              "sequence": 2,
+              "arcId": "DCA-N01",
+              "sourceLineRange": {
+                "start": 256,
+                "end": 497
+              },
+              "sourceCharacterRange": {
+                "start": 6008,
+                "end": 11942
+              },
+              "rawProseSha256": "eef41e88e1afb662bcdb7c27ae8b9494e038d66cde205934d7e3632475f82c2b"
+            },
+            {
+              "sequence": 75,
+              "arcId": "DCA-N05",
+              "sourceLineRange": {
+                "start": 13787,
+                "end": 13971
+              },
+              "sourceCharacterRange": {
+                "start": 412470,
+                "end": 417825
+              },
+              "rawProseSha256": "231ccc1c1dc153d6fcd2a5fa29bfac4fb095be913f57ff96b1fd3cdc2023d831"
+            }
+          ]
+        },
+        "styleExamples": {
+          "path": ".inkos/reference-packs/doksik-chaebol3-ko-v1/style-examples.jsonl",
+          "sha256": "6895542335651ff5df31fe54197e5080bb5935161819347b876e37d7d97b6e9b",
+          "selected": [
+            {
+              "id": "phase-1-entry-1",
+              "sequence": 1,
+              "arcId": "DCA-N01",
+              "rawProseSha256": "159211f2fc89773e2f6b37655be696ccffa85daded8b92bc51c5f309c231596f"
+            },
+            {
+              "id": "phase-1-escalation-75",
+              "sequence": 75,
+              "arcId": "DCA-N05",
+              "rawProseSha256": "231ccc1c1dc153d6fcd2a5fa29bfac4fb095be913f57ff96b1fd3cdc2023d831"
+            },
+            {
+              "id": "phase-1-payoff-150",
+              "sequence": 150,
+              "arcId": "DCA-N15",
+              "rawProseSha256": "ca478372b4a42cf996043ade59027beaa17fcfd7e15d0e0584178ac802fc1371"
+            }
+          ]
+        },
+        "structureInputs": [
+          {
+            "role": "project-bible",
+            "path": "../firefly_reference_lab/analyses/doksik-chaebol3/project_bible.md",
+            "sha256": "7f9e87f885fc3c5e01ae9c4db40c7aa1fd033a0aa574fb502ab0fc6fd0181572"
+          },
+          {
+            "role": "chapter-map",
+            "path": "../firefly_reference_lab/analyses/doksik-chaebol3/chapter_map.csv",
+            "sha256": "3e6ade1b048df571a4bd327f4c699751eabbe4e403761b4b17f1e54610dd5167"
+          },
+          {
+            "role": "arc-atlas",
+            "path": "../firefly_reference_lab/analyses/doksik-chaebol3/arc_atlas.md",
+            "sha256": "90f1eb72082f2853bf23f96a644eb7fa78ac0d90f536c04f0aec817091140c4f"
+          }
+        ]
+      },
+      "runtimeReceipt": {
+        "schemaVersion": "firefly_pitch_runtime/v1",
+        "provider": "codex-cli",
+        "model": "gpt-5.6-sol",
+        "reasoning": "high",
+        "soul": {
+          "mode": "canary-scoped",
+          "soulId": "male-modern-fantasy-ko",
+          "version": "v1",
+          "manifestSha256": "a55be6440d3cb18885ccdd7935f11a976a6b61d6b7ce2a26d96a8695963ec459",
+          "promptSha256": "0c4b0a7074ab1534d0a0426d9d7fa0cc4d7e7c6fdd8220bde732c24ef4c9fdcc",
+          "resourceSha256": "95bf542d085903129a1966fcc2c6dc8cde456caed11fd1eac8d220cd373a5b38"
+        }
+      },
+      "reviewerRuntimeReceipt": {
+        "schemaVersion": "firefly_pitch_runtime/v1",
+        "provider": "codex-cli",
+        "model": "gpt-5.6-sol",
+        "reasoning": "high",
+        "soul": {
+          "mode": "canary-scoped",
+          "soulId": "male-modern-fantasy-ko",
+          "version": "v1",
+          "manifestSha256": "a55be6440d3cb18885ccdd7935f11a976a6b61d6b7ce2a26d96a8695963ec459",
+          "promptSha256": "0c4b0a7074ab1534d0a0426d9d7fa0cc4d7e7c6fdd8220bde732c24ef4c9fdcc",
+          "resourceSha256": "95bf542d085903129a1966fcc2c6dc8cde456caed11fd1eac8d220cd373a5b38"
+        }
+      },
+      "candidates": [
+        {
+          "sha256": "98bf4596a80dd08cf6ff8079e5f20b08b5f18ab9ac02392e86398dcb4cb004e3",
+          "titleCandidates": [
+            "회귀한 재벌 손자는 사람부터 고른다",
+            "이번 생엔 할아버지를 지킨다"
+          ],
+          "oneLineHumanPromise": "모든 것을 잃고 죽었던 열일곱 살 손자가 다시 만난 할아버지의 믿음을 되찾는 순간, 거액의 종잣돈과 사람을 고를 기회까지 함께 받는다.",
+          "humanPremise": {
+            "protagonistAsPerson": "세림그룹이 무너진 뒤 유일한 가족인 할아버지의 임종도 지키지 못하고 가난 속에서 죽었다가 열일곱 살로 돌아온 윤도현이다. 첫 생에는 할아버지의 사랑을 부담스러워했고, 사람을 잘못 믿은 대가로 가족까지 잃었다.",
+            "privateWant": "윤도현은 할아버지 윤석만이 자신을 후계자나 철없는 손자로 보기 전에, 이번에는 끝까지 곁을 지킬 가족으로 믿어 주기를 바란다.",
+            "feltLack": "첫 생의 윤도현은 할아버지가 수감되고 병들어 죽는 동안 아무것도 해 주지 못했다. 마지막에는 따뜻한 밥 한 끼와 장례비조차 감당하지 못했고, 사랑받았던 기억을 후회로만 되씹었다.",
+            "targetPerson": "세림그룹 창업주이자 윤도현에게 남은 유일한 가족인 할아버지 윤석만.",
+            "whyToday": "회귀한 날은 윤석만의 칠순 가족연이자 핵심 협력사 대표들이 모이는 자리다. 이 자리에서 거짓 호소가 윤석만의 판단을 흔들면 첫 생의 부실 거래가 다시 시작되고, 윤도현도 철없는 아이로 남아 할아버지 곁에서 밀려난다.",
+            "firstChoice": "윤도현은 아이답게 모른 척하는 대신, 경영난을 호소하는 협력사 대표의 블루 다이아 커프스 단추가 해외 경매에서 8억 원에 낙찰된 진품이라는 사실을 하객들 앞에서 확인시킨다. 이어 대표가 숨긴 납품 마진과 개인 사치를 윤석만이 직접 조사하도록 판을 뒤집는다.",
+            "emotionalPayment": "윤석만은 웃음을 거두고 협력사 대표를 내보낸 뒤, 윤도현을 자신의 옆자리에 앉힌다. 그는 어릴 때만 부르던 ‘우리 도련님’이라는 애칭을 다시 꺼내며 이번에는 네 말을 먼저 믿겠다고 말한다. 같은 자리에서 해외 신탁계좌와 150만 달러가 든 통장을 건네고, 그 돈을 직접 굴릴 투자 실무팀 네 명을 고르게 한다.",
+            "stillHumanWithoutPower": "돈과 그룹을 모두 지워도, 한 번 외면했던 할아버지에게 이번에는 도망치지 않고 곁을 지키는 손자로 인정받고 싶다는 욕망이 남는다."
+          },
+          "firstScene": {
+            "currentSituation": "회귀 당일 저녁, 세림가 본가의 윤석만 칠순 가족연이다. 윤도현은 행사 종료 전까지 자신이 기억하는 첫 부실 거래를 막고 할아버지에게 말을 걸 자리를 되찾아야 한다.",
+            "pressure": "협력사 대표는 직원 월급도 못 준다며 납품가 인상을 요구하고, 친척과 임원들은 열일곱 살 윤도현에게 어른들 일에 끼어들지 말라고 눈치를 준다. 윤석만이 거래를 승인하면 과거의 손실이 되풀이된다.",
+            "action": "윤도현은 대표의 소매를 직접 잡아 커프스 뒷면의 경매 일련번호를 읽고, 행사장 전화로 해외 경매사의 낙찰 기록을 확인시킨다. 대표가 모조품이라고 둘러대자 구매 시점과 금액까지 말해 거짓말을 무너뜨린다.",
+            "witnessedChange": "임원들과 친척들이 보는 앞에서 협력사 대표는 말을 잃고 쫓겨난다. 윤석만은 처음으로 손자의 판단을 공개 지지하고 자기 옆자리를 내준다. 이어 현금성 종잣돈과 투자팀 선발권을 함께 건네면서 가족의 인정과 사업의 첫 보상이 한 장면에서 지급된다."
+          },
+          "sourceBeatSequences": [
+            1,
+            2,
+            75
+          ],
+          "styleExampleIds": [
+            "phase-1-entry-1",
+            "phase-1-escalation-75"
+          ],
+          "retainedReferenceTraits": [
+            "몰락과 가족 상실을 겪은 재벌가 미성년자가 회귀해 가족 행사에서 협력사 인물의 기만을 공개 행동으로 벗기고, 할아버지의 인정과 거액의 현금성 종잣돈을 같은 장면에서 받는 기능",
+            "얼굴을 통해 소속·특이사항·업무 능력을 판별하고, 아직 저평가된 투자 실무자를 직접 골라 미래 경제 사건에 돈을 거는 상승 엔진",
+            "시험 투자와 판매 실적을 숫자로 확인한 뒤 생산능력·유통망을 가진 해외 기업과의 합작으로 키우는 장편 확대 감각",
+            "짧은 상황 진술과 즉각적인 행동, 상대의 궁색한 변명, 눈앞에서 확인되는 금액과 대우 변화로 보상을 빠르게 지급하는 문체·정서 기능"
+          ],
+          "surfaceVariation": "주인공을 윤도현, 할아버지를 윤석만, 태우그룹을 세림그룹으로 바꾼다. 첫 무대는 생일연회 대신 칠순 가족연이며, 기만을 드러내는 소품은 고가 손목시계 대신 해외 경매 일련번호가 남은 8억 원짜리 블루 다이아 커프스 단추다. 첫 투자 대상은 일본 버블 붕괴 대신 영국 파운드화 급락으로 바꾸고, 국내 시험 판매 실적을 해외 합작으로 환전할 주력 업종은 자동차 대신 가전 생산·유통으로 변주한다.",
+          "id": "p01",
+          "independentReview": {
+            "candidateId": "p01",
+            "verdict": "SURVIVE",
+            "gates": {
+              "humanDesire": true,
+              "sourceGrounded": true,
+              "sceneableToday": true,
+              "nonMechanical": true,
+              "voiceGrounded": true
+            },
+            "decisiveStrength": "할아버지에게 이번에는 곁을 지키는 가족으로 인정받고 싶다는 사적 욕망이 선명하고, 소매를 붙잡아 경매 일련번호를 확인시키는 행동이 오늘의 구체적 첫 장면으로 즉시 전환된다. 몰락한 죽음, 가족 행사 폭로, 조손 인정, 현금 지급, 인재 선발, 실적 기반 해외 확장까지 원문 기능도 실질적으로 이어진다.",
+            "decisiveRisk": "가족의 신뢰 회복과 150만 달러·투자팀 선발권이 한 장면에 몰려 있어, 감정적 인정이 사업 보상의 부속품처럼 보일 수 있다.",
+            "requiredRepair": "윤석만이 돈을 건네기 전에 도현의 말을 먼저 믿겠다는 선택을 별도 비트로 확정하고, 도현이 그 인정에 반응하는 짧은 감정 행동을 추가해 가족 지급과 사업 지급을 분리한다."
+          }
+        },
+        {
+          "sha256": "a8d6142d5f038827e487eb83cfa94e400d932cec211c231e06c53e4bbae3b61f",
+          "titleCandidates": [
+            "이번 생은 할아버지부터 지킨다",
+            "사람을 읽는 재벌 3세"
+          ],
+          "oneLineHumanPromise": "할아버지를 원망한 채 홀로 죽었던 열일곱 살 손자가 이번에는 먼저 그 사람의 편에 서서, ‘내 손자’라는 믿음과 120만 달러 종잣돈을 같은 자리에서 되찾는다.",
+          "humanPremise": {
+            "protagonistAsPerson": "세강그룹이 무너진 뒤 유일한 가족인 할아버지까지 잃고 가난 속에서 죽었다가 열일곱 살로 돌아온 손자 김도윤. 첫 생에 할아버지의 사랑을 귀찮아하고 마지막까지 원망했던 일을 누구에게도 털어놓지 못한다.",
+            "privateWant": "김도윤은 할아버지 김원석이 다시는 외롭게 무너지지 않도록 곁을 지키고, 자신을 철없는 후계자가 아니라 끝까지 등을 맡길 손자로 믿어 주기를 바란다.",
+            "feltLack": "그는 쓰러진 할아버지의 장례를 홀로 치르고도 라면 한 봉지 살 돈이 없어 죽었다. 마지막까지 자신을 기다렸던 사람에게 사랑한다는 말조차 제대로 돌려주지 못했다는 죄책감이 남아 있다.",
+            "targetPerson": "세강그룹 창업자이자 김도윤의 유일한 가족인 할아버지 김원석.",
+            "whyToday": "김원석의 생일연회에서 협력업체 대표가 거짓 사정을 내세워 공개적으로 납품가 인상을 받아 내려 한다. 김도윤이 침묵하면 할아버지는 체면과 오랜 정 때문에 또 이용당하고, 도윤은 첫 생처럼 가장 가까운 자리에서 그 장면을 외면하게 된다.",
+            "firstChoice": "김도윤은 철없는 아이로 남아 의심을 피할 수 있는데도 손님들 앞에 나선다. 그는 협력업체 대표가 감춘 고가의 사파이어 커프스 버튼을 지목하고 경매가와 구입 경로를 말해 궁핍한 척하던 거짓말을 벗긴다.",
+            "emotionalPayment": "김원석은 손자를 뒤로 물리지 않고 자기 옆자리로 불러 앉힌다. 굳은 얼굴로 협력업체 대표를 내보낸 뒤 도윤의 머리를 쓰다듬으며 ‘이제 할애비 걱정도 해 주는구나. 역시 내 손자다’라고 말한다. 곧바로 120만 달러가 든 해외계좌를 건네고, 세강증권에서 원하는 사람을 골라 그 돈을 운용해 보라고 허락한다.",
+            "stillHumanWithoutPower": "돈과 회사를 모두 지워도, 김도윤에게는 자신이 외면했던 할아버지 곁에 이번에는 끝까지 남고 그 사람에게 믿을 만한 손자로 인정받고 싶다는 욕망이 남는다."
+          },
+          "firstScene": {
+            "currentSituation": "회귀 당일 저녁, 세강호텔에서 열린 김원석의 생일연회. 협력업체 대표는 주요 임원과 거래처가 지켜보는 가운데 원가 폭등을 호소하며 그 자리에서 납품가 인상 약속을 받아 내려 한다.",
+            "pressure": "열일곱 살인 김도윤이 어른들의 거래에 끼어들면 망신만 당할 수 있다. 그러나 김원석이 공개적으로 약속하는 순간 거짓 요구는 계약이 되고, 도윤은 또다시 할아버지가 이용당하는 모습을 지켜봐야 한다.",
+            "action": "김도윤은 협력업체 대표의 소매를 직접 가리키며 사파이어 커프스 버튼의 최근 경매가를 말한다. 상대가 모조품이라고 둘러대자 뒷면의 제작번호와 낙찰 기록까지 짚어 도망갈 말을 없앤다.",
+            "witnessedChange": "임원들은 웃음을 거두고 협력업체 대표에게서 물러선다. 김원석은 비서에게 사실 확인과 거래 감사를 지시한 뒤 도윤을 자기 옆에 앉힌다. 손자를 바라보는 눈빛이 보호해야 할 아이를 볼 때와 달라지고, 그는 그 자리에서 120만 달러 계좌와 세강증권 인력 선택권을 함께 내준다."
+          },
+          "sourceBeatSequences": [
+            1,
+            2,
+            75
+          ],
+          "styleExampleIds": [
+            "phase-1-entry-1",
+            "phase-1-escalation-75"
+          ],
+          "retainedReferenceTraits": [
+            "가족과 그룹을 모두 잃고 빈곤하게 죽은 미성년 재벌가 손자가 회귀해 할아버지를 지키겠다고 선택하는 출발 기능",
+            "가족 행사에서 협력업체 인물의 고가 소품을 공개적으로 지목해 기만을 벗기고, 할아버지의 인정과 거액의 현금성 종잣돈을 같은 장면에서 받는 지급 리듬",
+            "얼굴에 뜨는 소속·특이사항·업무 능력으로 투자 실무자를 직접 골라 팀을 꾸리고 미래 경제 사건에 종잣돈을 거는 반복 성공 엔진",
+            "생산량과 판매량이라는 확인 가능한 실적을 협상 근거로 삼아 완성차 합작과 해외 유통 확장으로 환전하는 장편 확대 감각",
+            "가난한 죽음의 구체적인 생활상에서 짧은 대화와 속내로 빠르게 넘어가고, 장면 끝에서 계좌 금액이나 판매 수치로 보상을 찍는 문체 감각"
+          ],
+          "surfaceVariation": "주인공은 김도윤, 할아버지는 김원석, 조직은 세강그룹과 세강증권으로 바꾼다. 첫 기만 소품은 고가 시계 대신 경매 이력이 남은 사파이어 커프스 버튼이며, 첫 투자 대상은 일본 버블 붕괴 대신 영국 파운드화 급락이다. 가족 생일연회, 미성년 손자의 공개 폭로, 사람 판별 능력, 증권 실무팀 선발, 완성차 판매 실적을 합작과 해외 확장으로 바꾸는 뼈대는 유지한다.",
+          "id": "p02",
+          "independentReview": {
+            "candidateId": "p02",
+            "verdict": "HOLD",
+            "gates": {
+              "humanDesire": true,
+              "sourceGrounded": true,
+              "sceneableToday": true,
+              "nonMechanical": true,
+              "voiceGrounded": true
+            },
+            "decisiveStrength": "돈과 회사를 제거해도 할아버지를 다시 외롭게 두지 않겠다는 죄책감과 애착이 남으며, 공개 연회에서 커프스 버튼의 제작번호와 낙찰 기록을 짚는 선택도 장면성이 충분하다. 짧은 대화와 금액·대우 변화로 보상을 찍는 원문의 문체 감각 역시 근거가 있다.",
+            "decisiveRisk": "p01과 인간 욕망, 첫 선택, 소품 폭로, 조손 인정, 해외계좌 지급, 증권 인력 선택까지 거의 같은 후보라 독립적인 상업 훅이 약하다. 특히 ‘할아버지부터 지킨다’는 욕망이 첫 장면에서는 협력업체의 거짓말을 밝히는 행동으로만 표현되어, 도윤만의 감정적 선택이 p01보다 덜 구체적이다.",
+            "requiredRepair": "폭로 뒤 계좌나 인력 선발권을 받는 구조는 유지하되, 도윤이 첫 생에 하지 못했던 개인적 행동 하나를 먼저 실행하게 한다. 예를 들어 체면을 무릅쓰고 할아버지 편에 공개적으로 서거나, 거래 판단보다 건강·외로움과 관련된 약속을 요구하게 해 p01과 다른 감정 중심축을 만든다."
+          }
+        }
+      ],
+      "recommendation": {
+        "candidateId": "p01",
+        "reason": "두 후보 모두 다섯 gate를 통과하지만 SURVIVE는 하나만 가능하다. p01은 ‘믿음을 되찾고 곁을 지킬 가족이 된다’는 욕망과 경매사 확인이라는 현장 행동의 인과가 조금 더 촘촘하고, 첫 장면 이후 가전 생산·유통 합작으로 확장되는 반복 엔진도 명확하다. p02는 상업적으로 사용 가능하지만 p01과 구조적 중복이 커서 차별화 수리 전까지 HOLD가 적절하다."
+      },
+      "actions": [
+        "select",
+        "hold",
+        "reject"
+      ],
+      "authority": {
+        "canon": "inkos",
+        "decisionSurface": "storyyard",
+        "decisionEffect": "human-premise-selection",
+        "commercialExpansion": false,
+        "bookCreation": false,
+        "manuscriptApply": false,
+        "reverseSync": false
+      }
+    },
     {
       "schemaVersion": "firefly_review_packet/v3",
       "packetId": "frp-984253c92d9b3bd1fb06c976",

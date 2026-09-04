@@ -56,7 +56,7 @@ export function validateFireflyDecisionIntent(
     };
   }
 
-  if (packet.schemaVersion === "firefly_review_packet/v3") {
+  if (packet.schemaVersion === "firefly_review_packet/v3" || packet.schemaVersion === "firefly_review_packet/v4") {
     const decision = input?.decision;
     if (!decision || !planningDecisions.has(decision as FireflyPlanningDecision)) {
       return { ok: false, status: 400, error: "기획 판정은 후보 선택·보류·탈락 중 하나여야 함." };

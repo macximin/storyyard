@@ -1,0 +1,279 @@
+{
+  "schemaVersion": "firefly_review_packet/v4",
+  "packetId": "frp-643e0fc8422a6ba2f6962176",
+  "packetSha256": "643e0fc8422a6ba2f69621766c47ec655cbe9a6d5ce717750210466679a97af9",
+  "generatedAt": "2026-09-04T04:18:35.332Z",
+  "purpose": "human-premise",
+  "source": {
+    "system": "inkos",
+    "slateId": "chaebol-human-premise-20260904-v3",
+    "sourceRevision": "cb6b6cb84348493d9d20db321bd7fcf39c5a60adcfaff6bb20e78b838b9ce52c"
+  },
+  "work": {
+    "id": "chaebol-human-premise-20260904-v3",
+    "title": "Human Premise HIL · chaebol-human-premise-20260904-v3",
+    "genre": "modern-fantasy-ko",
+    "status": "non-canonical"
+  },
+  "artifact": {
+    "id": "chaebol-human-premise-20260904-v3",
+    "kind": "human-premise-slate",
+    "title": "Human Premise HIL · chaebol-human-premise-20260904-v3",
+    "status": "human-decision-pending"
+  },
+  "sourceBinding": {
+    "schemaVersion": "firefly_pitch_source_binding/v1",
+    "packId": "doksik-chaebol3-ko-v1",
+    "packSha256": "ff8365b632fd85519f4dc5e1f51e1d36b3aaba8015de23427b0bb4dee954d57d",
+    "sourceSha256": "66f3e7df3123343c14a7134108dc59940511f40372493a549cba8ae709df4b45",
+    "sourceWork": {
+      "workSlug": "doksik-chaebol3",
+      "workTitle": "독식하는 재벌 3세"
+    },
+    "storyIndex": {
+      "path": ".inkos/reference-packs/doksik-chaebol3-ko-v1/story-index.jsonl",
+      "sha256": "821df0df9eb2f42dae8fac003f857c72bdcdf23cfc40c821fd19895540232043",
+      "selected": [
+        {
+          "sequence": 1,
+          "arcId": "DCA-N01",
+          "sourceLineRange": {
+            "start": 1,
+            "end": 255
+          },
+          "sourceCharacterRange": {
+            "start": 0,
+            "end": 6008
+          },
+          "rawProseSha256": "159211f2fc89773e2f6b37655be696ccffa85daded8b92bc51c5f309c231596f"
+        },
+        {
+          "sequence": 2,
+          "arcId": "DCA-N01",
+          "sourceLineRange": {
+            "start": 256,
+            "end": 497
+          },
+          "sourceCharacterRange": {
+            "start": 6008,
+            "end": 11942
+          },
+          "rawProseSha256": "eef41e88e1afb662bcdb7c27ae8b9494e038d66cde205934d7e3632475f82c2b"
+        },
+        {
+          "sequence": 75,
+          "arcId": "DCA-N05",
+          "sourceLineRange": {
+            "start": 13787,
+            "end": 13971
+          },
+          "sourceCharacterRange": {
+            "start": 412470,
+            "end": 417825
+          },
+          "rawProseSha256": "231ccc1c1dc153d6fcd2a5fa29bfac4fb095be913f57ff96b1fd3cdc2023d831"
+        }
+      ]
+    },
+    "styleExamples": {
+      "path": ".inkos/reference-packs/doksik-chaebol3-ko-v1/style-examples.jsonl",
+      "sha256": "6895542335651ff5df31fe54197e5080bb5935161819347b876e37d7d97b6e9b",
+      "selected": [
+        {
+          "id": "phase-1-entry-1",
+          "sequence": 1,
+          "arcId": "DCA-N01",
+          "rawProseSha256": "159211f2fc89773e2f6b37655be696ccffa85daded8b92bc51c5f309c231596f"
+        },
+        {
+          "id": "phase-1-escalation-75",
+          "sequence": 75,
+          "arcId": "DCA-N05",
+          "rawProseSha256": "231ccc1c1dc153d6fcd2a5fa29bfac4fb095be913f57ff96b1fd3cdc2023d831"
+        },
+        {
+          "id": "phase-1-payoff-150",
+          "sequence": 150,
+          "arcId": "DCA-N15",
+          "rawProseSha256": "ca478372b4a42cf996043ade59027beaa17fcfd7e15d0e0584178ac802fc1371"
+        }
+      ]
+    },
+    "structureInputs": [
+      {
+        "role": "project-bible",
+        "path": "../firefly_reference_lab/analyses/doksik-chaebol3/project_bible.md",
+        "sha256": "7f9e87f885fc3c5e01ae9c4db40c7aa1fd033a0aa574fb502ab0fc6fd0181572"
+      },
+      {
+        "role": "chapter-map",
+        "path": "../firefly_reference_lab/analyses/doksik-chaebol3/chapter_map.csv",
+        "sha256": "3e6ade1b048df571a4bd327f4c699751eabbe4e403761b4b17f1e54610dd5167"
+      },
+      {
+        "role": "arc-atlas",
+        "path": "../firefly_reference_lab/analyses/doksik-chaebol3/arc_atlas.md",
+        "sha256": "90f1eb72082f2853bf23f96a644eb7fa78ac0d90f536c04f0aec817091140c4f"
+      }
+    ]
+  },
+  "runtimeReceipt": {
+    "schemaVersion": "firefly_pitch_runtime/v1",
+    "provider": "codex-cli",
+    "model": "gpt-5.6-sol",
+    "reasoning": "high",
+    "soul": {
+      "mode": "canary-scoped",
+      "soulId": "male-modern-fantasy-ko",
+      "version": "v1",
+      "manifestSha256": "a55be6440d3cb18885ccdd7935f11a976a6b61d6b7ce2a26d96a8695963ec459",
+      "promptSha256": "0c4b0a7074ab1534d0a0426d9d7fa0cc4d7e7c6fdd8220bde732c24ef4c9fdcc",
+      "resourceSha256": "95bf542d085903129a1966fcc2c6dc8cde456caed11fd1eac8d220cd373a5b38"
+    }
+  },
+  "reviewerRuntimeReceipt": {
+    "schemaVersion": "firefly_pitch_runtime/v1",
+    "provider": "codex-cli",
+    "model": "gpt-5.6-sol",
+    "reasoning": "high",
+    "soul": {
+      "mode": "canary-scoped",
+      "soulId": "male-modern-fantasy-ko",
+      "version": "v1",
+      "manifestSha256": "a55be6440d3cb18885ccdd7935f11a976a6b61d6b7ce2a26d96a8695963ec459",
+      "promptSha256": "0c4b0a7074ab1534d0a0426d9d7fa0cc4d7e7c6fdd8220bde732c24ef4c9fdcc",
+      "resourceSha256": "95bf542d085903129a1966fcc2c6dc8cde456caed11fd1eac8d220cd373a5b38"
+    }
+  },
+  "candidates": [
+    {
+      "sha256": "98bf4596a80dd08cf6ff8079e5f20b08b5f18ab9ac02392e86398dcb4cb004e3",
+      "titleCandidates": [
+        "회귀한 재벌 손자는 사람부터 고른다",
+        "이번 생엔 할아버지를 지킨다"
+      ],
+      "oneLineHumanPromise": "모든 것을 잃고 죽었던 열일곱 살 손자가 다시 만난 할아버지의 믿음을 되찾는 순간, 거액의 종잣돈과 사람을 고를 기회까지 함께 받는다.",
+      "humanPremise": {
+        "protagonistAsPerson": "세림그룹이 무너진 뒤 유일한 가족인 할아버지의 임종도 지키지 못하고 가난 속에서 죽었다가 열일곱 살로 돌아온 윤도현이다. 첫 생에는 할아버지의 사랑을 부담스러워했고, 사람을 잘못 믿은 대가로 가족까지 잃었다.",
+        "privateWant": "윤도현은 할아버지 윤석만이 자신을 후계자나 철없는 손자로 보기 전에, 이번에는 끝까지 곁을 지킬 가족으로 믿어 주기를 바란다.",
+        "feltLack": "첫 생의 윤도현은 할아버지가 수감되고 병들어 죽는 동안 아무것도 해 주지 못했다. 마지막에는 따뜻한 밥 한 끼와 장례비조차 감당하지 못했고, 사랑받았던 기억을 후회로만 되씹었다.",
+        "targetPerson": "세림그룹 창업주이자 윤도현에게 남은 유일한 가족인 할아버지 윤석만.",
+        "whyToday": "회귀한 날은 윤석만의 칠순 가족연이자 핵심 협력사 대표들이 모이는 자리다. 이 자리에서 거짓 호소가 윤석만의 판단을 흔들면 첫 생의 부실 거래가 다시 시작되고, 윤도현도 철없는 아이로 남아 할아버지 곁에서 밀려난다.",
+        "firstChoice": "윤도현은 아이답게 모른 척하는 대신, 경영난을 호소하는 협력사 대표의 블루 다이아 커프스 단추가 해외 경매에서 8억 원에 낙찰된 진품이라는 사실을 하객들 앞에서 확인시킨다. 이어 대표가 숨긴 납품 마진과 개인 사치를 윤석만이 직접 조사하도록 판을 뒤집는다.",
+        "emotionalPayment": "윤석만은 웃음을 거두고 협력사 대표를 내보낸 뒤, 윤도현을 자신의 옆자리에 앉힌다. 그는 어릴 때만 부르던 ‘우리 도련님’이라는 애칭을 다시 꺼내며 이번에는 네 말을 먼저 믿겠다고 말한다. 같은 자리에서 해외 신탁계좌와 150만 달러가 든 통장을 건네고, 그 돈을 직접 굴릴 투자 실무팀 네 명을 고르게 한다.",
+        "stillHumanWithoutPower": "돈과 그룹을 모두 지워도, 한 번 외면했던 할아버지에게 이번에는 도망치지 않고 곁을 지키는 손자로 인정받고 싶다는 욕망이 남는다."
+      },
+      "firstScene": {
+        "currentSituation": "회귀 당일 저녁, 세림가 본가의 윤석만 칠순 가족연이다. 윤도현은 행사 종료 전까지 자신이 기억하는 첫 부실 거래를 막고 할아버지에게 말을 걸 자리를 되찾아야 한다.",
+        "pressure": "협력사 대표는 직원 월급도 못 준다며 납품가 인상을 요구하고, 친척과 임원들은 열일곱 살 윤도현에게 어른들 일에 끼어들지 말라고 눈치를 준다. 윤석만이 거래를 승인하면 과거의 손실이 되풀이된다.",
+        "action": "윤도현은 대표의 소매를 직접 잡아 커프스 뒷면의 경매 일련번호를 읽고, 행사장 전화로 해외 경매사의 낙찰 기록을 확인시킨다. 대표가 모조품이라고 둘러대자 구매 시점과 금액까지 말해 거짓말을 무너뜨린다.",
+        "witnessedChange": "임원들과 친척들이 보는 앞에서 협력사 대표는 말을 잃고 쫓겨난다. 윤석만은 처음으로 손자의 판단을 공개 지지하고 자기 옆자리를 내준다. 이어 현금성 종잣돈과 투자팀 선발권을 함께 건네면서 가족의 인정과 사업의 첫 보상이 한 장면에서 지급된다."
+      },
+      "sourceBeatSequences": [
+        1,
+        2,
+        75
+      ],
+      "styleExampleIds": [
+        "phase-1-entry-1",
+        "phase-1-escalation-75"
+      ],
+      "retainedReferenceTraits": [
+        "몰락과 가족 상실을 겪은 재벌가 미성년자가 회귀해 가족 행사에서 협력사 인물의 기만을 공개 행동으로 벗기고, 할아버지의 인정과 거액의 현금성 종잣돈을 같은 장면에서 받는 기능",
+        "얼굴을 통해 소속·특이사항·업무 능력을 판별하고, 아직 저평가된 투자 실무자를 직접 골라 미래 경제 사건에 돈을 거는 상승 엔진",
+        "시험 투자와 판매 실적을 숫자로 확인한 뒤 생산능력·유통망을 가진 해외 기업과의 합작으로 키우는 장편 확대 감각",
+        "짧은 상황 진술과 즉각적인 행동, 상대의 궁색한 변명, 눈앞에서 확인되는 금액과 대우 변화로 보상을 빠르게 지급하는 문체·정서 기능"
+      ],
+      "surfaceVariation": "주인공을 윤도현, 할아버지를 윤석만, 태우그룹을 세림그룹으로 바꾼다. 첫 무대는 생일연회 대신 칠순 가족연이며, 기만을 드러내는 소품은 고가 손목시계 대신 해외 경매 일련번호가 남은 8억 원짜리 블루 다이아 커프스 단추다. 첫 투자 대상은 일본 버블 붕괴 대신 영국 파운드화 급락으로 바꾸고, 국내 시험 판매 실적을 해외 합작으로 환전할 주력 업종은 자동차 대신 가전 생산·유통으로 변주한다.",
+      "id": "p01",
+      "independentReview": {
+        "candidateId": "p01",
+        "verdict": "SURVIVE",
+        "gates": {
+          "humanDesire": true,
+          "sourceGrounded": true,
+          "sceneableToday": true,
+          "nonMechanical": true,
+          "voiceGrounded": true
+        },
+        "decisiveStrength": "할아버지에게 이번에는 곁을 지키는 가족으로 인정받고 싶다는 사적 욕망이 선명하고, 소매를 붙잡아 경매 일련번호를 확인시키는 행동이 오늘의 구체적 첫 장면으로 즉시 전환된다. 몰락한 죽음, 가족 행사 폭로, 조손 인정, 현금 지급, 인재 선발, 실적 기반 해외 확장까지 원문 기능도 실질적으로 이어진다.",
+        "decisiveRisk": "가족의 신뢰 회복과 150만 달러·투자팀 선발권이 한 장면에 몰려 있어, 감정적 인정이 사업 보상의 부속품처럼 보일 수 있다.",
+        "requiredRepair": "윤석만이 돈을 건네기 전에 도현의 말을 먼저 믿겠다는 선택을 별도 비트로 확정하고, 도현이 그 인정에 반응하는 짧은 감정 행동을 추가해 가족 지급과 사업 지급을 분리한다."
+      }
+    },
+    {
+      "sha256": "a8d6142d5f038827e487eb83cfa94e400d932cec211c231e06c53e4bbae3b61f",
+      "titleCandidates": [
+        "이번 생은 할아버지부터 지킨다",
+        "사람을 읽는 재벌 3세"
+      ],
+      "oneLineHumanPromise": "할아버지를 원망한 채 홀로 죽었던 열일곱 살 손자가 이번에는 먼저 그 사람의 편에 서서, ‘내 손자’라는 믿음과 120만 달러 종잣돈을 같은 자리에서 되찾는다.",
+      "humanPremise": {
+        "protagonistAsPerson": "세강그룹이 무너진 뒤 유일한 가족인 할아버지까지 잃고 가난 속에서 죽었다가 열일곱 살로 돌아온 손자 김도윤. 첫 생에 할아버지의 사랑을 귀찮아하고 마지막까지 원망했던 일을 누구에게도 털어놓지 못한다.",
+        "privateWant": "김도윤은 할아버지 김원석이 다시는 외롭게 무너지지 않도록 곁을 지키고, 자신을 철없는 후계자가 아니라 끝까지 등을 맡길 손자로 믿어 주기를 바란다.",
+        "feltLack": "그는 쓰러진 할아버지의 장례를 홀로 치르고도 라면 한 봉지 살 돈이 없어 죽었다. 마지막까지 자신을 기다렸던 사람에게 사랑한다는 말조차 제대로 돌려주지 못했다는 죄책감이 남아 있다.",
+        "targetPerson": "세강그룹 창업자이자 김도윤의 유일한 가족인 할아버지 김원석.",
+        "whyToday": "김원석의 생일연회에서 협력업체 대표가 거짓 사정을 내세워 공개적으로 납품가 인상을 받아 내려 한다. 김도윤이 침묵하면 할아버지는 체면과 오랜 정 때문에 또 이용당하고, 도윤은 첫 생처럼 가장 가까운 자리에서 그 장면을 외면하게 된다.",
+        "firstChoice": "김도윤은 철없는 아이로 남아 의심을 피할 수 있는데도 손님들 앞에 나선다. 그는 협력업체 대표가 감춘 고가의 사파이어 커프스 버튼을 지목하고 경매가와 구입 경로를 말해 궁핍한 척하던 거짓말을 벗긴다.",
+        "emotionalPayment": "김원석은 손자를 뒤로 물리지 않고 자기 옆자리로 불러 앉힌다. 굳은 얼굴로 협력업체 대표를 내보낸 뒤 도윤의 머리를 쓰다듬으며 ‘이제 할애비 걱정도 해 주는구나. 역시 내 손자다’라고 말한다. 곧바로 120만 달러가 든 해외계좌를 건네고, 세강증권에서 원하는 사람을 골라 그 돈을 운용해 보라고 허락한다.",
+        "stillHumanWithoutPower": "돈과 회사를 모두 지워도, 김도윤에게는 자신이 외면했던 할아버지 곁에 이번에는 끝까지 남고 그 사람에게 믿을 만한 손자로 인정받고 싶다는 욕망이 남는다."
+      },
+      "firstScene": {
+        "currentSituation": "회귀 당일 저녁, 세강호텔에서 열린 김원석의 생일연회. 협력업체 대표는 주요 임원과 거래처가 지켜보는 가운데 원가 폭등을 호소하며 그 자리에서 납품가 인상 약속을 받아 내려 한다.",
+        "pressure": "열일곱 살인 김도윤이 어른들의 거래에 끼어들면 망신만 당할 수 있다. 그러나 김원석이 공개적으로 약속하는 순간 거짓 요구는 계약이 되고, 도윤은 또다시 할아버지가 이용당하는 모습을 지켜봐야 한다.",
+        "action": "김도윤은 협력업체 대표의 소매를 직접 가리키며 사파이어 커프스 버튼의 최근 경매가를 말한다. 상대가 모조품이라고 둘러대자 뒷면의 제작번호와 낙찰 기록까지 짚어 도망갈 말을 없앤다.",
+        "witnessedChange": "임원들은 웃음을 거두고 협력업체 대표에게서 물러선다. 김원석은 비서에게 사실 확인과 거래 감사를 지시한 뒤 도윤을 자기 옆에 앉힌다. 손자를 바라보는 눈빛이 보호해야 할 아이를 볼 때와 달라지고, 그는 그 자리에서 120만 달러 계좌와 세강증권 인력 선택권을 함께 내준다."
+      },
+      "sourceBeatSequences": [
+        1,
+        2,
+        75
+      ],
+      "styleExampleIds": [
+        "phase-1-entry-1",
+        "phase-1-escalation-75"
+      ],
+      "retainedReferenceTraits": [
+        "가족과 그룹을 모두 잃고 빈곤하게 죽은 미성년 재벌가 손자가 회귀해 할아버지를 지키겠다고 선택하는 출발 기능",
+        "가족 행사에서 협력업체 인물의 고가 소품을 공개적으로 지목해 기만을 벗기고, 할아버지의 인정과 거액의 현금성 종잣돈을 같은 장면에서 받는 지급 리듬",
+        "얼굴에 뜨는 소속·특이사항·업무 능력으로 투자 실무자를 직접 골라 팀을 꾸리고 미래 경제 사건에 종잣돈을 거는 반복 성공 엔진",
+        "생산량과 판매량이라는 확인 가능한 실적을 협상 근거로 삼아 완성차 합작과 해외 유통 확장으로 환전하는 장편 확대 감각",
+        "가난한 죽음의 구체적인 생활상에서 짧은 대화와 속내로 빠르게 넘어가고, 장면 끝에서 계좌 금액이나 판매 수치로 보상을 찍는 문체 감각"
+      ],
+      "surfaceVariation": "주인공은 김도윤, 할아버지는 김원석, 조직은 세강그룹과 세강증권으로 바꾼다. 첫 기만 소품은 고가 시계 대신 경매 이력이 남은 사파이어 커프스 버튼이며, 첫 투자 대상은 일본 버블 붕괴 대신 영국 파운드화 급락이다. 가족 생일연회, 미성년 손자의 공개 폭로, 사람 판별 능력, 증권 실무팀 선발, 완성차 판매 실적을 합작과 해외 확장으로 바꾸는 뼈대는 유지한다.",
+      "id": "p02",
+      "independentReview": {
+        "candidateId": "p02",
+        "verdict": "HOLD",
+        "gates": {
+          "humanDesire": true,
+          "sourceGrounded": true,
+          "sceneableToday": true,
+          "nonMechanical": true,
+          "voiceGrounded": true
+        },
+        "decisiveStrength": "돈과 회사를 제거해도 할아버지를 다시 외롭게 두지 않겠다는 죄책감과 애착이 남으며, 공개 연회에서 커프스 버튼의 제작번호와 낙찰 기록을 짚는 선택도 장면성이 충분하다. 짧은 대화와 금액·대우 변화로 보상을 찍는 원문의 문체 감각 역시 근거가 있다.",
+        "decisiveRisk": "p01과 인간 욕망, 첫 선택, 소품 폭로, 조손 인정, 해외계좌 지급, 증권 인력 선택까지 거의 같은 후보라 독립적인 상업 훅이 약하다. 특히 ‘할아버지부터 지킨다’는 욕망이 첫 장면에서는 협력업체의 거짓말을 밝히는 행동으로만 표현되어, 도윤만의 감정적 선택이 p01보다 덜 구체적이다.",
+        "requiredRepair": "폭로 뒤 계좌나 인력 선발권을 받는 구조는 유지하되, 도윤이 첫 생에 하지 못했던 개인적 행동 하나를 먼저 실행하게 한다. 예를 들어 체면을 무릅쓰고 할아버지 편에 공개적으로 서거나, 거래 판단보다 건강·외로움과 관련된 약속을 요구하게 해 p01과 다른 감정 중심축을 만든다."
+      }
+    }
+  ],
+  "recommendation": {
+    "candidateId": "p01",
+    "reason": "두 후보 모두 다섯 gate를 통과하지만 SURVIVE는 하나만 가능하다. p01은 ‘믿음을 되찾고 곁을 지킬 가족이 된다’는 욕망과 경매사 확인이라는 현장 행동의 인과가 조금 더 촘촘하고, 첫 장면 이후 가전 생산·유통 합작으로 확장되는 반복 엔진도 명확하다. p02는 상업적으로 사용 가능하지만 p01과 구조적 중복이 커서 차별화 수리 전까지 HOLD가 적절하다."
+  },
+  "actions": [
+    "select",
+    "hold",
+    "reject"
+  ],
+  "authority": {
+    "canon": "inkos",
+    "decisionSurface": "storyyard",
+    "decisionEffect": "human-premise-selection",
+    "commercialExpansion": false,
+    "bookCreation": false,
+    "manuscriptApply": false,
+    "reverseSync": false
+  }
+}
