@@ -76,7 +76,7 @@ test("refuses legacy v1 packets inside the generated v2 index", async () => {
   ));
   assert.throws(
     () => buildFireflyReviewPacketStaticIndex([legacy]),
-    /accepts immutable Firefly review packet v2, v3, or v4 values only/u,
+    /accepts immutable Firefly review packet v2, v3, v4, or v5 values only/u,
   );
 });
 
