@@ -68,6 +68,7 @@ test("kanban derives receipt states without turning a human opinion into complet
 
 test("kanban and archive use the same packet identities with exact candidate links", async () => {
   const { ReviewCollection } = await component("../app/review/collection.tsx", {
+    "./canary-card": await component("../app/review/canary-card.tsx"),
     "../global-sidebar": { GlobalSidebar: () => null }, "../firefly-review-catalog": catalog,
     "../firefly-review-display.mjs": { fireflyReviewQueueMetadata },
   });
@@ -82,6 +83,12 @@ test("kanban and archive use the same packet identities with exact candidate lin
   assert.ok(!history.includes(`id="packet-${currentId}"`));
   for (const packet of packets.filter((p) => archives.has(p.packetId))) for (const candidate of packet.candidates) assert.ok(history.includes(catalog.reviewDetailHref(packet.packetId, candidate.id, true)));
   assert.doesNotMatch(board + history, /<form|draggable=/);
+  const canaries = ['complete','incomplete','failed'].map((state,i)=>({canary:{id:`fcp-${i}`,title:`비교 ${i}`,state,generatedAt:'2026-09-06',author:{route:'웹',model:'관찰 모델',reasoning:'최고'}},decisions:i===1?[{decision:'hold',status:'pending',createdAt:'2026-09-06'}]:[]}));
+  const combined=renderToStaticMarkup(React.createElement(ReviewCollection,{user,entries,mode:'board',archiveCount:17,canaries}));
+  assert.equal((combined.match(/class="ff-review-card"/gu)??[]).length,4);
+  for(const e of canaries)assert.ok(combined.includes(`/review/canary/${e.canary.id}`));
+  assert.match(combined,/실행 영수증/);assert.match(combined,/실행 실패/);assert.match(combined,/보류/);
+
 });
 
 test("archived detail preserves text and comments while removing decision controls", async () => {
@@ -109,6 +116,7 @@ test("old review deep links redirect to the exact archived candidate before any 
   const { default: ReviewPage } = await component("../app/review/page.tsx", {
     "next/navigation": { redirect: (url) => { throw new Error(`REDIRECT ${url}`); } },
     "@/app/chatgpt-auth": { requireChatGPTUser: async () => user },
+    "@/app/firefly-canaries": { listPlanningCanaries: () => [] },
     "@/app/firefly-review-data": { ensureFireflyReviewSnapshot: () => { throw new Error("Unexpected write"); } },
     "@/app/firefly-review-packets": { listFireflyReviewPackets: () => packets, getFireflyReviewArchive: (id) => archives.get(id) },
     "@/app/firefly-review-catalog": catalog, "@/app/firefly-review-queue": queue,
@@ -122,6 +130,7 @@ test("confirmed kanban links keep the exact requested packet in read-only mode",
   const { default: ReviewPage } = await component("../app/review/page.tsx", {
     "next/navigation": { redirect: () => { throw new Error("Unexpected redirect"); }, notFound: () => { throw new Error("NOT FOUND"); } },
     "@/app/chatgpt-auth": { requireChatGPTUser: async () => user },
+    "@/app/firefly-canaries": { listPlanningCanaries: () => [] },
     "@/app/firefly-review-data": { ensureFireflyReviewSnapshot: async () => {}, listFireflyReviewDecisions: async (id) => id === done.packetId ? [{ status: "applied" }] : [], toFireflyReviewDecisionContract: (row) => row },
     "@/app/firefly-review-packets": { listFireflyReviewPackets: () => [current, done], getFireflyReviewArchive: () => undefined },
     "@/app/firefly-review-catalog": catalog, "@/app/firefly-review-queue": queue,

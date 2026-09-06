@@ -1,3 +1,4 @@
+import {listPlanningCanaries} from "@/app/firefly-canaries";
 import { notFound, redirect } from "next/navigation";
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { ensureFireflyReviewSnapshot, listFireflyReviewDecisions, toFireflyReviewDecisionContract } from "@/app/firefly-review-data";
@@ -26,6 +27,7 @@ export default async function ReviewPage({ searchParams, returnPath }: {
   const returnTo = returnPath ?? (encodedQuery ? `/review?${encodedQuery}` : "/review");
   const user = await requireChatGPTUser(returnTo);
   if (user.role !== "admin") redirect("/");
+  if (!requestedPacket && listPlanningCanaries().length) redirect("/review/canary");
   const packets = listFireflyReviewPackets();
   if (requestedPacket && getFireflyReviewArchive(requestedPacket)) redirect(requestedCandidate ? reviewDetailHref(requestedPacket, requestedCandidate, true) : `/review/archive?packet=${encodeURIComponent(requestedPacket)}`);
   const requested = packets.find((packet) => packet.packetId === requestedPacket);
