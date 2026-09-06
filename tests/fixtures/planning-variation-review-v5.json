@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "firefly_review_packet/v5",
+  "packetId": "frp-d8a494bf67b00de1f65bd2b2",
+  "packetSha256": "d8a494bf67b00de1f65bd2b2bdb14011878e01cbba876a809eef71ba78fa30bf",
+  "generatedAt": "2026-09-06T00:00:00.000Z",
+  "purpose": "planning-variation",
+  "source": {
+    "system": "inkos",
+    "slateId": "synthetic-opening-variation-v1",
+    "sourceRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "work": {
+    "id": "synthetic-opening-variation-v1",
+    "title": "합성 초반 변주 검토",
+    "genre": "modern-fantasy-ko",
+    "status": "non-canonical",
+    "targetChapters": 200
+  },
+  "artifact": {
+    "id": "synthetic-opening-variation-v1",
+    "kind": "pitch-variation-slate",
+    "title": "초반 사건 변주 비교",
+    "status": "human-decision-pending"
+  },
+  "baseline": {
+    "slateId": "synthetic-baseline-v1",
+    "candidateId": "p01",
+    "candidateSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "planSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "title": "비교용 합성 원안"
+  },
+  "scope": {
+    "episodeStart": 1,
+    "episodeEnd": 4,
+    "through": "첫 투자 회수까지"
+  },
+  "candidates": [
+    {
+      "id": "v01",
+      "title": "합성 v01 초반 변주",
+      "markdown": "# 합성 초반 사건 변주안\n\n실제 작품이 아닌 계약·표시 검증 자료입니다.\n\n## 초반 이야기\n\n1번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 1 | 합성 변주 사건 1 | 본인의 투자 수익 |\n\n## 사건을 어떻게 바꾸는가\n\n2번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 2 | 합성 변주 사건 2 | 본인의 투자 수익 |\n\n## 도입 4화\n\n3번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 3 | 합성 변주 사건 3 | 본인의 투자 수익 |\n\n## 첫 투자와 회수\n\n4번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 4 | 합성 변주 사건 4 | 본인의 투자 수익 |\n\n## 배치와 남은 판단\n\n5번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 5 | 합성 변주 사건 5 | 본인의 투자 수익 |\n\n## 실제 원문 근거\n\n6번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 6 | 합성 변주 사건 6 | 본인의 투자 수익 |",
+      "preparedAt": "2026-09-06T00:00:00.000Z",
+      "sourceEventIds": [
+        "main-event-1",
+        "donor-event-1"
+      ],
+      "independentReview": {
+        "verdict": "ready",
+        "sourceAccuracy": {
+          "passed": true,
+          "evidence": "합성 근거: 주인공이 자기 이익을 위해 선택하며 선행 사건과 결과가 연결된다."
+        },
+        "selfInterest": {
+          "passed": true,
+          "evidence": "합성 근거: 주인공이 자기 이익을 위해 선택하며 선행 사건과 결과가 연결된다."
+        },
+        "causalCoherence": {
+          "passed": true,
+          "evidence": "합성 근거: 주인공이 자기 이익을 위해 선택하며 선행 사건과 결과가 연결된다."
+        },
+        "variationQuality": {
+          "passed": true,
+          "evidence": "합성 근거: 주인공이 자기 이익을 위해 선택하며 선행 사건과 결과가 연결된다."
+        },
+        "readingPleasure": {
+          "assessment": "이익 회수의 기대",
+          "evidence": "합성 독자가 정보 우위를 이용한 수익 실현을 기대한다."
+        },
+        "requiredRepair": "필수 수정 없음."
+      },
+      "sha256": "ded63a019094c0d3364446fe0c4d3ee0e27775aea0b9a5044ef31891e75e8fc0"
+    },
+    {
+      "id": "v02",
+      "title": "합성 v02 초반 변주",
+      "markdown": "# 합성 초반 사건 변주안\n\n실제 작품이 아닌 계약·표시 검증 자료입니다.\n\n## 초반 이야기\n\n1번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 1 | 합성 변주 사건 1 | 본인의 투자 수익 |\n\n## 사건을 어떻게 바꾸는가\n\n2번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 2 | 합성 변주 사건 2 | 본인의 투자 수익 |\n\n## 도입 4화\n\n3번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 3 | 합성 변주 사건 3 | 본인의 투자 수익 |\n\n## 첫 투자와 회수\n\n4번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 4 | 합성 변주 사건 4 | 본인의 투자 수익 |\n\n## 배치와 남은 판단\n\n5번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 5 | 합성 변주 사건 5 | 본인의 투자 수익 |\n\n## 실제 원문 근거\n\n6번째 비교에서는 주인공이 자기 몫을 얻기 위해 정보 우위를 쓰고, 확보한 자금을 다음 투자에 사용한다. 원문의 실제 사건과 새 사건을 구분하여 인물의 자기 목적과 개입 이유를 확인한다. 선행 조건과 후속 연결을 비교하되 새로운 기획서 전체로 확장하지 않는다.\n\n| 원문 사건 | 새 사건 | 보존한 이익 |\n| --- | --- | --- |\n| 합성 원문 사건 6 | 합성 변주 사건 6 | 본인의 투자 수익 |",
+      "preparedAt": "2026-09-06T00:00:00.000Z",
+      "sourceEventIds": [
+        "main-event-1",
+        "donor-event-1"
+      ],
+      "independentReview": {
+        "verdict": "revise",
+        "sourceAccuracy": {
+          "passed": true,
+          "evidence": "합성 근거: 주인공이 자기 이익을 위해 선택하며 선행 사건과 결과가 연결된다."
+        },
+        "selfInterest": {
+          "passed": true,
+          "evidence": "합성 근거: 주인공이 자기 이익을 위해 선택하며 선행 사건과 결과가 연결된다."
+        },
+        "causalCoherence": {
+          "passed": true,
+          "evidence": "합성 근거: 주인공이 자기 이익을 위해 선택하며 선행 사건과 결과가 연결된다."
+        },
+        "variationQuality": {
+          "passed": true,
+          "evidence": "합성 근거: 주인공이 자기 이익을 위해 선택하며 선행 사건과 결과가 연결된다."
+        },
+        "readingPleasure": {
+          "assessment": "이익 회수의 기대",
+          "evidence": "합성 독자가 정보 우위를 이용한 수익 실현을 기대한다."
+        },
+        "requiredRepair": "회수 직전 인물 행동을 더 구체화한다."
+      },
+      "sha256": "f40d21e6e3e0c60b6b9400fc5af3a65860ca5b441162764db96fccac33b2536c"
+    }
+  ],
+  "recommendation": {
+    "candidateId": "v01",
+    "reason": "합성 비교에서 사건 연결이 더 명료하다."
+  },
+  "actions": [
+    "select",
+    "hold",
+    "reject"
+  ],
+  "authority": {
+    "canon": "inkos",
+    "decisionSurface": "storyyard",
+    "decisionEffect": "variation-selection",
+    "bookCreation": false,
+    "manuscriptApply": false,
+    "reverseSync": false
+  }
+}

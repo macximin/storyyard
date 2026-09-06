@@ -56,7 +56,7 @@ export function validateFireflyDecisionIntent(
     };
   }
 
-  if (packet.schemaVersion === "firefly_review_packet/v3" || packet.schemaVersion === "firefly_review_packet/v4") {
+  if (packet.schemaVersion === "firefly_review_packet/v3" || packet.schemaVersion === "firefly_review_packet/v4" || packet.schemaVersion === "firefly_review_packet/v5") {
     const decision = input?.decision;
     if (!decision || !planningDecisions.has(decision as FireflyPlanningDecision)) {
       return { ok: false, status: 400, error: "기획 판정은 후보 선택·보류·탈락 중 하나여야 함." };
@@ -64,6 +64,9 @@ export function validateFireflyDecisionIntent(
     const candidate = packet.candidates.find((item) => item.id === input?.candidateId);
     if (!candidate || candidate.sha256 !== input?.candidateSha256) {
       return { ok: false, status: 409, error: "기획 후보의 해시가 검토 패킷과 다름." };
+    }
+    if (packet.schemaVersion === "firefly_review_packet/v5" && !comment) {
+      return { ok: false, status: 400, error: "변주 방향을 고른 이유나 보류·반려 근거를 짧게 적어 주세요." };
     }
     if (decision !== "select" && !comment) {
       return { ok: false, status: 400, error: "기획 보류·탈락에는 근거가 필요함." };

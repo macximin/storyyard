@@ -18,8 +18,8 @@ function compareText(left, right) {
 }
 
 function comparePackets(left, right) {
-  const leftPlanning = left.schemaVersion === "firefly_review_packet/v4" ? 0 : left.schemaVersion === "firefly_review_packet/v3" ? 1 : 2;
-  const rightPlanning = right.schemaVersion === "firefly_review_packet/v4" ? 0 : right.schemaVersion === "firefly_review_packet/v3" ? 1 : 2;
+  const leftPlanning = left.schemaVersion === "firefly_review_packet/v5" ? -1 : left.schemaVersion === "firefly_review_packet/v4" ? 0 : left.schemaVersion === "firefly_review_packet/v3" ? 1 : 2;
+  const rightPlanning = right.schemaVersion === "firefly_review_packet/v5" ? -1 : right.schemaVersion === "firefly_review_packet/v4" ? 0 : right.schemaVersion === "firefly_review_packet/v3" ? 1 : 2;
   if (leftPlanning !== rightPlanning) return leftPlanning - rightPlanning;
   return compareText(left.work.genre, right.work.genre)
     || compareText(left.work.id, right.work.id)
@@ -31,8 +31,8 @@ function comparePackets(left, right) {
 export function buildFireflyReviewPacketStaticIndex(values) {
   const packets = values.map((value) => {
     const packet = validateFireflyReviewPacket(value);
-    if (!["firefly_review_packet/v2", "firefly_review_packet/v3", "firefly_review_packet/v4"].includes(packet.schemaVersion)) {
-      throw new Error("The generated static index accepts immutable Firefly review packet v2, v3, or v4 values only.");
+    if (!["firefly_review_packet/v2", "firefly_review_packet/v3", "firefly_review_packet/v4", "firefly_review_packet/v5"].includes(packet.schemaVersion)) {
+      throw new Error("The generated static index accepts immutable Firefly review packet v2, v3, v4, or v5 values only.");
     }
     return packet;
   }).sort(comparePackets);

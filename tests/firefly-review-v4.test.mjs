@@ -39,12 +39,18 @@ function packet() {
     source: { system: "inkos", slateId: "premise-canary", sourceRevision: digest("c") },
     work: { id: "premise-canary", title: "Human Premise HIL", genre: "modern-fantasy-ko", status: "non-canonical" },
     artifact: { id: "premise-canary", kind: "human-premise-slate", title: "Human Premise HIL", status: "human-decision-pending" },
-    sourceBinding, runtimeReceipt: runtime, reviewerRuntimeReceipt: runtime,
+    sourceBinding, runtimeReceipt: structuredClone(runtime), reviewerRuntimeReceipt: structuredClone(runtime),
     candidates: [candidate("p01", "SURVIVE"), candidate("p02", "HOLD")], recommendation: { candidateId: "p01", reason: "사람 욕망이 선명하다" }, actions: ["select", "hold", "reject"],
     authority: { canon: "inkos", decisionSurface: "storyyard", decisionEffect: "human-premise-selection", commercialExpansion: false, bookCreation: false, manuscriptApply: false, reverseSync: false },
   };
   const packetSha256 = canonicalSha256(body);
   return { schemaVersion: "firefly_review_packet/v4", packetId: `frp-${packetSha256.slice(0, 24)}`, packetSha256, ...body };
+}
+
+function rehash(value) {
+  const { schemaVersion, packetId: _id, packetSha256: _sha, ...body } = value;
+  const packetSha256 = canonicalSha256(body);
+  return { schemaVersion, packetId: `frp-${packetSha256.slice(0, 24)}`, packetSha256, ...body };
 }
 
 test("accepts source-bound Human Premise HIL and keeps expansion disabled", () => {
@@ -56,9 +62,28 @@ test("accepts source-bound Human Premise HIL and keeps expansion disabled", () =
   assert.equal(validateFireflyDecisionIntent(parsed, { decision: "select", candidateId: selected.id, candidateSha256: selected.sha256 }).ok, true);
 });
 
+test("accepts matching Astra/high v4 runtimes and rejects model tampering or mixed runtimes", () => {
+  const astra = packet();
+  astra.runtimeReceipt.model = "gpt-6-astra";
+  astra.reviewerRuntimeReceipt.model = "gpt-6-astra";
+  assert.throws(() => validateFireflyReviewPacket(astra), /identity or SHA-256 mismatch/u);
+  const parsed = validateFireflyReviewPacket(rehash(astra));
+  assert.equal(parsed.runtimeReceipt.model, "gpt-6-astra");
+  assert.equal(parsed.reviewerRuntimeReceipt.model, "gpt-6-astra");
+
+  for (const field of ["runtimeReceipt", "reviewerRuntimeReceipt"]) {
+    const mixed = packet();
+    mixed[field].model = "gpt-6-astra";
+    assert.throws(() => validateFireflyReviewPacket(rehash(mixed)), /runtime models must match/u);
+  }
+  const wrongReasoning = packet();
+  wrongReasoning.reviewerRuntimeReceipt.reasoning = "medium";
+  assert.throws(() => validateFireflyReviewPacket(rehash(wrongReasoning)), /supported codex\/Sol-or-Astra\/high/u);
+});
+
 test("rejects runtime drift, unbound evidence, and failed-gate survivors", () => {
   const runtimeDrift = packet(); runtimeDrift.runtimeReceipt.model = "gpt-5.6-terra";
-  assert.throws(() => validateFireflyReviewPacket(runtimeDrift), /sol\/high runtime/);
+  assert.throws(() => validateFireflyReviewPacket(runtimeDrift), /supported codex\/Sol-or-Astra\/high/);
   runtimeDrift.runtimeReceipt.model = "gpt-5.6-sol";
   const unbound = packet(); unbound.candidates[0].sourceBeatSequences = [2];
   const { id, sha256: _sha, independentReview: _review, ...unsigned } = unbound.candidates[0];

@@ -12,6 +12,7 @@ import { fireflyReviewDecisions } from "@/db/schema";
 const allowedSurfaceClassifications = new Set<SurfaceClassification>(["engine", "genre-convention", "source-surface", "canon-leak"]);
 
 function decisionSchemaForPacket(schemaVersion: string): string {
+  if (schemaVersion === "firefly_review_packet/v5") return "firefly_review_decision/v5";
   if (schemaVersion === "firefly_review_packet/v4") return "firefly_review_decision/v4";
   if (schemaVersion === "firefly_review_packet/v3") return "firefly_review_decision/v3";
   if (schemaVersion === "firefly_review_packet/v2") return "firefly_review_decision/v2";
@@ -149,7 +150,8 @@ export async function POST(request: Request) {
     id: crypto.randomUUID(),
     schemaVersion: decisionSchemaForPacket(packet.schemaVersion),
     packetId: packet.packetId, packetSha256: packet.packetSha256,
-    bookId: packet.schemaVersion === "firefly_review_packet/v3" || packet.schemaVersion === "firefly_review_packet/v4" ? packet.source.slateId : packet.source.bookId,
+    bookId: packet.schemaVersion === "firefly_review_packet/v3" || packet.schemaVersion === "firefly_review_packet/v4" || packet.schemaVersion === "firefly_review_packet/v5" ? packet.source.slateId : packet.source.bookId,
+    artifactId: packet.artifact.id,
     candidateId: storedCandidateId, candidateSha256: storedCandidateSha256,
     decision: decisionChoice, comment, surfaceClassifications: surfaceClassificationsJson,
     actorUserId: user.id, actorEmail: user.email,
@@ -174,7 +176,7 @@ export async function PATCH(request: Request) {
   if (!packet || packet.packetSha256 !== stored.packetSha256) {
     return Response.json({ error: "등록된 검토 패킷과 원판정이 일치하지 않음." }, { status: 409 });
   }
-  if (packet.schemaVersion === "firefly_review_packet/v3" || packet.schemaVersion === "firefly_review_packet/v4") {
+  if (packet.schemaVersion === "firefly_review_packet/v3" || packet.schemaVersion === "firefly_review_packet/v4" || packet.schemaVersion === "firefly_review_packet/v5") {
     return Response.json({ error: "기획 판정 적용 영수증은 InkOS 기획 경로에서 처리해야 함." }, { status: 409 });
   }
   const validation = packet.schemaVersion === "firefly_review_packet/v2"

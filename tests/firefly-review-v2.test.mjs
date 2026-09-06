@@ -155,6 +155,22 @@ test("accepts a strict blind v2 packet without raw source prose", () => {
   assert.equal(JSON.stringify(parsed).includes("원문 압박"), false);
 });
 
+test("accepts Astra/high v2 packets while binding the exact model to packet identity", () => {
+  const astra = packet();
+  astra.comparison.runtime.model = "gpt-6-astra";
+  assert.throws(() => validateFireflyReviewPacket(astra), /identity or SHA-256 mismatch/u);
+  const parsed = validateFireflyReviewPacket(rehash(astra));
+  assert.equal(parsed.comparison.runtime.model, "gpt-6-astra");
+  assert.equal(parsed.comparison.runtime.reasoning, "high");
+
+  const unsupported = packet();
+  unsupported.comparison.runtime.model = "gpt-5.6-terra";
+  assert.throws(() => validateFireflyReviewPacket(rehash(unsupported)), /supported Sol\/Astra high/u);
+  const wrongReasoning = packet();
+  wrongReasoning.comparison.runtime.reasoning = "medium";
+  assert.throws(() => validateFireflyReviewPacket(rehash(wrongReasoning)), /supported Sol\/Astra high/u);
+});
+
 test("rejects candidate drift, automatic rewrite, and raw selector fields", () => {
   const base = packet();
   const changedCandidate = structuredClone(base);

@@ -8,8 +8,19 @@ import { FireflyReviewBoard } from "./review-board";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "검토 대기 — Storyyard" };
 
-export default async function ReviewPage() {
-  const user = await requireChatGPTUser("/review");
+export default async function ReviewPage({ searchParams, returnPath }: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  returnPath?: string;
+}) {
+  const query = await searchParams;
+  const requestedPacket = typeof query.packet === "string" ? query.packet : undefined;
+  const requestedCandidate = typeof query.candidate === "string" ? query.candidate : undefined;
+  const returnQuery = new URLSearchParams();
+  if (requestedPacket) returnQuery.set("packet", requestedPacket);
+  if (requestedCandidate) returnQuery.set("candidate", requestedCandidate);
+  const encodedQuery = returnQuery.toString();
+  const returnTo = returnPath ?? (encodedQuery ? `/review?${encodedQuery}` : "/review");
+  const user = await requireChatGPTUser(returnTo);
   if (user.role !== "admin") redirect("/");
   const packets = listFireflyReviewPackets();
   await Promise.all(packets.map(ensureFireflyReviewSnapshot));
@@ -19,9 +30,12 @@ export default async function ReviewPage() {
   ])));
   const queue = partitionFireflyReviewPackets(packets, decisions);
   return <FireflyReviewBoard
+    key={`${requestedPacket ?? ""}:${requestedCandidate ?? ""}`}
     user={user}
     packets={queue.active}
     completedCount={queue.completed.length}
     initialDecisions={decisions}
+    initialPacketId={requestedPacket}
+    initialCandidateId={requestedCandidate}
   />;
 }

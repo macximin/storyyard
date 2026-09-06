@@ -1010,6 +1010,29 @@ a { color: inherit; text-decoration: none; }
 .entry-gate-card ul { margin: 10px 0 0; padding: 10px 10px 10px 28px; background: #fff1ec; color: #8b2f21; font-size: .68rem; }
 .planning-contract-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .planning-contract-grid > article { min-width: 0; padding: 16px; border: 1px solid #aaa; background: #f7f6f1; }
+.planning-source-evidence h4 { margin: 22px 0 10px; font-size: .85rem; }
+.planning-comparison-list { display: grid; gap: 10px; }
+.planning-comparison-list > article { min-width: 0; padding: 12px; border: 1px solid #ccc; background: #fff; }
+.planning-comparison-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.planning-comparison-columns > div { min-width: 0; }
+.planning-comparison-list h5 { margin: 0 0 8px; font-size: .78rem; }
+.planning-comparison-list p { margin: 7px 0; font-size: .72rem; line-height: 1.6; overflow-wrap: anywhere; }
+.planning-comparison-columns p strong { display: block; margin-bottom: 3px; color: #777; font-size: .65rem; }
+.planning-source-location { color: #806d13; }
+.planning-evidence-hash { overflow-wrap: anywhere; font-family: monospace; }
+.planning-source-evidence details, .planning-project-plan details { margin-top: 18px; font-size: .72rem; }
+.planning-source-evidence summary, .planning-project-plan summary { cursor: pointer; padding: 8px 0; }
+.planning-table-scroll { max-width: 100%; overflow-x: auto; }
+.planning-table-scroll table { width: 100%; border-collapse: collapse; font-size: .73rem; line-height: 1.6; text-align: left; }
+.planning-table-scroll th, .planning-table-scroll td { min-width: 90px; padding: 9px; border: 1px solid #ccc; vertical-align: top; overflow-wrap: anywhere; }
+.planning-table-scroll th { background: #f0eee4; }
+.planning-markdown { font-size: .8rem; line-height: 1.75; overflow-wrap: anywhere; }
+.planning-markdown h3 { margin-top: 24px; font-size: 1.1rem; }
+.planning-markdown h4 { margin: 24px 0 10px; font-size: .95rem; }
+.planning-markdown p { white-space: pre-wrap; }
+.planning-markdown blockquote { margin: 12px 0; padding: 8px 14px; border-left: 3px solid #aa9126; background: #f7f5e9; }
+.planning-markdown pre, .planning-markdown-source { max-width: 100%; padding: 12px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #f2f2ed; font-size: .73rem; line-height: 1.6; }
+.planning-markdown code { background: #eeede8; padding: 1px 4px; }
 .opening-payment-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: #aaa; border: 1px solid #aaa; }
 .opening-payment-grid article { min-width: 0; padding: 12px; background: #fff; }
 .opening-payment-grid span { color: #8b7500; font-size: .62rem; font-weight: 900; }
@@ -1267,7 +1290,7 @@ a { color: inherit; text-decoration: none; }
   .firefly-review-grid { grid-template-columns: 1fr; }
   .candidate-reader-head { align-items: flex-start; gap: 16px; }
   .blind-comparison-banner dl, .commercial-dimensions > div { grid-template-columns: 1fr 1fr; }
-  .planning-contract-grid, .planning-review-notes { grid-template-columns: 1fr; }
+  .planning-comparison-columns, .planning-contract-grid, .planning-review-notes { grid-template-columns: 1fr; }
   .opening-payment-grid, .planning-score-grid { grid-template-columns: 1fr 1fr; }
   .entry-gate-card dl > div, .commercial-promise-card dl > div, .planning-contract-grid dl > div { grid-template-columns: 1fr; }
   .surface-pair { grid-template-columns: 1fr; }

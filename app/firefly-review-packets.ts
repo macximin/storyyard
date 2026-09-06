@@ -3,7 +3,7 @@ import packetIndex from "../data/firefly/review-packets/index.json";
 import packetInvalidations from "../data/firefly/review-packets/invalidations.json";
 import { validateFireflyReviewPacket } from "./firefly-review-contract";
 import { mergeFireflyReviewPackets, validateFireflyReviewPacketStaticIndex } from "./firefly-review-packet-index.mjs";
-export type { FireflyDecision, FireflyHumanPremiseCandidateV4, FireflyPitchReviewCandidateV3, FireflyReviewPacket, FireflySurfaceClassificationReceipt, FireflySurfaceMatch, SurfaceClassification } from "./firefly-review-contract";
+export type { FireflyVariationReviewCandidateV5, FireflyVariationReviewPacketV5, FireflyDecision, FireflyHumanPremiseCandidateV4, FireflyPitchReviewCandidateV3, FireflyReviewPacket, FireflySurfaceClassificationReceipt, FireflySurfaceMatch, SurfaceClassification } from "./firefly-review-contract";
 import type { FireflyReviewPacket } from "./firefly-review-contract";
 
 const indexedPackets = validateFireflyReviewPacketStaticIndex(packetIndex).packets;
