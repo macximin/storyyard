@@ -13,6 +13,6 @@ export default async function ReviewKanbanPage() {
   const packets = listFireflyReviewPackets().filter((packet) => !getFireflyReviewArchive(packet.packetId));
   const entries = await Promise.all(packets.map(async (packet) => ({ packet, decisions: await listFireflyReviewDecisions(packet.packetId) })));
   const archiveCount = listStoredFireflyReviewPackets().filter((packet) => getFireflyReviewArchive(packet.packetId)).length;
-  const canaries = await Promise.all(listPlanningCanaries().map(async canary=>({canary,decisions:await listFireflyReviewDecisions(canary.id)})));
+  const canaries = await Promise.all((await listPlanningCanaries()).map(async canary=>({canary,decisions:await listFireflyReviewDecisions(canary.id)})));
   return <ReviewCollection canaries={canaries} user={user} entries={entries} mode="board" archiveCount={archiveCount} />;
 }
