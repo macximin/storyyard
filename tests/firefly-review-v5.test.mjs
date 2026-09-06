@@ -149,3 +149,34 @@ test("opens a linked plan or variation and keeps a candidate inside its own pack
   assert.ok(!planHtml.includes("<h3>초반 구간 변주안</h3>"));
   assert.ok(render("missing", plan.candidates[0].id).includes(`<h3>${variant.candidates[0].title}</h3>`));
 });
+
+test("actual planning opens with the document and keeps technical audits folded without changing owner feedback", async () => {
+  const evidence = await component("../app/review/planning-evidence.tsx");
+  const variation = await component("../app/review/planning-variation.tsx", { "./planning-evidence": evidence });
+  const board = await component("../app/review/review-board.tsx", {
+    "@phosphor-icons/react": Phosphor,
+    "./planning-evidence": evidence, "./planning-variation": variation,
+    "@/app/global-sidebar": { GlobalSidebar: () => null },
+    "@/app/firefly-review-display.mjs": { fireflyReviewQueueMetadata },
+  });
+  const plan = validateFireflyReviewPacket(JSON.parse(await readFile(new URL("../data/firefly/review-packets/immutable/frp-37e1670f18b2933c2647bc1e.json", import.meta.url), "utf8")));
+  const html = renderToStaticMarkup(React.createElement(board.FireflyReviewBoard, {
+    user: { id: "test", email: "test@example.invalid", role: "admin" }, packets: [plan], completedCount: 0,
+    initialDecisions: { [plan.packetId]: [
+      { decisionId: "test-format-comment", candidateId: "p01", decision: "select", comment: "양식을 사람이 읽기 쉽게 정리해 줘", status: "pending", createdAt: "2026-09-06T00:00:00Z" },
+      { decisionId: "test-format-rejection", candidateId: "p01", decision: "reject", comment: "기획서 양식이 싫어", status: "pending", createdAt: "2026-09-05T00:00:00Z" },
+    ] }, initialPacketId: plan.packetId, initialCandidateId: "p01",
+  }));
+  assert.ok(html.indexOf("<h3>작품 기획서</h3>") < html.indexOf("독립 심사자의 원문 대조"));
+  let depth = 0;
+  const visible = html.split(/(<\/?details\b[^>]*>)/u).map((token) => {
+    if (/^<details\b/u.test(token)) { if (depth || !/\bopen(?:[\s=>])/u.test(token)) depth++; return depth ? "" : token; }
+    if (token === "</details>" && depth) { depth--; return ""; }
+    return depth ? "" : token;
+  }).join("");
+  assert.match(visible, /작품 기획서/);
+  assert.doesNotMatch(visible, /p01\.linkedCausalAdjustments|배열 첨자는 0부터|INDEPENDENT ENTRY GATE/);
+  assert.match(html, /양식을 사람이 읽기 쉽게 정리해 줘/);
+  assert.match(html, /기획서 양식이 싫어/);
+  assert.doesNotMatch(html, /type="radio"[^>]*checked/);
+});

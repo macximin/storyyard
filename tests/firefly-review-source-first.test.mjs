@@ -193,3 +193,56 @@ test("renders plan tables and escapes embedded HTML and remote media", () => {
   assert.doesNotMatch(html, /<script>|<img /);
   assert.match(html, /&lt;script&gt;/);
 });
+
+function withoutClosedDetails(html) {
+  const tokens = html.split(/(<\/?details\b[^>]*>)/u);
+  let hiddenDepth = 0;
+  return tokens.map((token) => {
+    if (/^<details\b/u.test(token)) {
+      if (hiddenDepth || !/\bopen(?:[\s=>])/u.test(token)) hiddenDepth++;
+      return hiddenDepth ? "" : token;
+    }
+    if (token === "</details>" && hiddenDepth) { hiddenDepth--; return ""; }
+    return hiddenDepth ? "" : token;
+  }).join("");
+}
+
+test("gives actual p01 and p02 nine working section links, intact source, and folded production annotations", async () => {
+  const packet = JSON.parse(await readFile(new URL("../data/firefly/review-packets/immutable/frp-37e1670f18b2933c2647bc1e.json", import.meta.url), "utf8"));
+  for (const candidate of packet.candidates) {
+    const markdown = candidate.projectPlan.markdown;
+    const html = renderToStaticMarkup(React.createElement(PlanningProjectPlan, { markdown }));
+    const visible = withoutClosedDetails(html);
+    const links = [...html.matchAll(/href="#(plan-[^"]+)"/gu)].map((match) => match[1]);
+    assert.equal(links.length, 9);
+    for (const target of links) assert.ok(html.includes(`id="${target}"`));
+    assert.equal((visible.match(/<h4>/gu) ?? []).length, 9);
+    assert.ok(html.includes(`<pre class="planning-markdown-source">${escapeHtml(markdown)}</pre>`));
+    assert.match(visible, /1,210억 원/);
+    assert.match(visible, /220억 원/);
+    assert.doesNotMatch(visible, /ArcPacket|NarrativeArc|이번 결과물은 비정본|후보 상태는 pending/);
+    assert.match(visible, /작품 기획서 목차/);
+    assert.match(html, /data-label="/);
+  }
+});
+
+test("preserves decimals and field paths while splitting mixed story and production paragraphs", () => {
+  const markdown = "# 1. 자금\n\n주인공의 원금은 1.5억 원이다. Book 승인 기록은 p01.linkedCausalAdjustments[3]에 있다. 그는 이 돈으로 자기 회사를 산다.";
+  const html = renderToStaticMarkup(React.createElement(PlanningProjectPlan, { markdown }));
+  const visible = withoutClosedDetails(html);
+  assert.match(visible, /원금은 1\.5억 원이다/);
+  assert.match(visible, /그는 이 돈으로 자기 회사를 산다/);
+  assert.doesNotMatch(visible, /Book|linkedCausalAdjustments/);
+  assert.ok(html.includes("p01.linkedCausalAdjustments[3]"));
+  assert.ok(html.includes(escapeHtml(markdown)));
+});
+
+test("keeps long independent audit coordinates behind deliberate disclosure", () => {
+  const candidate = fixture().candidates[0];
+  candidate.independentReview.sourceChecks.sourceFidelity.evidence = "배열 첨자는 0부터 센다. ① 출발 자금: p01.linkedCausalAdjustments[3~4]와 L1~L722를 대조했다. ② 실현금: 회수액을 확인했다.";
+  const html = renderToStaticMarkup(React.createElement(PlanningIndependentSourceReview, { checks: candidate.independentReview.sourceChecks }));
+  const visible = withoutClosedDetails(html);
+  assert.match(visible, /원작 보존/);
+  assert.doesNotMatch(visible, /linkedCausalAdjustments|배열 첨자|L1~L722/);
+  assert.ok(html.includes(escapeHtml(candidate.independentReview.sourceChecks.sourceFidelity.evidence)));
+});

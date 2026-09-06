@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useId, type ReactNode } from "react";
 import type { FireflyPitchReviewCandidateV3 } from "../firefly-review-contract";
 
 // Render the planning format's headings, lists and tables as escaped React text.
@@ -15,9 +15,33 @@ function cells(line: string): string[] {
   return line.trim().replace(/^\|/u, "").replace(/\|$/u, "").split(/(?<!\\)\|/u).map((cell) => cell.trim().replace(/\\\|/gu, "|"));
 }
 
-export function PlanningProjectPlan({ markdown, title = "작품 기획서", kicker = "PROJECT PLAN" }: { markdown: string; title?: string; kicker?: string }) {
+// Only explicit production vocabulary becomes a note. Story facts, dates,
+// figures and uncertainty remain available, including the untouched source.
+function productionAnnotation(text: string): boolean {
+  return /비정본|정본|승격|ArcPacket|NarrativeArc|\b(?:Book|Story Frame|Rail|railA|railB|pending|projectPlan)\b|생성자 자기점수|내부 설계 평가|이번 턴|이번 직접 본문 범위/u.test(text);
+}
+
+function sentences(text: string): string[] {
+  // A period within a decimal, field path or array coordinate is not a break.
+  return text.split(/(?<=[.!?])\s+/u).map((part) => part.trim()).filter(Boolean);
+}
+
+function readableParagraphs(text: string): string[] {
+  if (text.length < 220) return [text];
+  const chunks: string[] = [];
+  let current = "";
+  for (const sentence of sentences(text)) {
+    if (current && current.length + sentence.length > 220) { chunks.push(current); current = ""; }
+    current += (current ? " " : "") + sentence;
+  }
+  if (current) chunks.push(current);
+  return chunks.length ? chunks : [text];
+}
+
+function planBlocks(markdown: string): { content: ReactNode[]; notes: ReactNode[] } {
   const lines = markdown.replace(/\r\n/gu, "\n").split("\n");
-  const blocks: ReactNode[] = [];
+  const content: ReactNode[] = [];
+  const notes: ReactNode[] = [];
   for (let index = 0; index < lines.length;) {
     const line = lines[index];
     if (!line.trim()) { index++; continue; }
@@ -26,21 +50,24 @@ export function PlanningProjectPlan({ markdown, title = "작품 기획서", kick
       const body: string[] = [];
       for (index++; index < lines.length && !/^\s*```/u.test(lines[index]); index++) body.push(lines[index]);
       index++;
-      blocks.push(<pre key={key}>{body.join("\n")}</pre>);
+      content.push(<pre key={key}>{body.join("\n")}</pre>);
       continue;
     }
     const heading = /^(#{1,6})\s+(.+)$/u.exec(line);
-    if (heading) {
-      blocks.push(heading[1].length === 1 ? <h3 key={key}>{inline(heading[2])}</h3> : <h4 key={key}>{inline(heading[2])}</h4>);
-      index++;
-      continue;
-    }
-    if (/^\s*([-*_])(?:\s*\1){2,}\s*$/u.test(line)) { blocks.push(<hr key={key} />); index++; continue; }
+    if (heading) { content.push(<h5 key={key}>{inline(heading[2])}</h5>); index++; continue; }
+    if (/^\s*([-*_])(?:\s*\1){2,}\s*$/u.test(line)) { content.push(<hr key={key} />); index++; continue; }
     if (line.includes("|") && index + 1 < lines.length && cells(lines[index + 1]).every((cell) => /^:?-{3,}:?$/u.test(cell))) {
       const headers = cells(line);
       const rows: string[][] = [];
       for (index += 2; index < lines.length && lines[index].includes("|") && lines[index].trim(); index++) rows.push(cells(lines[index]));
-      blocks.push(<div key={key} className="planning-table-scroll"><table><thead><tr>{headers.map((cell, column) => <th key={column}>{inline(cell)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, column) => <td key={column}>{inline(cell)}</td>)}</tr>)}</tbody></table></div>);
+      const noteColumns = headers.map((header, column) => /^(?:원작 대응|근거 상태)$/u.test(header) ? column : -1).filter((column) => column >= 0);
+      const visibleColumns = headers.map((_, column) => column).filter((column) => !noteColumns.includes(column));
+      // A table made entirely of evidence still needs its column headings.
+      const columns = visibleColumns.length ? visibleColumns : headers.map((_, column) => column);
+      content.push(<div key={key} className="planning-table-scroll ff-plan-table-cards"><table><thead><tr>{columns.map((column) => <th key={column} scope="col">{inline(headers[column])}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{columns.map((column, displayIndex) => <td key={column} data-label={headers[column]}>
+        {readableParagraphs(row[column] ?? "").map((part, partIndex) => <p key={partIndex}>{inline(part)}</p>)}
+        {displayIndex === 0 && visibleColumns.length > 0 && noteColumns.length > 0 && <details className="ff-plan-note"><summary>원작·검토 주석</summary><dl>{noteColumns.map((noteColumn) => <div key={noteColumn}><dt>{headers[noteColumn]}</dt><dd>{inline(row[noteColumn] ?? "")}</dd></div>)}</dl></details>}
+      </td>)}</tr>)}</tbody></table></div>);
       continue;
     }
     const list = /^\s*(?:[-*+] |\d+\. )/u;
@@ -48,18 +75,54 @@ export function PlanningProjectPlan({ markdown, title = "작품 기획서", kick
       const ordered = /^\s*\d+\. /u.test(line);
       const items: ReactNode[] = [];
       for (; index < lines.length && list.test(lines[index]); index++) items.push(<li key={index}>{inline(lines[index].replace(list, ""))}</li>);
-      blocks.push(ordered ? <ol key={key}>{items}</ol> : <ul key={key}>{items}</ul>);
+      content.push(ordered ? <ol key={key}>{items}</ol> : <ul key={key}>{items}</ul>);
       continue;
     }
-    if (/^>\s?/u.test(line)) { blocks.push(<blockquote key={key}>{inline(line.replace(/^>\s?/u, ""))}</blockquote>); index++; continue; }
+    if (/^>\s?/u.test(line)) { content.push(<blockquote key={key}>{inline(line.replace(/^>\s?/u, ""))}</blockquote>); index++; continue; }
     const paragraph: string[] = [line];
     for (index++; index < lines.length && lines[index].trim() && !/^(?:#{1,6}\s|\s*```|>\s?|\s*[-*+] |\s*\d+\. )/u.test(lines[index]) && !lines[index].includes("|"); index++) paragraph.push(lines[index]);
-    blocks.push(<p key={key}>{inline(paragraph.join("\n"))}</p>);
+    const text = paragraph.join("\n");
+    if (productionAnnotation(text)) {
+      // Preserve ordinary sentences from a mixed paragraph in the reading view.
+      const parts = sentences(text);
+      const story = parts.filter((part) => !productionAnnotation(part));
+      const annotations = parts.filter(productionAnnotation);
+      for (const [partIndex, part] of readableParagraphs(story.join(" ")).entries()) if (part) content.push(<p key={`${key}-story-${partIndex}`}>{inline(part)}</p>);
+      annotations.forEach((part, partIndex) => notes.push(<p key={`${key}-note-${partIndex}`}>{inline(part)}</p>));
+    } else {
+      readableParagraphs(text).forEach((part, partIndex) => content.push(<p key={`${key}-${partIndex}`}>{inline(part)}</p>));
+    }
   }
+  return { content, notes };
+}
+
+export function PlanningProjectPlan({ markdown, title = "작품 기획서", kicker = "PROJECT PLAN" }: { markdown: string; title?: string; kicker?: string }) {
+  const prefix = `plan-${useId().replace(/[^a-zA-Z0-9_-]/gu, "")}`;
+  const sections: Array<{ title: string; lines: string[] }> = [];
+  let inCode = false;
+  for (const line of markdown.replace(/\r\n/gu, "\n").split("\n")) {
+    if (/^\s*```/u.test(line)) inCode = !inCode;
+    const heading = !inCode && /^#{1,2}\s+(.+)$/u.exec(line);
+    if (heading) sections.push({ title: heading[1], lines: [] });
+    else {
+      if (!sections.length) sections.push({ title: "", lines: [] });
+      sections[sections.length - 1].lines.push(line);
+    }
+  }
+  const numbered = sections.filter((section) => section.title);
   return <section className="planning-project-plan commercial-promise-card">
-    <p className="kicker">{kicker}</p><h3>{title}</h3>
-    <div className="planning-markdown">{blocks}</div>
-    <details><summary>전달받은 Markdown 원문</summary><pre className="planning-markdown-source">{markdown}</pre></details>
+    <p className="kicker">{kicker === "PROJECT PLAN" ? "작품 기획" : kicker}</p><h3>{title}</h3>
+    {numbered.length > 1 && <nav className="ff-plan-nav" aria-label={`${title} 목차`}>{sections.map((section, index) => (section.title && (index > 0 || /^\d+\./u.test(section.title))) && <a key={index} href={`#${prefix}-${index}`}>{section.title}</a>)}</nav>}
+    <div className="planning-markdown ff-plan-body">{sections.map((section, index) => {
+      const rendered = planBlocks(section.lines.join("\n"));
+      const heading = /^(\d+)\.\s*(.*)$/u.exec(section.title);
+      return <section key={index} id={`${prefix}-${index}`} className="ff-plan-section">
+        {section.title && <header className="ff-plan-section-head">{heading && <span className="ff-plan-section-number" aria-hidden="true">{heading[1].padStart(2, "0")}</span>}{index === 0 && !heading ? <p className="ff-plan-section-subtitle">{inline(section.title)}</p> : <h4>{heading ? heading[2] : section.title}</h4>}</header>}
+        {rendered.content}
+        {rendered.notes.length > 0 && <details className="ff-plan-note ff-plan-notes"><summary>제작·검토 주석 {rendered.notes.length}개</summary>{rendered.notes}</details>}
+      </section>;
+    })}</div>
+    <details className="ff-plan-note"><summary>전체 원문 · 주석 포함</summary><pre className="planning-markdown-source">{markdown}</pre></details>
   </section>;
 }
 
@@ -134,13 +197,18 @@ export function PlanningEvidence({ candidate }: { candidate: FireflyPitchReviewC
   </section>;
 }
 
+function SourceReviewText({ text }: { text: string }) {
+  const paragraphs = text.split(/\s+(?=[①-⑳])/u).flatMap(readableParagraphs);
+  return <div className="ff-plan-evidence-text">{paragraphs.map((paragraph, index) => <p key={index}>{inline(paragraph)}</p>)}<details className="ff-plan-note"><summary>심사 원문 그대로 보기</summary><pre className="planning-markdown-source">{text}</pre></details></div>;
+}
+
 export function PlanningIndependentSourceReview({ checks }: { checks: NonNullable<FireflyPitchReviewCandidateV3["independentReview"]["sourceChecks"]> }) {
   return <section className="commercial-promise-card">
-    <p className="kicker">INDEPENDENT SOURCE REVIEW</p><h3>독립 심사자의 원문 대조</h3>
-    <div className="planning-comparison-list">
-      <article><h4>자기 이익 우선 · {checks.selfInterest.passed ? "PASS" : "FAIL"}</h4><p>{checks.selfInterest.evidence}</p></article>
-      <article><h4>원작 보존 · {checks.sourceFidelity.passed ? "PASS" : "FAIL"}</h4><p>{checks.sourceFidelity.evidence}</p></article>
-      <article><h4>읽는 재미 · {checks.commercialReading.assessment}</h4><p>{checks.commercialReading.evidence}</p></article>
+    <p className="kicker">심사 근거</p><h3>독립 심사자의 원문 대조</h3>
+    <div className="planning-comparison-list ff-plan-checks">
+      <article><h4>자기 이익 우선 · {checks.selfInterest.passed ? "PASS" : "FAIL"}</h4><details className="ff-plan-note"><summary>판정 근거 펼치기</summary><SourceReviewText text={checks.selfInterest.evidence} /></details></article>
+      <article><h4>원작 보존 · {checks.sourceFidelity.passed ? "PASS" : "FAIL"}</h4><details className="ff-plan-note"><summary>원문 대조 내역 펼치기</summary><SourceReviewText text={checks.sourceFidelity.evidence} /></details></article>
+      <article><h4>읽는 재미</h4><p>{checks.commercialReading.assessment}</p><details className="ff-plan-note"><summary>상업성 판단 근거 펼치기</summary><SourceReviewText text={checks.commercialReading.evidence} /></details></article>
     </div>
   </section>;
 }
