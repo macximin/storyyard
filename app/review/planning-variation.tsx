@@ -36,23 +36,26 @@ export function PlanningVariationReview({ candidate, packet, baseline }: {
       <p><strong>이번 범위</strong>{packet.scope.episodeStart}~{packet.scope.episodeEnd}화 · {packet.scope.through}</p>
       <p>이번에는 초반의 변주 방향을 고릅니다. 선택한 방향은 다음 전체 기획서의 기준이 됩니다.</p>
       <nav className="ff-planning-document-nav" aria-label="기획서와 수정안 이동">
-        {baseline && <a href={`#${baselinePrefix}`}>전체 기획서 · 육하원칙</a>}
         <a href={`#${variationPrefix}`}>이번 초반 수정안</a>
+        {baseline && <a href={`#${baselinePrefix}`}>이전 기준안 · 육하원칙</a>}
       </nav>
     </section>
-    {baseline ? <div id={baselinePrefix} className="ff-planning-baseline">
-      <aside className="ff-planning-baseline-notice">
-        <strong>기준 전체 기획서 · 수정 전</strong>
-        <p>기존 9절 기획서와 이번 도입 변주를 함께 봅니다. 각 절의 관련 수정안으로 이동해 비교할 수 있습니다.</p>
-        <p>아래 기준안의 인물·연대·장기 전개에는 이번 변주가 아직 반영되지 않았습니다. 통합 기획서는 방향 선택 후 같은 양식으로 작성합니다.</p>
-        {baseline.reviewHref && <a href={baseline.reviewHref}>기준 기획서 검토 화면 열기</a>}
-      </aside>
-      <PlanningProjectPlan markdown={baseline.markdown} title="전체 기획서 · 수정 전 기준안" idPrefix={`${baselinePrefix}-section`} sectionLinks={sectionLinks} />
-    </div> : <aside className="ff-planning-baseline-notice"><strong>기준 전체 기획서를 불러올 수 없습니다.</strong><p>현재는 초반 변주안만 표시합니다. 제목이 같은 다른 기획서로 대신하지 않습니다.</p></aside>}
     <div id={variationPrefix} className="ff-planning-variation-document">
-      <aside className="ff-planning-baseline-notice"><strong>검토 중인 초반 수정안 · {candidate.title}</strong><p>이하 내용은 도입 {packet.scope.episodeStart}~{packet.scope.episodeEnd}화의 수정 제안입니다. 아래 판정도 이 변주 후보를 대상으로 합니다.</p>{baseline && <a href={`#${baselinePrefix}`}>전체 기획서 · 육하원칙으로 돌아가기</a>}</aside>
-      <PlanningProjectPlan markdown={candidate.markdown} title="초반 구간 변주안" kicker="VARIATION DETAILS" idPrefix={variationPrefix} />
+      <aside className="ff-planning-baseline-notice"><strong>검토 중인 초반 수정안 · {candidate.title}</strong><p>이하 내용은 도입 {packet.scope.episodeStart}~{packet.scope.episodeEnd}화의 수정 제안입니다. 아래 판정도 이 변주 후보를 대상으로 합니다.</p><p>현재 전체 기획서는 아직 통합 전입니다. 이전 기획서는 아래 접힌 참고에서 확인할 수 있습니다.</p></aside>
+      <PlanningProjectPlan markdown={candidate.markdown} title="초반 구간 변주안" kicker="VARIATION DETAILS" idPrefix={variationPrefix} referenceSections={["사건을 어떻게 바꾸는가", "실제 원문 근거"]} />
     </div>
+    {baseline ? <div id={baselinePrefix} className="ff-planning-baseline">
+      <details className="commercial-promise-card">
+      <summary>이전 기준안 · 육하원칙과 9절 기획서 · 수정 전 참고</summary>
+      <aside className="ff-planning-baseline-notice">
+        <strong>이전 전체 기획서 · 현재안 아님</strong>
+        <p>변주 전 기록입니다. 교체되거나 제외된 사건도 포함되어 있습니다. 각 절의 관련 수정안으로 이동해 비교할 수 있습니다.</p>
+        <p>아래 기준안의 인물·연대·장기 전개에는 이번 변주가 아직 반영되지 않았습니다. 통합 기획서는 방향 선택 후 같은 양식으로 작성합니다.</p>
+        {baseline.reviewHref && <a href={baseline.reviewHref}>이전 기획서 검토 화면 열기</a>}
+      </aside>
+      <PlanningProjectPlan markdown={baseline.markdown} title="이전 전체 기획서 · 수정 전 참고" idPrefix={`${baselinePrefix}-section`} sectionLinks={sectionLinks} />
+      </details>
+    </div> : <aside className="ff-planning-baseline-notice"><strong>기준 전체 기획서를 불러올 수 없습니다.</strong><p>현재는 초반 변주안만 표시합니다. 제목이 같은 다른 기획서로 대신하지 않습니다.</p></aside>}
     <details className="commercial-promise-card">
       <summary>독립 심사 · {variationVerdictLabels[review.verdict]}</summary>
       <div className="planning-comparison-list">{checks.map(([label, check]) => <article key={label}><h4>{label} · {check.passed ? "PASS" : "FAIL"}</h4><p>{check.evidence}</p></article>)}</div>

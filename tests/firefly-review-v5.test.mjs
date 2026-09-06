@@ -210,8 +210,9 @@ test("binds the exact baseline document without mistaking a projection SHA or a 
   assert.equal(JSON.stringify([variant, plan]), before);
 });
 
-test("keeps all nine baseline sections visible and links each to the current unselected variation", async () => {
+test("shows the current variation first and retains the discarded baseline only in closed references", async () => {
   const [packet, plan] = await actualPlanningPair();
+  const before = JSON.stringify([packet, plan]);
   const baselines = resolvePlanningBaselines([packet, plan]);
   const evidence = await component("../app/review/planning-evidence.tsx");
   const variation = await component("../app/review/planning-variation.tsx", { "./planning-evidence": evidence });
@@ -226,7 +227,26 @@ test("keeps all nine baseline sections visible and links each to the current uns
       user: { id: "test", email: "test@example.invalid", role: "admin" }, packets: [packet, plan], completedCount: 0,
       planningBaselines: baselines, initialDecisions: {}, initialPacketId: packet.packetId, initialCandidateId: candidate.id,
     }));
-    assert.ok(html.indexOf("<h3>전체 기획서 · 수정 전 기준안</h3>") < html.indexOf("<h3>초반 구간 변주안</h3>"));
+    assert.ok(html.indexOf("<h3>초반 구간 변주안</h3>") < html.indexOf("<h3>이전 전체 기획서 · 수정 전 참고</h3>"));
+    assert.match(html, /<details class="commercial-promise-card"><summary>이전 기준안 · 육하원칙과 9절 기획서 · 수정 전 참고<\/summary>/);
+    assert.equal((html.match(/<details[^>]*class="ff-plan-reference"><summary>이전·원문 비교 참고/gu) ?? []).length, 2);
+    let closedDepth = 0;
+    const visible = html.split(/(<\/?details\b[^>]*>)/u).map((token) => {
+      if (/^<details\b/u.test(token)) {
+        if (closedDepth || !/\bopen(?:[\s=>])/u.test(token)) closedDepth++;
+        return closedDepth ? "" : token;
+      }
+      if (token === "</details>" && closedDepth) { closedDepth--; return ""; }
+      return closedDepth ? "" : token;
+    }).join("");
+    assert.match(visible, /<h3>초반 구간 변주안<\/h3>/);
+    assert.doesNotMatch(visible, /<h3>이전 전체 기획서/);
+    if (candidate.id === "v01") {
+      assert.match(visible, /한수경/);
+      assert.match(visible, /풋옵션/);
+      assert.doesNotMatch(visible, /시계|연회/);
+      assert.match(html, /시계/); // Preserve the historical source; do not rewrite sealed packets.
+    }
     assert.match(html, /작품의 육하원칙/);
     assert.match(html, /이번 변주가 아직 반영되지 않았습니다/);
     assert.match(html, /통합 기획서는 방향 선택 후 같은 양식/);
@@ -241,4 +261,5 @@ test("keeps all nine baseline sections visible and links each to the current uns
     assert.doesNotMatch(html, /type="radio"[^>]*checked/);
     assert.match(html, /<details[^>]*><summary>독립 심사/);
   }
+  assert.equal(JSON.stringify([packet, plan]), before);
 });

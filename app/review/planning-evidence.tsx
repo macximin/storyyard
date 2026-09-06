@@ -115,9 +115,10 @@ function splitPlanningSections(markdown: string): Array<{ title: string; lines: 
   return sections;
 }
 
-export function PlanningProjectPlan({ markdown, title = "작품 기획서", kicker = "PROJECT PLAN", idPrefix, sectionLinks = [] }: {
+export function PlanningProjectPlan({ markdown, title = "작품 기획서", kicker = "PROJECT PLAN", idPrefix, sectionLinks = [], referenceSections = [] }: {
   markdown: string; title?: string; kicker?: string; idPrefix?: string;
   sectionLinks?: Array<{ sectionNumber: number; label: string; href: string }>;
+  referenceSections?: string[];
 }) {
   const uniqueId = useId();
   const prefix = idPrefix ?? `plan-${uniqueId.replace(/[^a-zA-Z0-9_-]/gu, "")}`;
@@ -125,11 +126,12 @@ export function PlanningProjectPlan({ markdown, title = "작품 기획서", kick
   const numbered = sections.filter((section) => section.title);
   return <section className="planning-project-plan commercial-promise-card">
     <p className="kicker">{kicker === "PROJECT PLAN" ? "작품 기획" : kicker}</p><h3>{title}</h3>
-    {numbered.length > 1 && <nav className="ff-plan-nav" aria-label={`${title} 목차`}>{sections.map((section, index) => (section.title && (index > 0 || /^\d+\./u.test(section.title))) && <a key={index} href={`#${prefix}-${index}`}>{section.title}</a>)}</nav>}
+    {numbered.length > 1 && <nav className="ff-plan-nav" aria-label={`${title} 목차`}>{sections.map((section, index) => (section.title && (index > 0 || /^\d+\./u.test(section.title))) && <a key={index} href={`#${prefix}-${index}`}>{referenceSections.includes(section.title) ? `이전·원문 비교 참고 · ${section.title}` : section.title}</a>)}</nav>}
     <div className="planning-markdown ff-plan-body">{sections.map((section, index) => {
       const rendered = planBlocks(section.lines.join("\n"));
       const heading = /^(\d+)\.\s*(.*)$/u.exec(section.title);
-      return <section key={index} id={`${prefix}-${index}`} className="ff-plan-section">
+      const reference = referenceSections.includes(section.title);
+      const content = <section key={index} id={reference ? undefined : `${prefix}-${index}`} className="ff-plan-section">
         {section.title && <header className="ff-plan-section-head">{heading && <span className="ff-plan-section-number" aria-hidden="true">{heading[1].padStart(2, "0")}</span>}{index === 0 && !heading ? <p className="ff-plan-section-subtitle">{inline(section.title)}</p> : <h4>{heading ? heading[2] : section.title}</h4>}</header>}
         {heading && sectionLinks.some((link) => link.sectionNumber === Number(heading[1])) && <aside className="ff-plan-revision-links" aria-label={`${section.title} 관련 수정안`}>
           <strong>기준안 · 수정 전</strong><span>관련 수정안:</span>{sectionLinks.filter((link) => link.sectionNumber === Number(heading[1])).map((link) => <a key={link.href} href={link.href}>{link.label}</a>)}
@@ -137,6 +139,7 @@ export function PlanningProjectPlan({ markdown, title = "작품 기획서", kick
         {rendered.content}
         {rendered.notes.length > 0 && <details className="ff-plan-note ff-plan-notes"><summary>제작·검토 주석 {rendered.notes.length}개</summary>{rendered.notes}</details>}
       </section>;
+      return reference ? <details key={index} id={`${prefix}-${index}`} className="ff-plan-reference"><summary>이전·원문 비교 참고 · {section.title}</summary><p>아래에는 교체 전 사건과 원작 내용이 함께 나옵니다.</p>{content}</details> : content;
     })}</div>
     <details className="ff-plan-note"><summary>전체 원문 · 주석 포함</summary><pre className="planning-markdown-source">{markdown}</pre></details>
   </section>;
