@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "firefly_review_archives/v1",
+  "archives": [
+    {
+      "packetId": "frp-08a029b4381f5a2c61f530b1",
+      "packetSha256": "08a029b4381f5a2c61f530b1d12ede9970a35fbf52e1e2527c05862568e9a0f7",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-5f7d2056b4d39c9a8d2c8f88",
+      "packetSha256": "5f7d2056b4d39c9a8d2c8f88b5449c7cfab0630a5e1312368a8914641d20d167",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-326a79098a01aabd990f4abb",
+      "packetSha256": "326a79098a01aabd990f4abbc90b4f5348fdd6fa5f0982b06f09b02ac6490dc0",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-643e0fc8422a6ba2f6962176",
+      "packetSha256": "643e0fc8422a6ba2f69621766c47ec655cbe9a6d5ce717750210466679a97af9",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-37e1670f18b2933c2647bc1e",
+      "packetSha256": "37e1670f18b2933c2647bc1e362e9017371925688ec96ca1177f9cf4d899e105",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-984253c92d9b3bd1fb06c976",
+      "packetSha256": "984253c92d9b3bd1fb06c9762a9e58eb07a1fc3656dd5a0291f9a37bd952a3db",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-cc93f2bb015349cd5413aa0e",
+      "packetSha256": "cc93f2bb015349cd5413aa0e8d08b1b1185aef7577347164964542319959d58c",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-657075751933415b74ccbc32",
+      "packetSha256": "657075751933415b74ccbc32a187e4d9695c6ad2cc01d29acdbd3f6e6bffe017",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-eb74b3a148affeeea868f785",
+      "packetSha256": "eb74b3a148affeeea868f785a6d45b78da3f1ac6cc850affc9ac09abd632c3f5",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-349306f41a648c80a0f883b6",
+      "packetSha256": "349306f41a648c80a0f883b68b3c231ef12416585701cbb1f7254bb2ef6c84dd",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-8b0fe55e293b565696ec5931",
+      "packetSha256": "8b0fe55e293b565696ec5931fe30c7b70ec564c1b33b4e7c370a94b970618317",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-1616c37e921e296eeccaf032",
+      "packetSha256": "1616c37e921e296eeccaf032ab37ed439537748dc6d59cf8284338d75beb7d8b",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-fa1b5699b0fdc6efed4b22e5",
+      "packetSha256": "fa1b5699b0fdc6efed4b22e5660ee54ecb39288f25f02c1f88188ca8c9c585ee",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-7671ee771362e321a1a82db6",
+      "packetSha256": "7671ee771362e321a1a82db655565594090ce98da756793819f571cc94fdbc36",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-8ef0cc30ac12d9a3d3116ac9",
+      "packetSha256": "8ef0cc30ac12d9a3d3116ac954a85568a3a97d61d5363225d71d9bf5d7c578ff",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-0e3ce561b1db95ef01021942",
+      "packetSha256": "0e3ce561b1db95ef010219422abd4466cb33b7cddfa4acc42dd5faa0ab113283",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    },
+    {
+      "packetId": "frp-53c23574a09caeef1122f213",
+      "packetSha256": "53c23574a09caeef1122f213ddee00f31f1891fd1897502895bb729acee06492",
+      "archivedAt": "2026-09-06T09:54:50.429089Z",
+      "reason": "현재 금융 변주만 검토 대기에 남기도록 요청하여 이전 검토를 보관함."
+    }
+  ]
+}

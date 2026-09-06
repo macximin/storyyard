@@ -28,7 +28,7 @@ const commercialLabels: Record<string, string> = {
   transformationIntegrity: "변형 정합성", styleFidelity: "문체 충실도",
 };
 
-export function FireflyReviewBoard({ user, packets, completedCount, initialDecisions, initialPacketId, initialCandidateId, planningBaselines = {} }: {
+export function FireflyReviewBoard({ user, packets, completedCount, initialDecisions, initialPacketId, initialCandidateId, planningBaselines = {}, archive, completed = false }: {
   user: Exclude<SidebarUser, null>;
   packets: FireflyReviewPacket[];
   completedCount: number;
@@ -36,6 +36,8 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
   initialPacketId?: string;
   initialCandidateId?: string;
   planningBaselines?: Record<string, PlanningBaselineView>;
+  archive?: { reason: string; archivedAt: string; invalidated: boolean };
+  completed?: boolean;
 }) {
   const [packetIndex, setPacketIndex] = useState(() => Math.max(0, packets.findIndex((item) => item.packetId === initialPacketId)));
   const packet = packets[packetIndex] ?? null;
@@ -79,6 +81,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
           <h2>검토 대기 없음</h2>
           <p>원고 적용 또는 평가 수신 영수증까지 확인된 패킷은 활성 큐에서 자동 종료됩니다.</p>
           {completedCount > 0 && <span>종료된 패킷 {completedCount}개</span>}
+          <p><a href="/review/board">검토 칸반</a> · <a href="/review/archive">검토 보관함</a></p>
         </section>
       </section>
     </main>;
@@ -132,6 +135,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (archive || completed) return;
     if (!decision) { setMessage("사람 판정을 먼저 선택해 줘."); return; }
     setPending(true); setMessage("");
     try {
@@ -173,12 +177,15 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
   }
 
   return <main className={`library-shell firefly-review-shell${v3Candidate ? " ff-plan-view" : ""}`}>
-    <GlobalSidebar user={user} active="review" />
+    <GlobalSidebar user={user} active={archive ? "review-archive" : completed ? "review-board" : "review"} />
     <section className="firefly-review-main">
       <header className="review-queue-head">
-        <div><p className="kicker">FIREFLY HUMAN REVIEW</p><h1>오늘 검토</h1><p>재미와 도파민을 먼저 보고, 정합성은 치명적인 모순만 막습니다.</p></div>
+        <div><p className="kicker">FIREFLY HUMAN REVIEW</p><h1>{archive ? "보관된 검토" : completed ? "처리 확인된 검토" : "오늘 검토"}</h1><p>{archive || completed ? "이전 내용과 당시 판정 기록입니다." : "재미와 도파민을 먼저 보고, 정합성은 치명적인 모순만 막습니다."}</p></div>
         <div className="review-authority"><LockKey size={18} /><strong>정본은 InkOS</strong><span>Storyyard는 판정만 기록</span></div>
       </header>
+      <nav className="ff-review-view-nav" aria-label="검토 보기"><a href="/review">검토 대기</a><a href="/review/board">검토 칸반</a><a href="/review/archive">검토 보관함</a></nav>
+      {archive && <aside className="ff-review-archive-notice"><strong>{archive.invalidated ? "무효 처리된 이전 검토 · 읽기 전용" : "보관된 이전 검토 · 읽기 전용"}</strong><p>{archive.reason}</p><small>보관일 {archive.archivedAt.slice(0, 10)}</small></aside>}
+      {completed && !archive && <aside className="ff-review-archive-notice"><strong>처리 확인된 검토 · 읽기 전용</strong><p>기록된 판정과 InkOS 처리 확인을 볼 수 있습니다.</p></aside>}
       <nav className="review-queue" aria-label="검토 패킷">
         {packets.map((item, index) => <button key={item.packetId} className={index === packetIndex ? "active" : ""} onClick={() => selectPacket(index)}>
           <span>{item.schemaVersion === "firefly_review_packet/v3" ? "기획서" : item.work.title}</span><strong>{item.schemaVersion === "firefly_review_packet/v5" ? `초반 변주 · ${item.artifact.title}` : item.schemaVersion === "firefly_review_packet/v4" ? `전제 · ${item.artifact.title}` : item.schemaVersion === "firefly_review_packet/v3" ? (item.candidates[0]?.titleCandidates[0] ?? item.work.title) : `${item.artifact.chapterNumber}화 · ${item.artifact.title}`}</strong><small>{fireflyReviewQueueMetadata(item)}</small>
@@ -191,7 +198,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
           <nav className="candidate-tabs" aria-label="후보 선택">{packet.candidates.map((item, index) => <button key={item.id} className={item.id === candidate.id ? "active" : ""} onClick={() => selectCandidate(item.id)}>
             후보 {String.fromCharCode(65 + index)} {!v3Candidate && <span>{candidateCommercialScore(packet, item.id)}</span>}
           </button>)}</nav>
-          {v5Candidate && <section className="planning-entry-banner"><div><ShieldCheck size={18} /><strong>초반 구간 변주 방향 선택</strong></div><p>p01을 기준으로, 사건을 바꿔도 주인공의 이익과 읽는 재미가 살아 있는지 비교해 주세요.</p></section>}
+          {!archive && !completed && v5Candidate && <section className="planning-entry-banner"><div><ShieldCheck size={18} /><strong>초반 구간 변주 방향 선택</strong></div><p>p01을 기준으로, 사건을 바꿔도 주인공의 이익과 읽는 재미가 살아 있는지 비교해 주세요.</p></section>}
           {v4Candidate && <section className="planning-entry-banner">
             <div><ShieldCheck size={18} /><strong>Human Premise · 상업 기획 확장 전 필수 HIL</strong></div>
             <p>회사·돈·지분·권한을 지워도 남는 사람의 욕망, 오늘의 선택, 감정적 지급을 먼저 확인합니다. 선택해도 Book·Arc·Rail·원고는 만들지 않습니다.</p>
@@ -224,7 +231,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
                       : source?.status === "error" ? <p>{source.message}</p>
                         : <button type="button" disabled={source?.status === "loading"} onClick={() => openSourceSlice(match)}><Eye size={15} /> {source?.status === "loading" ? "불러오는 중…" : "원문 열기"}</button>}
                   </div></div>
-                  <label><span>사람 분류</span><select value={classifications[match.matchId] ?? ""} onChange={(event) => setClassifications((current) => ({ ...current, [match.matchId]: event.target.value as SurfaceClassification }))}>
+                  <label><span>사람 분류</span><select disabled={Boolean(archive) || completed} value={classifications[match.matchId] ?? ""} onChange={(event) => setClassifications((current) => ({ ...current, [match.matchId]: event.target.value as SurfaceClassification }))}>
                     <option value="" disabled>분류 선택</option>{Object.entries(classificationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select></label>
                   <small>분류는 정보와 캐논 판정만 남깁니다. 자동 거리두기나 원고 수정은 하지 않습니다.</small>
@@ -233,7 +240,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
           </section>}
           {packet.schemaVersion !== "firefly_review_packet/v3" && packet.schemaVersion !== "firefly_review_packet/v4" && packet.schemaVersion !== "firefly_review_packet/v5" && <details className="baseline-details"><summary>현재 InkOS 원고와 비교</summary><article>{packet.artifact.currentContent}</article></details>}
         </section>
-        <aside className="decision-dock"><form onSubmit={submit}>
+        <aside className="decision-dock">{!archive && !completed && <form onSubmit={submit}>
           <p className="kicker">DECISION RECEIPT</p><h2>판정 남기기</h2>
           <div className="decision-options">{packet.actions.map((value) => { const Icon = icons[value]; return <label key={value} className={decision === value ? `selected ${value}` : ""}><input type="radio" checked={decision === value} onChange={() => setDecision(value)} /><Icon size={17} /><span>{decisionLabel(packet, value)}</span></label>; })}</div>
           <label className="review-comment"><span>{packet.schemaVersion === "firefly_review_packet/v5" ? "판정 이유 (필수)" : decision === "approve" || decision === "select" ? "메모 (선택)" : "근거 (필수)"}</span><textarea value={comment} onChange={(event) => setComment(event.target.value)} maxLength={2000} placeholder={packet.schemaVersion === "firefly_review_packet/v5" ? "좋았던 사건과 바꿀 부분을 짧게 적어 주세요." : decision === "polish" ? "살릴 부분과 다듬을 부분을 짧게 적어 주세요." : "판정 이유를 적어 주세요."} /></label>
@@ -251,7 +258,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
                 ? "이 기획 판정은 pending으로 저장됩니다. 이번 원작 중심 기획 선택은 Book·아크·원고 생성으로 이어지지 않습니다."
                 : "이 기획 판정은 pending으로 저장됩니다. InkOS가 선택 영수증을 확인하기 전에는 집필할 수 없습니다."
               : "이 판정은 pending으로 저장됩니다. InkOS가 해시를 다시 확인하고 적용해야 정본이 바뀝니다."}</span></p>
-        </form>
+        </form>}
         <section className="decision-history"><h3>최근 판정</h3>{(histories[packet.packetId] ?? []).map((row) => <article key={row.decisionId}><header><strong>{decisionLabel(packet, row.decision as FireflyDecision) ?? row.decision}</strong><span>{row.status}</span></header>{row.candidateId && <p>{row.candidateId}</p>}{row.comment && <blockquote>{row.comment}</blockquote>}</article>)}</section>
         </aside>
       </div>

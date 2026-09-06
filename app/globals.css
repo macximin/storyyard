@@ -994,6 +994,40 @@ a { color: inherit; text-decoration: none; }
 .planning-entry-banner > div { display: flex; align-items: center; gap: 7px; }
 .planning-entry-banner p { margin: 7px 0 0; color: #5f520b; font-size: .7rem; line-height: 1.55; }
 .planning-entry-review { display: grid; gap: 12px; }
+.ff-review-view-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 24px; }
+.ff-review-view-nav a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 9px 14px; border: 1px solid #d7d7d7; border-radius: 6px; color: #333; background: #fff; font-size: .9rem; text-decoration: none; }
+.ff-review-view-nav a[aria-current="page"] { background: var(--yellow); border-color: var(--ink); font-weight: 700; }
+.ff-review-view-nav a:focus-visible, .ff-review-card a:focus-visible { outline: 2px solid #235578; outline-offset: 3px; }
+.ff-review-collection { min-width: 0; padding: 32px clamp(20px, 4vw, 48px); }
+.ff-review-collection > header h1 { margin: 6px 0 10px; font-size: 1.8rem; }
+.ff-review-collection > header p:not(.kicker) { color: #555; font-size: 1rem; line-height: 1.7; }
+.ff-review-kanban { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.ff-review-column { min-width: 0; min-height: 340px; padding: 16px; border: 1px solid #ddd; border-top: 4px solid #969696; border-radius: 8px; background: #f5f5f5; }
+.ff-review-column-waiting { border-top-color: #e0b927; }
+.ff-review-column-recorded { border-top-color: #6080aa; }
+.ff-review-column-confirmed { border-top-color: #52876a; }
+.ff-review-column > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ff-review-column h2 { margin: 0; font-size: 1.05rem; }
+.ff-review-column > header span { min-width: 24px; text-align: center; font-size: .9rem; }
+.ff-review-column > p { color: #666; font-size: .875rem; line-height: 1.6; }
+.ff-review-column .ff-review-column-empty { margin: 30px 0; text-align: center; color: #777; }
+.ff-review-card { min-width: 0; margin-top: 14px; padding: 18px; border: 1px solid #d5d5d5; border-radius: 8px; background: #fff; box-shadow: 0 2px 5px #00000005; scroll-margin-top: 20px; }
+.ff-review-card-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: #666; font-size: .875rem; }
+.ff-review-card-meta > span { color: #544713; font-weight: 700; }
+.ff-review-card h3 { margin: 14px 0 8px; font-size: 1.05rem; line-height: 1.65; overflow-wrap: anywhere; }
+.ff-review-card > p, .ff-review-card details { font-size: .875rem; color: #666; line-height: 1.7; overflow-wrap: anywhere; }
+.ff-review-card-candidates { display: grid; gap: 8px; margin-top: 16px; }
+.ff-review-card-candidates a { display: grid; gap: 4px; min-height: 44px; padding: 11px 12px; border: 1px solid #ddd; border-radius: 5px; color: #222; text-decoration: none; background: #fafafa; }
+.ff-review-card-candidates a:hover { background: #fff9d6; border-color: #bba137; }
+.ff-review-card-candidates span { font-size: .875rem; color: #666; }
+.ff-review-card-candidates strong { font-size: 1rem; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
+.ff-review-archive-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 16px; }
+.ff-review-archive-list .ff-review-card { margin: 0; }
+.ff-review-card summary { cursor: pointer; padding: 8px 0; }
+.ff-review-archive-notice { margin: 12px 0 20px; padding: 18px; border: 1px solid #bbb; background: #f6f6f6; font-size: 1rem; line-height: 1.7; }
+.ff-review-archive-notice small { font-size: .875rem; color: #666; }
+@media (max-width: 1200px) { .ff-review-archive-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ff-review-kanban { grid-template-columns: repeat(3, minmax(240px, 1fr)); overflow-x: auto; padding-bottom: 12px; } }
+@media (max-width: 700px) { .ff-review-collection { padding: 24px 16px; } .ff-review-kanban, .ff-review-archive-list { grid-template-columns: 1fr; } .ff-review-column { min-height: auto; } }
 .ff-planning-document-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .ff-planning-document-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; border: 1px solid #c9c9c9; border-radius: 6px; font-size: .9rem; color: #222; background: #fff; text-decoration: underline; text-underline-offset: 3px; }
 .ff-planning-baseline, .ff-planning-variation-document { min-width: 0; display: grid; gap: 12px; scroll-margin-top: 24px; }

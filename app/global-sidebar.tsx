@@ -11,6 +11,7 @@ import {
   EyeSlash,
   GearSix,
   House,
+  Kanban,
   ShieldCheck,
   SignOut,
   Star,
@@ -32,7 +33,7 @@ export function GlobalSidebar({
   setupRequired = false,
 }: {
   user: SidebarUser;
-  active: "community" | "preferred" | "studio" | "studio-favorites" | "review" | "legacy" | "canon" | "admin";
+  active: "community" | "preferred" | "studio" | "studio-favorites" | "review" | "review-board" | "review-archive" | "legacy" | "canon" | "admin";
   setupRequired?: boolean;
 }) {
   const router = useRouter();
@@ -177,6 +178,12 @@ export function GlobalSidebar({
             <p>Firefly</p>
             <Link className={active === "review" ? "active" : ""} href="/review" aria-label="검토 대기">
               <ClipboardText size={18} /><span>검토 대기</span>
+            </Link>
+            <Link className={active === "review-board" ? "active" : ""} href="/review/board" aria-label="검토 칸반">
+              <Kanban size={18} /><span>검토 칸반</span>
+            </Link>
+            <Link className={active === "review-archive" ? "active" : ""} href="/review/archive" aria-label="검토 보관함">
+              <Archive size={18} /><span>검토 보관함</span>
             </Link>
             <Link className={active === "legacy" ? "active" : ""} href="/legacy" aria-label="이전 작품">
               <Archive size={18} /><span>이전 작품</span>

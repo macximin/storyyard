@@ -4,7 +4,7 @@ import { validateAppliedReceipt, validateEvaluationAck } from "@/app/firefly-rev
 import { validateFireflyDecisionIntent } from "@/app/firefly-review-decision-intent";
 import { ensureFireflyReviewSnapshot, toFireflyReviewDecisionContract } from "@/app/firefly-review-data";
 import { allSurfaceMatches } from "@/app/firefly-review-contract";
-import { FireflyDecision, getFireflyReviewPacket, SurfaceClassification } from "@/app/firefly-review-packets";
+import { FireflyDecision, getFireflyReviewPacket, getFireflyReviewArchive, SurfaceClassification } from "@/app/firefly-review-packets";
 import { hasDistinctBearerAuthority } from "@/app/firefly-review-service-auth";
 import { getDb } from "@/db";
 import { fireflyReviewDecisions } from "@/db/schema";
@@ -67,6 +67,7 @@ export async function POST(request: Request) {
   }> | null;
   const packet = getFireflyReviewPacket(input?.packetId?.trim() ?? "");
   if (!packet) return Response.json({ error: "등록되지 않은 검토 패킷임." }, { status: 404 });
+  if (getFireflyReviewArchive(packet.packetId)) return Response.json({ error: "보관된 검토입니다. 기존 내용과 판정은 보관함에서 읽을 수 있습니다." }, { status: 409 });
   if (input?.packetSha256 !== packet.packetSha256) {
     return Response.json({ error: "화면의 패킷이 현재 InkOS 스냅샷과 다름. 새로 열어 확인해 줘." }, { status: 409 });
   }

@@ -13,6 +13,7 @@ test(`stores ${decisionVersion} artifact identity and exact candidate hashes as 
   const snapshots = [];
   const columns = new Proxy({}, { get: (_target, key) => key });
   let acknowledgeAttempt = false;
+  let archived = false;
   const db = {
     select() {
       const query = { from: () => query, where: () => query, orderBy: () => query, limit: async () => acknowledgeAttempt ? stored : [] };
@@ -27,7 +28,7 @@ test(`stores ${decisionVersion} artifact identity and exact candidate hashes as 
     "@/app/firefly-review-decision-intent": { validateFireflyDecisionIntent },
     "@/app/firefly-review-data": { ensureFireflyReviewSnapshot: async (value) => { snapshots.push(value); }, toFireflyReviewDecisionContract: (value) => value },
     "@/app/firefly-review-contract": { allSurfaceMatches: () => [] },
-    "@/app/firefly-review-packets": { getFireflyReviewPacket: (id) => id === packet.packetId ? packet : undefined },
+    "@/app/firefly-review-packets": { getFireflyReviewPacket: (id) => id === packet.packetId ? packet : undefined, getFireflyReviewArchive: () => archived ? { packetId: packet.packetId } : undefined },
     "@/app/firefly-review-service-auth": { hasDistinctBearerAuthority: () => acknowledgeAttempt },
     "@/db": { getDb: () => db },
     "@/db/schema": { fireflyReviewDecisions: columns },
@@ -56,6 +57,14 @@ test(`stores ${decisionVersion} artifact identity and exact candidate hashes as 
   assert.equal(stored[0].appliedAt, null);
   assert.equal(stored[0].applyReceiptPath, null);
   assert.equal((await response.json()).decision.artifactId, packet.artifact.id);
+  archived = true;
+  const archivedResponse = await module.exports.POST(new Request("http://localhost/api/firefly/review-decisions", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ packetId: packet.packetId, packetSha256: packet.packetSha256, candidateId: candidate.id, candidateSha256: candidate.sha256, decision: "select", comment: "보관 이후 새 판정 차단" }),
+  }));
+  assert.equal(archivedResponse.status, 409);
+  assert.equal(stored.length, 1);
+  assert.equal(snapshots.length, 1);
   acknowledgeAttempt = true;
   const apply = await module.exports.PATCH(new Request("http://localhost/api/firefly/review-decisions", {
     method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ decisionId: stored[0].id }),

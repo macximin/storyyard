@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { ensureFireflyReviewSnapshot, listFireflyReviewDecisions, toFireflyReviewDecisionContract } from "@/app/firefly-review-data";
-import { listFireflyReviewPackets } from "@/app/firefly-review-packets";
+import { getFireflyReviewArchive, listFireflyReviewPackets } from "@/app/firefly-review-packets";
+import { reviewDetailHref } from "@/app/firefly-review-catalog";
 import { partitionFireflyReviewPackets } from "@/app/firefly-review-queue";
 import { resolvePlanningBaselines } from "@/app/firefly-planning-baseline";
 import { FireflyReviewBoard } from "./review-board";
@@ -24,16 +25,22 @@ export default async function ReviewPage({ searchParams, returnPath }: {
   const user = await requireChatGPTUser(returnTo);
   if (user.role !== "admin") redirect("/");
   const packets = listFireflyReviewPackets();
-  await Promise.all(packets.map(ensureFireflyReviewSnapshot));
-  const decisions = Object.fromEntries(await Promise.all(packets.map(async (packet) => [
+  if (requestedPacket && getFireflyReviewArchive(requestedPacket)) redirect(requestedCandidate ? reviewDetailHref(requestedPacket, requestedCandidate, true) : `/review/archive?packet=${encodeURIComponent(requestedPacket)}`);
+  const requested = packets.find((packet) => packet.packetId === requestedPacket);
+  if (requestedPacket && (!requested || (requestedCandidate && !requested.candidates.some((candidate) => candidate.id === requestedCandidate)))) notFound();
+  const reviewable = packets.filter((packet) => !getFireflyReviewArchive(packet.packetId));
+  await Promise.all(reviewable.map(ensureFireflyReviewSnapshot));
+  const decisions = Object.fromEntries(await Promise.all(reviewable.map(async (packet) => [
     packet.packetId,
     (await listFireflyReviewDecisions(packet.packetId)).map(toFireflyReviewDecisionContract),
   ])));
-  const queue = partitionFireflyReviewPackets(packets, decisions);
+  const queue = partitionFireflyReviewPackets(reviewable, decisions);
+  const selectedCompleted = queue.completed.find((packet) => packet.packetId === requestedPacket);
   return <FireflyReviewBoard
     key={`${requestedPacket ?? ""}:${requestedCandidate ?? ""}`}
     user={user}
-    packets={queue.active}
+    packets={selectedCompleted ? [selectedCompleted] : queue.active}
+    completed={Boolean(selectedCompleted)}
     planningBaselines={resolvePlanningBaselines(packets, new Set(queue.active.map((packet) => packet.packetId)))}
     completedCount={queue.completed.length}
     initialDecisions={decisions}
