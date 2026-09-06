@@ -8,6 +8,7 @@ import { GlobalSidebar, SidebarUser } from "@/app/global-sidebar";
 import { fireflyReviewQueueMetadata } from "@/app/firefly-review-display.mjs";
 import type { FireflyDecision, FireflyHumanPremiseCandidateV4, FireflyPitchReviewCandidateV3, FireflyReviewPacket, FireflySurfaceMatch, SurfaceClassification } from "@/app/firefly-review-packets";
 import type { PlanningBaselineView } from "../firefly-planning-baseline";
+import type { PlanningDocuments } from "../firefly-planning-documents";
 
 type DecisionRow = { decisionId: string; candidateId: string | null; decision: string; comment: string; status: string; createdAt: string };
 type DecisionChoice = FireflyDecision | "";
@@ -28,7 +29,7 @@ const commercialLabels: Record<string, string> = {
   transformationIntegrity: "변형 정합성", styleFidelity: "문체 충실도",
 };
 
-export function FireflyReviewBoard({ user, packets, completedCount, initialDecisions, initialPacketId, initialCandidateId, planningBaselines = {}, archive, completed = false }: {
+export function FireflyReviewBoard({ user, packets, completedCount, initialDecisions, initialPacketId, initialCandidateId, planningBaselines = {}, planningDocuments = {}, archive, completed = false }: {
   user: Exclude<SidebarUser, null>;
   packets: FireflyReviewPacket[];
   completedCount: number;
@@ -36,6 +37,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
   initialPacketId?: string;
   initialCandidateId?: string;
   planningBaselines?: Record<string, PlanningBaselineView>;
+  planningDocuments?: PlanningDocuments;
   archive?: { reason: string; archivedAt: string; invalidated: boolean };
   completed?: boolean;
 }) {
@@ -193,12 +195,11 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
       </nav>
       <div className="firefly-review-grid">
         <section className="candidate-reader">
-          <div className="candidate-reader-head"><div><p className="kicker">{packet.schemaVersion === "firefly_review_packet/v5" ? "OPENING VARIATION" : packet.schemaVersion === "firefly_review_packet/v4" ? "HUMAN PREMISE" : packet.schemaVersion === "firefly_review_packet/v3" ? "기획서" : "CANDIDATE"}</p><h2>{v3Candidate ? "후보 기획서" : packet.work.title}</h2><span>{packet.schemaVersion === "firefly_review_packet/v5" ? `${packet.scope.episodeStart}~${packet.scope.episodeEnd}화 · ${packet.scope.through}` : packet.schemaVersion === "firefly_review_packet/v4" ? "기획 확장 전 사람 욕망 HIL" : packet.schemaVersion === "firefly_review_packet/v3" ? `후보 ${String.fromCharCode(65 + packet.candidates.findIndex((item) => item.id === candidate.id))} · ${packet.work.targetChapters}화 목표` : `${packet.artifact.chapterNumber}화 · ${packet.artifact.title}`}</span></div>
+          <div className="candidate-reader-head"><div><p className="kicker">{packet.schemaVersion === "firefly_review_packet/v5" ? "기획서" : packet.schemaVersion === "firefly_review_packet/v4" ? "HUMAN PREMISE" : packet.schemaVersion === "firefly_review_packet/v3" ? "기획서" : "CANDIDATE"}</p><h2>{v3Candidate || v5Candidate ? "후보 기획서" : packet.work.title}</h2><span>{packet.schemaVersion === "firefly_review_packet/v5" ? `후보 ${String.fromCharCode(65 + packet.candidates.findIndex((item) => item.id === candidate.id))} · ${packet.work.targetChapters}화 목표` : packet.schemaVersion === "firefly_review_packet/v4" ? "기획 확장 전 사람 욕망 HIL" : packet.schemaVersion === "firefly_review_packet/v3" ? `후보 ${String.fromCharCode(65 + packet.candidates.findIndex((item) => item.id === candidate.id))} · ${packet.work.targetChapters}화 목표` : `${packet.artifact.chapterNumber}화 · ${packet.artifact.title}`}</span></div>
             {!v3Candidate && <div className="score-chip"><span>{v5Candidate ? "독립 심사" : "상업성"}</span><strong>{candidateCommercialScore(packet, candidate.id)}</strong></div>}</div>
           <nav className="candidate-tabs" aria-label="후보 선택">{packet.candidates.map((item, index) => <button key={item.id} className={item.id === candidate.id ? "active" : ""} onClick={() => selectCandidate(item.id)}>
             후보 {String.fromCharCode(65 + index)} {!v3Candidate && <span>{candidateCommercialScore(packet, item.id)}</span>}
           </button>)}</nav>
-          {!archive && !completed && v5Candidate && <section className="planning-entry-banner"><div><ShieldCheck size={18} /><strong>초반 구간 변주 방향 선택</strong></div><p>p01을 기준으로, 사건을 바꿔도 주인공의 이익과 읽는 재미가 살아 있는지 비교해 주세요.</p></section>}
           {v4Candidate && <section className="planning-entry-banner">
             <div><ShieldCheck size={18} /><strong>Human Premise · 상업 기획 확장 전 필수 HIL</strong></div>
             <p>회사·돈·지분·권한을 지워도 남는 사람의 욕망, 오늘의 선택, 감정적 지급을 먼저 확인합니다. 선택해도 Book·Arc·Rail·원고는 만들지 않습니다.</p>
@@ -208,13 +209,13 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
             <p>생성 경로와 label 매핑은 숨겼습니다. 선택은 승자 평가 영수증만 남기며 원고·캐논을 적용하지 않습니다.</p>
             <dl><div><dt>Kernel</dt><dd>{packet.comparison.runtime.kernel}</dd></div><div><dt>Model</dt><dd>{packet.comparison.runtime.model} / {packet.comparison.runtime.reasoning}</dd></div><div><dt>Pair receipt</dt><dd>{shortSha(packet.comparison.pairedGenerationReceiptSha256)}</dd></div></dl>
           </section>}
-          {!v3Candidate && packet.recommendation?.candidateId === candidate.id && <p className="recommendation"><Check size={15} /> 추천 후보 · {packet.recommendation.reason}</p>}
+          {!v3Candidate && !v5Candidate && packet.recommendation?.candidateId === candidate.id && <p className="recommendation"><Check size={15} /> 추천 후보 · {packet.recommendation.reason}</p>}
           {v2Candidate && <section className="commercial-dimensions">
             <header><div><p className="kicker">INDEPENDENT REVIEW</p><h3>상업성·감정적 정합성</h3></div><strong>{v2Candidate.review.emotionalCoherence.score.toFixed(1)}</strong></header>
             <div>{Object.entries(v2Candidate.commercialEvaluation).map(([key, value]) => <dl key={key}><dt>{commercialLabels[key] ?? key}</dt><dd>{value.toFixed(1)}</dd></dl>)}</div>
             <p className={v2Candidate.review.contentNeutrality.passed ? "neutrality-pass" : "neutrality-alert"}>허구 내용 중립 {v2Candidate.review.contentNeutrality.passed ? "PASS" : `${v2Candidate.review.contentNeutrality.violations.length}건 확인 필요`} · hard contradiction {v2Candidate.review.canonContradictions.length}건</p>
           </section>}
-          {v5Candidate && packet.schemaVersion === "firefly_review_packet/v5" && <PlanningVariationReview candidate={v5Candidate} packet={packet} baseline={planningBaselines[packet.packetId]} />}
+          {v5Candidate && packet.schemaVersion === "firefly_review_packet/v5" && <PlanningVariationReview candidate={v5Candidate} packet={packet} baseline={planningBaselines[packet.packetId]} document={planningDocuments[packet.packetId]?.[v5Candidate.id]} />}
           {v3Candidate && <PlanningEntryReview key={v3Candidate.id} candidate={v3Candidate} recommendation={packet.recommendation?.candidateId === v3Candidate.id ? packet.recommendation.reason : undefined} />}
           {v4Candidate && packet.schemaVersion === "firefly_review_packet/v4" && <HumanPremiseReview candidate={v4Candidate} packet={packet} />}
           {packet.schemaVersion !== "firefly_review_packet/v3" && packet.schemaVersion !== "firefly_review_packet/v4" && packet.schemaVersion !== "firefly_review_packet/v5" && "body" in candidate && <article className="candidate-prose">{candidate.body}</article>}

@@ -5,6 +5,8 @@ import { getFireflyReviewArchive, listFireflyReviewPackets } from "@/app/firefly
 import { reviewDetailHref } from "@/app/firefly-review-catalog";
 import { partitionFireflyReviewPackets } from "@/app/firefly-review-queue";
 import { resolvePlanningBaselines } from "@/app/firefly-planning-baseline";
+import { resolvePlanningDocuments } from "@/app/firefly-planning-documents";
+import planningDocumentIndex from "@/data/firefly/planning-documents/index.json";
 import { FireflyReviewBoard } from "./review-board";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +44,7 @@ export default async function ReviewPage({ searchParams, returnPath }: {
     packets={selectedCompleted ? [selectedCompleted] : queue.active}
     completed={Boolean(selectedCompleted)}
     planningBaselines={resolvePlanningBaselines(packets, new Set(queue.active.map((packet) => packet.packetId)))}
+    planningDocuments={resolvePlanningDocuments(packets, planningDocumentIndex)}
     completedCount={queue.completed.length}
     initialDecisions={decisions}
     initialPacketId={requestedPacket}

@@ -87,6 +87,10 @@ test("kanban and archive use the same packet identities with exact candidate lin
 test("archived detail preserves text and comments while removing decision controls", async () => {
   const evidence = await component("../app/review/planning-evidence.tsx");
   const variation = await component("../app/review/planning-variation.tsx", { "./planning-evidence": evidence });
+  const legacyVariation = packets.find((p) => p.packetId === "frp-08a029b4381f5a2c61f530b1");
+  const recommended = legacyVariation.candidates.find((c) => c.id === legacyVariation.recommendation.candidateId);
+  const legacyHtml = renderToStaticMarkup(React.createElement(variation.PlanningVariationReview, { packet: legacyVariation, candidate: recommended }));
+  assert.ok(legacyHtml.includes(renderToStaticMarkup(React.createElement("p", null, legacyVariation.recommendation.reason))));
   const { FireflyReviewBoard } = await component("../app/review/review-board.tsx", {
     "@phosphor-icons/react": Phosphor,
     "./planning-evidence": evidence, "./planning-variation": variation,
@@ -108,7 +112,7 @@ test("old review deep links redirect to the exact archived candidate before any 
     "@/app/firefly-review-data": { ensureFireflyReviewSnapshot: () => { throw new Error("Unexpected write"); } },
     "@/app/firefly-review-packets": { listFireflyReviewPackets: () => packets, getFireflyReviewArchive: (id) => archives.get(id) },
     "@/app/firefly-review-catalog": catalog, "@/app/firefly-review-queue": queue,
-    "@/app/firefly-planning-baseline": { resolvePlanningBaselines }, "./review-board": {},
+    "@/app/firefly-planning-baseline": { resolvePlanningBaselines }, "@/app/firefly-planning-documents": { resolvePlanningDocuments: () => ({}) }, "@/data/firefly/planning-documents/index.json": [], "./review-board": {},
   });
   await assert.rejects(ReviewPage({ searchParams: Promise.resolve({ packet: oldPlan.packetId, candidate: "p01" }) }), { message: `REDIRECT ${catalog.reviewDetailHref(oldPlan.packetId, "p01", true)}` });
 });
@@ -121,7 +125,7 @@ test("confirmed kanban links keep the exact requested packet in read-only mode",
     "@/app/firefly-review-data": { ensureFireflyReviewSnapshot: async () => {}, listFireflyReviewDecisions: async (id) => id === done.packetId ? [{ status: "applied" }] : [], toFireflyReviewDecisionContract: (row) => row },
     "@/app/firefly-review-packets": { listFireflyReviewPackets: () => [current, done], getFireflyReviewArchive: () => undefined },
     "@/app/firefly-review-catalog": catalog, "@/app/firefly-review-queue": queue,
-    "@/app/firefly-planning-baseline": { resolvePlanningBaselines }, "./review-board": { FireflyReviewBoard: () => null },
+    "@/app/firefly-planning-baseline": { resolvePlanningBaselines }, "@/app/firefly-planning-documents": { resolvePlanningDocuments: () => ({}) }, "@/data/firefly/planning-documents/index.json": [], "./review-board": { FireflyReviewBoard: () => null },
   });
   const result = await ReviewPage({ searchParams: Promise.resolve({ packet: done.packetId, candidate: done.candidates[0].id }) });
   assert.deepEqual(result.props.packets.map((packet) => packet.packetId), [done.packetId]);
@@ -138,7 +142,7 @@ test("archive server detail checks admin and candidate identity and only reads h
     "@/app/chatgpt-auth": { requireChatGPTUser: async () => ({ ...user, role }) },
     "@/app/firefly-review-data": { listFireflyReviewDecisions: async () => { reads++; return []; }, toFireflyReviewDecisionContract: (row) => row },
     "@/app/firefly-review-packets": { listStoredFireflyReviewPackets: () => packets, getFireflyReviewArchive: (id) => archives.get(id), getFireflyReviewInvalidation: (id) => invalidations.find((item) => item.packetId === id) },
-    "@/app/firefly-review-catalog": catalog, "@/app/firefly-planning-baseline": { resolvePlanningBaselines },
+    "@/app/firefly-review-catalog": catalog, "@/app/firefly-planning-baseline": { resolvePlanningBaselines }, "@/app/firefly-planning-documents": { resolvePlanningDocuments: () => ({}) }, "@/data/firefly/planning-documents/index.json": [],
     "../review-board": { FireflyReviewBoard: () => null }, "../collection": {},
   });
   await assert.rejects(ArchivedReviewDetail({ packetId: oldPlan.packetId, candidateId: "p01" }), /REDIRECT \//);

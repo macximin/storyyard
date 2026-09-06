@@ -1,5 +1,6 @@
 import type { FireflyVariationReviewCandidateV5, FireflyVariationReviewPacketV5 } from "../firefly-variation-review-contract";
 import type { PlanningBaselineView } from "../firefly-planning-baseline";
+import type { PlanningDocument } from "../firefly-planning-documents";
 import { PlanningProjectPlan, planningSectionTitles } from "./planning-evidence";
 
 export const variationVerdictLabels = { ready: "검토 준비됨", revise: "수정 필요", reject: "반려 의견" };
@@ -17,8 +18,8 @@ const relatedVariationSections: Record<number, string[]> = {
   9: ["배치와 남은 판단"],
 };
 
-export function PlanningVariationReview({ candidate, packet, baseline }: {
-  candidate: FireflyVariationReviewCandidateV5; packet: FireflyVariationReviewPacketV5; baseline?: PlanningBaselineView;
+export function PlanningVariationReview({ candidate, packet, baseline, document }: {
+  candidate: FireflyVariationReviewCandidateV5; packet: FireflyVariationReviewPacketV5; baseline?: PlanningBaselineView; document?: PlanningDocument;
 }) {
   const review = candidate.independentReview;
   const variationPrefix = `variation-${packet.packetId}-${candidate.id}`;
@@ -29,6 +30,17 @@ export function PlanningVariationReview({ candidate, packet, baseline }: {
     return index < 0 ? [] : [{ sectionNumber: Number(number), label: title, href: `#${variationPrefix}-${index}` }];
   }));
   const checks = [["원문 사실", review.sourceAccuracy], ["자기 이익 우선", review.selfInterest], ["선행 조건·후속 인과", review.causalCoherence], ["사건 변주의 실질", review.variationQuality]] as const;
+  const completePlan = document?.projectPlan.markdown ?? (/^#{1,2}\s+9\./mu.test(candidate.markdown) ? candidate.markdown : undefined);
+  if (completePlan) return <div className="planning-entry-review">
+    <PlanningProjectPlan markdown={completePlan} title={candidate.title} idPrefix={`project-plan-${packet.packetId}-${candidate.id}`} />
+    <details className="commercial-promise-card">
+      <summary>독립 심사 · {variationVerdictLabels[review.verdict]}</summary>
+      {packet.recommendation?.candidateId === candidate.id && <p>{packet.recommendation.reason}</p>}
+      <div className="planning-comparison-list">{checks.map(([label, check]) => <article key={label}><h4>{label} · {check.passed ? "PASS" : "FAIL"}</h4><p>{check.evidence}</p></article>)}</div>
+      <h4>읽는 재미 · {review.readingPleasure.assessment}</h4><p>{review.readingPleasure.evidence}</p>
+      <h4>필요한 수정</h4><p>{review.requiredRepair}</p>
+    </details>
+  </div>;
   return <div className="planning-entry-review">
     <section className="planning-promise">
       <p className="kicker">OPENING VARIATION</p><h3>{candidate.title}</h3>
@@ -58,6 +70,7 @@ export function PlanningVariationReview({ candidate, packet, baseline }: {
     </div> : <aside className="ff-planning-baseline-notice"><strong>기준 전체 기획서를 불러올 수 없습니다.</strong><p>현재는 초반 변주안만 표시합니다. 제목이 같은 다른 기획서로 대신하지 않습니다.</p></aside>}
     <details className="commercial-promise-card">
       <summary>독립 심사 · {variationVerdictLabels[review.verdict]}</summary>
+      {packet.recommendation?.candidateId === candidate.id && <p>{packet.recommendation.reason}</p>}
       <div className="planning-comparison-list">{checks.map(([label, check]) => <article key={label}><h4>{label} · {check.passed ? "PASS" : "FAIL"}</h4><p>{check.evidence}</p></article>)}</div>
       <h4>읽는 재미 · {review.readingPleasure.assessment}</h4><p>{review.readingPleasure.evidence}</p>
       <h4>필요한 수정</h4><p>{review.requiredRepair}</p>

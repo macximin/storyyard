@@ -3,6 +3,8 @@ import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { listFireflyReviewDecisions, toFireflyReviewDecisionContract } from "@/app/firefly-review-data";
 import { getFireflyReviewArchive, getFireflyReviewInvalidation, listStoredFireflyReviewPackets } from "@/app/firefly-review-packets";
 import { resolvePlanningBaselines } from "@/app/firefly-planning-baseline";
+import { resolvePlanningDocuments } from "@/app/firefly-planning-documents";
+import planningDocumentIndex from "@/data/firefly/planning-documents/index.json";
 import { reviewDetailHref } from "@/app/firefly-review-catalog";
 import { FireflyReviewBoard } from "../review-board";
 
@@ -15,5 +17,5 @@ export async function ArchivedReviewDetail({ packetId, candidateId }: { packetId
   if (!packet || !archive || !packet.candidates.some((candidate) => candidate.id === candidateId)) notFound();
   const decisions = (await listFireflyReviewDecisions(packetId)).map(toFireflyReviewDecisionContract);
   const invalidation = getFireflyReviewInvalidation(packetId);
-  return <FireflyReviewBoard user={user} packets={[packet]} completedCount={0} initialPacketId={packetId} initialCandidateId={candidateId} initialDecisions={{ [packetId]: decisions }} planningBaselines={resolvePlanningBaselines(packets, new Set())} archive={{ ...archive, reason: invalidation ? `${archive.reason} 무효 사유: ${invalidation.reason}` : archive.reason, invalidated: Boolean(invalidation) }} />;
+  return <FireflyReviewBoard user={user} packets={[packet]} completedCount={0} initialPacketId={packetId} initialCandidateId={candidateId} initialDecisions={{ [packetId]: decisions }} planningBaselines={resolvePlanningBaselines(packets, new Set())} planningDocuments={resolvePlanningDocuments(packets, planningDocumentIndex)} archive={{ ...archive, reason: invalidation ? `${archive.reason} 무효 사유: ${invalidation.reason}` : archive.reason, invalidated: Boolean(invalidation) }} />;
 }
