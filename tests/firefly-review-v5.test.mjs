@@ -11,6 +11,7 @@ import { variationReviewHash } from "../app/firefly-variation-review-contract.ts
 import { validateFireflyDecisionIntent } from "../app/firefly-review-decision-intent.ts";
 import { buildFireflyReviewPacketStaticIndex, validateFireflyReviewPacketStaticIndex } from "../app/firefly-review-packet-index.mjs";
 import { fireflyReviewQueueMetadata } from "../app/firefly-review-display.mjs";
+import { resolvePlanningBaselines } from "../app/firefly-planning-baseline.ts";
 
 const bytes = await readFile(new URL("./fixtures/planning-variation-review-v5.json", import.meta.url), "utf8");
 const fixture = () => JSON.parse(bytes);
@@ -179,4 +180,65 @@ test("actual planning opens with the document and keeps technical audits folded 
   assert.match(html, /양식을 사람이 읽기 쉽게 정리해 줘/);
   assert.match(html, /기획서 양식이 싫어/);
   assert.doesNotMatch(html, /type="radio"[^>]*checked/);
+});
+
+async function actualPlanningPair() {
+  return Promise.all(["frp-30945a8618f92b17b5069c1c", "frp-cc93f2bb015349cd5413aa0e"].map(async (id) =>
+    validateFireflyReviewPacket(JSON.parse(await readFile(new URL(`../data/firefly/review-packets/immutable/${id}.json`, import.meta.url), "utf8")))));
+}
+
+test("binds the exact baseline document without mistaking a projection SHA or a matching title", async () => {
+  const [variant, plan] = await actualPlanningPair();
+  const before = JSON.stringify([variant, plan]);
+  const resolved = resolvePlanningBaselines([variant, plan])[variant.packetId];
+  assert.equal(resolved.markdown, plan.candidates[0].projectPlan.markdown);
+  assert.equal(resolved.reviewHref, `/review/${plan.packetId}/p01`);
+  assert.notEqual(variant.baseline.candidateSha256, plan.candidates[0].sha256);
+  for (const change of [
+    (p) => { p.baseline.planSha256 = "0".repeat(64); },
+    (p) => { p.baseline.slateId = "another-slate"; },
+    (p) => { p.baseline.candidateId = "another-candidate"; },
+  ]) {
+    const stale = structuredClone(variant); change(stale);
+    assert.equal(resolvePlanningBaselines([stale, plan])[stale.packetId], undefined);
+  }
+  const changedPlan = structuredClone(plan); changedPlan.candidates[0].projectPlan.markdown += "\n";
+  assert.equal(resolvePlanningBaselines([variant, changedPlan])[variant.packetId], undefined);
+  const completed = resolvePlanningBaselines([variant, plan], new Set([variant.packetId]))[variant.packetId];
+  assert.equal(completed.markdown, resolved.markdown);
+  assert.equal(completed.reviewHref, undefined);
+  assert.equal(JSON.stringify([variant, plan]), before);
+});
+
+test("keeps all nine baseline sections visible and links each to the current unselected variation", async () => {
+  const [packet, plan] = await actualPlanningPair();
+  const baselines = resolvePlanningBaselines([packet, plan]);
+  const evidence = await component("../app/review/planning-evidence.tsx");
+  const variation = await component("../app/review/planning-variation.tsx", { "./planning-evidence": evidence });
+  const board = await component("../app/review/review-board.tsx", {
+    "@phosphor-icons/react": Phosphor,
+    "./planning-evidence": evidence, "./planning-variation": variation,
+    "@/app/global-sidebar": { GlobalSidebar: () => null },
+    "@/app/firefly-review-display.mjs": { fireflyReviewQueueMetadata },
+  });
+  for (const candidate of packet.candidates) {
+    const html = renderToStaticMarkup(React.createElement(board.FireflyReviewBoard, {
+      user: { id: "test", email: "test@example.invalid", role: "admin" }, packets: [packet, plan], completedCount: 0,
+      planningBaselines: baselines, initialDecisions: {}, initialPacketId: packet.packetId, initialCandidateId: candidate.id,
+    }));
+    assert.ok(html.indexOf("<h3>전체 기획서 · 수정 전 기준안</h3>") < html.indexOf("<h3>초반 구간 변주안</h3>"));
+    assert.match(html, /작품의 육하원칙/);
+    assert.match(html, /이번 변주가 아직 반영되지 않았습니다/);
+    assert.match(html, /통합 기획서는 방향 선택 후 같은 양식/);
+    assert.equal((html.match(/class="ff-plan-revision-links"/gu) ?? []).length, 9);
+    const anchors = [...html.matchAll(/href="#(variation-[^"]+)"/gu)].map((match) => match[1]);
+    assert.ok(anchors.length >= 17);
+    for (const anchor of anchors) {
+      assert.ok(anchor.includes(`-${candidate.id}`));
+      assert.ok(html.includes(`id="${anchor}"`), anchor);
+    }
+    assert.match(html, /이 변주 방향 선택/);
+    assert.doesNotMatch(html, /type="radio"[^>]*checked/);
+    assert.match(html, /<details[^>]*><summary>독립 심사/);
+  }
 });

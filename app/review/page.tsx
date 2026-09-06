@@ -3,6 +3,7 @@ import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { ensureFireflyReviewSnapshot, listFireflyReviewDecisions, toFireflyReviewDecisionContract } from "@/app/firefly-review-data";
 import { listFireflyReviewPackets } from "@/app/firefly-review-packets";
 import { partitionFireflyReviewPackets } from "@/app/firefly-review-queue";
+import { resolvePlanningBaselines } from "@/app/firefly-planning-baseline";
 import { FireflyReviewBoard } from "./review-board";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ export default async function ReviewPage({ searchParams, returnPath }: {
     key={`${requestedPacket ?? ""}:${requestedCandidate ?? ""}`}
     user={user}
     packets={queue.active}
+    planningBaselines={resolvePlanningBaselines(packets, new Set(queue.active.map((packet) => packet.packetId)))}
     completedCount={queue.completed.length}
     initialDecisions={decisions}
     initialPacketId={requestedPacket}

@@ -96,8 +96,11 @@ function planBlocks(markdown: string): { content: ReactNode[]; notes: ReactNode[
   return { content, notes };
 }
 
-export function PlanningProjectPlan({ markdown, title = "작품 기획서", kicker = "PROJECT PLAN" }: { markdown: string; title?: string; kicker?: string }) {
-  const prefix = `plan-${useId().replace(/[^a-zA-Z0-9_-]/gu, "")}`;
+export function planningSectionTitles(markdown: string): string[] {
+  return splitPlanningSections(markdown).map((section) => section.title);
+}
+
+function splitPlanningSections(markdown: string): Array<{ title: string; lines: string[] }> {
   const sections: Array<{ title: string; lines: string[] }> = [];
   let inCode = false;
   for (const line of markdown.replace(/\r\n/gu, "\n").split("\n")) {
@@ -109,6 +112,16 @@ export function PlanningProjectPlan({ markdown, title = "작품 기획서", kick
       sections[sections.length - 1].lines.push(line);
     }
   }
+  return sections;
+}
+
+export function PlanningProjectPlan({ markdown, title = "작품 기획서", kicker = "PROJECT PLAN", idPrefix, sectionLinks = [] }: {
+  markdown: string; title?: string; kicker?: string; idPrefix?: string;
+  sectionLinks?: Array<{ sectionNumber: number; label: string; href: string }>;
+}) {
+  const uniqueId = useId();
+  const prefix = idPrefix ?? `plan-${uniqueId.replace(/[^a-zA-Z0-9_-]/gu, "")}`;
+  const sections = splitPlanningSections(markdown);
   const numbered = sections.filter((section) => section.title);
   return <section className="planning-project-plan commercial-promise-card">
     <p className="kicker">{kicker === "PROJECT PLAN" ? "작품 기획" : kicker}</p><h3>{title}</h3>
@@ -118,6 +131,9 @@ export function PlanningProjectPlan({ markdown, title = "작품 기획서", kick
       const heading = /^(\d+)\.\s*(.*)$/u.exec(section.title);
       return <section key={index} id={`${prefix}-${index}`} className="ff-plan-section">
         {section.title && <header className="ff-plan-section-head">{heading && <span className="ff-plan-section-number" aria-hidden="true">{heading[1].padStart(2, "0")}</span>}{index === 0 && !heading ? <p className="ff-plan-section-subtitle">{inline(section.title)}</p> : <h4>{heading ? heading[2] : section.title}</h4>}</header>}
+        {heading && sectionLinks.some((link) => link.sectionNumber === Number(heading[1])) && <aside className="ff-plan-revision-links" aria-label={`${section.title} 관련 수정안`}>
+          <strong>기준안 · 수정 전</strong><span>관련 수정안:</span>{sectionLinks.filter((link) => link.sectionNumber === Number(heading[1])).map((link) => <a key={link.href} href={link.href}>{link.label}</a>)}
+        </aside>}
         {rendered.content}
         {rendered.notes.length > 0 && <details className="ff-plan-note ff-plan-notes"><summary>제작·검토 주석 {rendered.notes.length}개</summary>{rendered.notes}</details>}
       </section>;

@@ -7,6 +7,7 @@ import { ArrowRight, Check, Clock, Eye, LockKey, MagicWand, Pause, ShieldCheck, 
 import { GlobalSidebar, SidebarUser } from "@/app/global-sidebar";
 import { fireflyReviewQueueMetadata } from "@/app/firefly-review-display.mjs";
 import type { FireflyDecision, FireflyHumanPremiseCandidateV4, FireflyPitchReviewCandidateV3, FireflyReviewPacket, FireflySurfaceMatch, SurfaceClassification } from "@/app/firefly-review-packets";
+import type { PlanningBaselineView } from "../firefly-planning-baseline";
 
 type DecisionRow = { decisionId: string; candidateId: string | null; decision: string; comment: string; status: string; createdAt: string };
 type DecisionChoice = FireflyDecision | "";
@@ -27,13 +28,14 @@ const commercialLabels: Record<string, string> = {
   transformationIntegrity: "변형 정합성", styleFidelity: "문체 충실도",
 };
 
-export function FireflyReviewBoard({ user, packets, completedCount, initialDecisions, initialPacketId, initialCandidateId }: {
+export function FireflyReviewBoard({ user, packets, completedCount, initialDecisions, initialPacketId, initialCandidateId, planningBaselines = {} }: {
   user: Exclude<SidebarUser, null>;
   packets: FireflyReviewPacket[];
   completedCount: number;
   initialDecisions: Record<string, DecisionRow[]>;
   initialPacketId?: string;
   initialCandidateId?: string;
+  planningBaselines?: Record<string, PlanningBaselineView>;
 }) {
   const [packetIndex, setPacketIndex] = useState(() => Math.max(0, packets.findIndex((item) => item.packetId === initialPacketId)));
   const packet = packets[packetIndex] ?? null;
@@ -205,7 +207,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
             <div>{Object.entries(v2Candidate.commercialEvaluation).map(([key, value]) => <dl key={key}><dt>{commercialLabels[key] ?? key}</dt><dd>{value.toFixed(1)}</dd></dl>)}</div>
             <p className={v2Candidate.review.contentNeutrality.passed ? "neutrality-pass" : "neutrality-alert"}>허구 내용 중립 {v2Candidate.review.contentNeutrality.passed ? "PASS" : `${v2Candidate.review.contentNeutrality.violations.length}건 확인 필요`} · hard contradiction {v2Candidate.review.canonContradictions.length}건</p>
           </section>}
-          {v5Candidate && packet.schemaVersion === "firefly_review_packet/v5" && <PlanningVariationReview candidate={v5Candidate} packet={packet} />}
+          {v5Candidate && packet.schemaVersion === "firefly_review_packet/v5" && <PlanningVariationReview candidate={v5Candidate} packet={packet} baseline={planningBaselines[packet.packetId]} />}
           {v3Candidate && <PlanningEntryReview key={v3Candidate.id} candidate={v3Candidate} recommendation={packet.recommendation?.candidateId === v3Candidate.id ? packet.recommendation.reason : undefined} />}
           {v4Candidate && packet.schemaVersion === "firefly_review_packet/v4" && <HumanPremiseReview candidate={v4Candidate} packet={packet} />}
           {packet.schemaVersion !== "firefly_review_packet/v3" && packet.schemaVersion !== "firefly_review_packet/v4" && packet.schemaVersion !== "firefly_review_packet/v5" && "body" in candidate && <article className="candidate-prose">{candidate.body}</article>}
