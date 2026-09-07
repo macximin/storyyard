@@ -1,8 +1,9 @@
+import {pageCanaries} from "@/app/firefly-canary-catalog.mjs";
 import {eq,desc} from "drizzle-orm";
 import {runtimeSecret} from "@/app/chatgpt-auth";
 import {hasDistinctBearerAuthority} from "@/app/firefly-review-service-auth";
-import {listPlanningCanaries,getPlanningCanary} from "@/app/firefly-canaries";
-import {hashText,validateCanary} from "@/app/firefly-canary-contract.mjs";
+import {listPlanningCanaries,getPlanningCanary,getCanaryLifecycle} from "@/app/firefly-canaries";
+import {hashText,validateCanary,contentIssues} from "@/app/firefly-canary-contract.mjs";
 import {getDb} from "@/db";
 import {fireflyReviewSnapshots,fireflyReviewDecisions} from "@/db/schema";
 
@@ -23,6 +24,7 @@ export async function POST(request:Request){
  const digest=hashText(JSON.stringify(c));
  const previous=await getPlanningCanary(c.id);
  if(previous){const same=hashText(JSON.stringify(previous))===digest;return Response.json({id:c.id,duplicate:same,error:same?undefined:"Immutable ID conflict"},{status:same?200:409,headers});}
+ if(c.state==='complete'&&contentIssues(c.markdown).length)return Response.json({error:'Complete plan has empty required content',issues:contentIssues(c.markdown)},{status:400,headers});
  await getDb().insert(fireflyReviewSnapshots).values({packetId:c.id,packetSha256:digest,schemaVersion:c.schemaVersion,bookId:c.batchId,artifactId:c.id,title:c.title,payload:JSON.stringify(c),sourceRevision:c.inputSha256,generatedAt:c.generatedAt,importedAt:new Date().toISOString()}).onConflictDoNothing();
  const saved=await getPlanningCanary(c.id);if(!saved||hashText(JSON.stringify(saved))!==digest)return Response.json({error:"Concurrent conflict"},{status:409,headers});
  return Response.json({id:c.id,outputSha256:c.outputSha256,reviewUrl:`/review/canary/${c.id}`},{status:201,headers});
@@ -34,11 +36,15 @@ export async function GET(request:Request){
   const decisions=await getDb().select().from(fireflyReviewDecisions).orderBy(desc(fireflyReviewDecisions.createdAt)).limit(1000);
   return Response.json({decisions,coverage:"review-and-canary",truncated:decisions.length===1000},{headers});
  }
- if(params.get("view")==="inventory")return Response.json({canaries:await listPlanningCanaries(true)},{headers});
+ if(params.get("view")==="inventory"){
+  let page;try{page=pageCanaries(await listPlanningCanaries(true),{cursor:params.get('cursor')||'',date:params.get('date')||'',route:params.get('route')||'',limit:Number(params.get('limit')||100)});}catch{return Response.json({error:'Invalid cursor'},{status:400,headers});}
+  const canaries=await Promise.all(page.items.map(async (c:{id:string;lifecycle:unknown})=>({...await getPlanningCanary(c.id),lifecycle:c.lifecycle})));
+  return Response.json({canaries,nextCursor:page.nextCursor,total:page.total},{headers});
+ }
  const id=params.get("id");
  if(id){const c=await getPlanningCanary(id);if(!c)return Response.json({error:"Not found"},{status:404,headers});
   const decisions=await getDb().select().from(fireflyReviewDecisions).where(eq(fireflyReviewDecisions.packetId,id)).orderBy(desc(fireflyReviewDecisions.createdAt));
-  return Response.json({canary:c,decisions},{headers});}
+  return Response.json({canary:c,decisions,lifecycle:await getCanaryLifecycle(id)},{headers});}
  const rows=await getDb().select().from(fireflyReviewDecisions).where(eq(fireflyReviewDecisions.schemaVersion,"firefly-canary-decision/v1")).orderBy(desc(fireflyReviewDecisions.createdAt)).limit(100);
  return Response.json({decisions:rows},{headers});
 }

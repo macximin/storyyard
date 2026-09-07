@@ -239,7 +239,18 @@ export const fireflyReviewSnapshots = sqliteTable("firefly_review_snapshots", {
 }, (table) => [
   uniqueIndex("firefly_review_snapshots_sha_unique").on(table.packetSha256),
   index("firefly_review_snapshots_book_generated_idx").on(table.bookId, table.generatedAt),
+  index("firefly_review_snapshots_schema_generated_idx").on(table.schemaVersion, table.generatedAt, table.packetId),
 ]);
+
+// Mutable review visibility only. Immutable planning bodies and HIL stay separate.
+export const fireflyCanaryArchives = sqliteTable("firefly_canary_archives", {
+  canaryId: text("canary_id").primaryKey(),
+  archived: integer("archived", {mode:"boolean"}).notNull(),
+  reason: text("reason").notNull(),
+  replacementId: text("replacement_id"),
+  actorUserId: text("actor_user_id").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
 
 export const fireflyReviewDecisions = sqliteTable("firefly_review_decisions", {
   id: text("id").primaryKey(),

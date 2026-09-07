@@ -9,6 +9,35 @@ export function formatIssues(markdown) {
  for(const w of ["WHO","WHAT","HOW","WHERE","WHEN","WHY"]) if(!new RegExp(`\\b${w}\\b`).test(body)) issues.push(`${w} 확인 필요`);
  return issues;
 }
+// New submissions must contain answers; legacy immutable snapshots retain their validation.
+export function contentIssues(markdown){
+ const text=markdown.replace(/<!--[\s\S]*?-->/g,''),issues=formatIssues(text);
+ const sections=[...text.matchAll(/^#{1,2}\s+(\d+)\.\s+(.+)$/gmu)];
+ const plain=s=>s.replace(/[`*_#|>~:\-\s]/g,'');
+ for(let i=0;i<sections.length;i++){
+  const s=sections[i],body=text.slice(s.index+s[0].length,sections[i+1]?.index??text.length);
+  const bodyLines=body.split('\n');
+  const hasContent=bodyLines.some((line,n)=>{
+   if(!plain(line)||line.trim().startsWith('#')||/^\s*\*\*[^*]+\*\*\s*[:：]?\s*$/.test(line))return false;
+   if(line.includes('|')&&/^[\s|:\-]+$/.test(bodyLines[n+1]||''))return false;
+   return true;
+  });
+  if(!hasContent)issues.push(`${s[1]}절 본문 확인 필요`);
+  if(s[1]==='2')for(const word of ['WHO','WHAT','HOW','WHERE','WHEN','WHY']){
+   const lines=body.split('\n');let answered=false;
+   for(let n=0;n<lines.length;n++){
+    const line=lines[n];if(!new RegExp(`\\b${word}\\b`).test(line))continue;
+    if((line.match(/\b(?:WHO|WHAT|HOW|WHERE|WHEN|WHY)\b/g)||[]).length!==1)continue;
+    const tail=line.split(word)[1];let table=line.trim();if(table.startsWith('|'))table=table.slice(1);if(table.endsWith('|'))table=table.slice(0,-1);const cells=table.split('|');
+    const value=line.includes('|')?cells.at(-1):tail.includes(':')?tail.slice(tail.indexOf(':')+1):tail.includes('：')?tail.slice(tail.indexOf('：')+1):lines.slice(n+1).join('\n').split(/\b(?:WHO|WHAT|HOW|WHERE|WHEN|WHY)\b|^#/m)[0];
+    if(plain(value)&&!/^\s*\[[^\]]+\]\s*$/.test(value))answered=true;
+   }
+   if(!answered)issues.push(`${word} 답변 확인 필요`);
+  }
+ }
+ if(/\[(?:제목|작품명|가제|로그라인|주인공|내용|작성|기입)\]/.test(text))issues.push('양식 자리표시자 확인 필요');
+ return issues;
+}
 export function validateCanary(c) {
  if(!c || c.schemaVersion!=="firefly-planning-canary/v1" || !/^fcp-[a-f0-9]{24}$/.test(c.id)) throw new Error("Invalid canary identity");
  if(typeof c.markdown!=="string" || c.markdown.length>100000 || hashText(c.markdown)!==c.outputSha256) throw new Error("Canary content hash mismatch");

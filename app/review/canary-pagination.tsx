@@ -1,0 +1,4 @@
+export function CanaryPagination({base,date='',route='',nextCursor,total}:{base:string;date?:string;route?:string;nextCursor:string|null;total:number}){
+ const query=new URLSearchParams({...(date?{date}:{}),...(route?{route}:{})});if(nextCursor)query.set('cursor',nextCursor);
+ return <div className="commercial-promise-card"><form action={base} method="get" style={{display:'flex',gap:'1rem',flexWrap:'wrap',alignItems:'end'}}><label>실행일<input type="date" name="date" defaultValue={date}/></label><label>작성 경로<select name="route" defaultValue={route}><option value="">전체</option>{['astra','grok-cli','gemini-cli','chatgpt-web','grok-web','gemini-web'].map(x=><option key={x}>{x}</option>)}</select></label><button type="submit">찾기</button><a href={base}>전체 보기</a></form><p>기획서 {total}건{nextCursor&&<> · <a href={`${base}?${query}`}>다음 기획서 →</a></>}</p></div>;
+}

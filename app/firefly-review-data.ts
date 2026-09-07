@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { fireflyReviewDecisions, fireflyReviewSnapshots } from "@/db/schema";
 import type { FireflyReviewPacket } from "./firefly-review-packets";
@@ -78,4 +78,10 @@ function parseSurfaceClassifications(value: string): unknown[] {
   } catch {
     return [];
   }
+}
+
+export async function listDecisionsForPackets(ids:string[]){
+ if(!ids.length)return new Map<string,FireflyReviewDecisionRecord[]>();
+ const rows=await getDb().select().from(fireflyReviewDecisions).where(inArray(fireflyReviewDecisions.packetId,ids)).orderBy(desc(fireflyReviewDecisions.createdAt));
+ const grouped=new Map<string,FireflyReviewDecisionRecord[]>();for(const row of rows)grouped.set(row.packetId,[...(grouped.get(row.packetId)||[]),row]);return grouped;
 }

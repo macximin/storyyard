@@ -7,6 +7,7 @@ import * as Phosphor from "@phosphor-icons/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import * as catalog from "../app/firefly-review-catalog.ts";
+import * as canaryCatalog from "../app/firefly-canary-catalog.mjs";
 import * as queue from "../app/firefly-review-queue.ts";
 import { mergeFireflyReviewPackets, validateFireflyReviewPacketStaticIndex } from "../app/firefly-review-packet-index.mjs";
 import { validateFireflyReviewPacket } from "../app/firefly-review-contract.ts";
@@ -68,7 +69,7 @@ test("kanban derives receipt states without turning a human opinion into complet
 
 test("kanban and archive use the same packet identities with exact candidate links", async () => {
   const { ReviewCollection } = await component("../app/review/collection.tsx", {
-    "./canary-card": await component("../app/review/canary-card.tsx"),
+    "./canary-card": await component("../app/review/canary-card.tsx",{"../firefly-canary-catalog.mjs":canaryCatalog}),
     "../global-sidebar": { GlobalSidebar: () => null }, "../firefly-review-catalog": catalog,
     "../firefly-review-display.mjs": { fireflyReviewQueueMetadata },
   });
