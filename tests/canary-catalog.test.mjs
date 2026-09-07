@@ -5,12 +5,14 @@ test('KST execution dates and mixed timestamp formats keep every card reachable'
  const cards=['2026-09-07T17:00:00Z','2026-09-07T17:00:00+00:00','2026-09-07T17:00:00.000Z','2026-09-07T17:00:00.000001+00:00'].map((generatedAt,i)=>({id:String(i),generatedAt,author:{route:'astra'}}));
  let cursor='',seen=[];do{const page=pageCanaries(cards,{cursor,limit:1,date:'2026-09-08'});seen.push(...page.items.map(x=>x.id));cursor=page.nextCursor;}while(cursor);
  assert.equal(new Set(seen).size,4);assert.equal(pageCanaries(cards,{date:'2026-09-07'}).total,0);
+ const recovered={...cards[0],batchId:'sentinel-canary-20260907',generatedAt:'2026-09-08T00:00:00Z'};assert.equal(pageCanaries([recovered],{date:'2026-09-07'}).total,1);
 });
 test('all 165 cards remain reachable with tied timestamps and filters',()=>{
  const cards=Array.from({length:165},(_,i)=>({id:String(i).padStart(4,'0'),generatedAt:'2026-09-08T00:00:00Z',author:{route:i%2?'astra':'grok-web'}}));
  let cursor='',seen=[];do{const page=pageCanaries(cards,{cursor,limit:30});seen.push(...page.items.map(x=>x.id));cursor=page.nextCursor;}while(cursor);
  assert.equal(seen.length,165);assert.equal(new Set(seen).size,165);
- assert.equal(pageCanaries(cards,{route:'astra'}).total,82);assert.equal(pageCanaries(cards,{date:'2026-09-07'}).total,0);assert.throws(()=>pageCanaries(cards,{cursor:'bad'}));
+ assert.equal(pageCanaries(cards,{route:'astra'}).total,82);assert.equal(pageCanaries(cards,{date:'2026-09-07'}).total,0);
+ const recovered={...cards[0],batchId:'sentinel-canary-20260907',generatedAt:'2026-09-08T00:00:00Z'};assert.equal(pageCanaries([recovered],{date:'2026-09-07'}).total,1);assert.throws(()=>pageCanaries(cards,{cursor:'bad'}));
 });
 test('receipt shows actual rotated sources and process attempts',()=>{
  const c={receipt:{input:{sources:[{title:'실제 참고작'}]},process:{status:'process_completed'},web:{conversationUrl:'https://grok.com/c/test'},previousAttempts:[{status:'failed'}],presentationRecovery:{originalId:'old'}}};
