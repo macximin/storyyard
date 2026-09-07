@@ -33,3 +33,15 @@ test('new complete submissions require answers beyond table headings and labels'
  const empty=Array.from({length:9},(_,i)=>`## ${i+1}. 제목\n${i===1?words.map(w=>`| ${w} | 구체화할 질문 | |`).join('\n'):'| 항목 | 기입 |\n| --- | --- |'}`).join('\n');
  const issues=contentIssues(empty);for(const w of words)assert.ok(issues.includes(`${w} 답변 확인 필요`));assert.ok(issues.includes('1절 본문 확인 필요'));
 });
+test('filled six-W brackets are content while template placeholders stay incomplete',()=>{
+ const words=['WHO','WHAT','HOW','WHERE','WHEN','WHY'];
+ const document=answers=>Array.from({length:9},(_,i)=>`## ${i+1}. 제목\n${i===1?words.map((w,n)=>`| **${w} — 질문** | 구체화할 질문 | ${answers[n]} |`).join('\n'):'주인공의 선택과 실제 결과가 이어진다.'}`).join('\n');
+ const filled=['[투자 경험을 가진 주인공이 친척들과 후계 경쟁을 한다.]','[남에게 빼앗기지 않는 자기 자본을 구축한다.]','[회귀로 얻은 미래 정보로 위기 자산을 선점하고 수익을 얻는다.]','[서울 금융가와 기업 인수 현장에서 움직인다.]','[경제 위기가 시작되기 직전에 첫 투자를 준비한다.]','[다시는 자신의 성과를 빼앗기고 싶지 않기 때문이다.]'];
+ assert.deepEqual(contentIssues(document(filled)),[]);
+ for(const label of ['','[]','[기입]','[내용]','미정','**[기입]**']){
+  const issues=contentIssues(document(words.map(()=>label)));
+  for(const word of words)assert.ok(issues.includes(`${word} 답변 확인 필요`),label);
+ }
+ const placeholders=['[구체적인 인물과 관계]','[작품 전체의 이야기와 장기 목적]','[우위의 원리 → 선택 → 실행 → 결과]','[구체적인 무대와 작동 조건]','[시대·시작 시점·행동의 계기]','[개인적인 욕망과 동기]'];
+ for(const word of words)assert.ok(contentIssues(document(placeholders)).includes(`${word} 답변 확인 필요`));
+});

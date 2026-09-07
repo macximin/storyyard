@@ -1,5 +1,17 @@
 import { createHash } from "node:crypto";
 export const hashText = (value) => createHash("sha256").update(value,"utf8").digest("hex");
+const emptyAnswerLabels = new Set([
+ "제목","작품명","가제","로그라인","주인공","내용","작성","기입",
+ "미정","없음","해당 없음","n/a","tbd","body",
+ "구체적인 인물과 관계","작품 전체의 이야기와 장기 목적",
+ "우위의 원리 → 선택 → 실행 → 결과","구체적인 무대와 작동 조건",
+ "시대·시작 시점·행동의 계기","개인적인 욕망과 동기",
+]);
+function hasAnswer(value){
+ let text=value.replace(/[`*_]/g,'').trim();
+ if(text.startsWith('[')&&text.endsWith(']'))text=text.slice(1,-1).trim();
+ return /[가-힣A-Za-z0-9]/.test(text)&&!emptyAnswerLabels.has(text.toLowerCase());
+}
 export function formatIssues(markdown) {
  const sections=[...markdown.matchAll(/^#{1,2}\s+(\d+)\.\s+(.+)$/gmu)];
  const issues=[];
@@ -30,7 +42,7 @@ export function contentIssues(markdown){
     if((line.match(/\b(?:WHO|WHAT|HOW|WHERE|WHEN|WHY)\b/g)||[]).length!==1)continue;
     const tail=line.split(word)[1];let table=line.trim();if(table.startsWith('|'))table=table.slice(1);if(table.endsWith('|'))table=table.slice(0,-1);const cells=table.split('|');
     const value=line.includes('|')?cells.at(-1):tail.includes(':')?tail.slice(tail.indexOf(':')+1):tail.includes('：')?tail.slice(tail.indexOf('：')+1):lines.slice(n+1).join('\n').split(/\b(?:WHO|WHAT|HOW|WHERE|WHEN|WHY)\b|^#/m)[0];
-    if(plain(value)&&!/^\s*\[[^\]]+\]\s*$/.test(value))answered=true;
+    if(hasAnswer(value))answered=true;
    }
    if(!answered)issues.push(`${word} 답변 확인 필요`);
   }
