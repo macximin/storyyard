@@ -1,7 +1,7 @@
 import {eq,desc} from "drizzle-orm";
 import {runtimeSecret} from "@/app/chatgpt-auth";
 import {hasDistinctBearerAuthority} from "@/app/firefly-review-service-auth";
-import {getPlanningCanary} from "@/app/firefly-canaries";
+import {listPlanningCanaries,getPlanningCanary} from "@/app/firefly-canaries";
 import {hashText,validateCanary} from "@/app/firefly-canary-contract.mjs";
 import {getDb} from "@/db";
 import {fireflyReviewSnapshots,fireflyReviewDecisions} from "@/db/schema";
@@ -29,7 +29,13 @@ export async function POST(request:Request){
 }
 export async function GET(request:Request){
  if(!authorized(request))return Response.json({error:"Forbidden"},{status:403,headers});
- const id=new URL(request.url).searchParams.get("id");
+ const params=new URL(request.url).searchParams;
+ if(params.get("view")==="hil"){
+  const decisions=await getDb().select().from(fireflyReviewDecisions).orderBy(desc(fireflyReviewDecisions.createdAt)).limit(1000);
+  return Response.json({decisions,coverage:"review-and-canary",truncated:decisions.length===1000},{headers});
+ }
+ if(params.get("view")==="inventory")return Response.json({canaries:await listPlanningCanaries(true)},{headers});
+ const id=params.get("id");
  if(id){const c=await getPlanningCanary(id);if(!c)return Response.json({error:"Not found"},{status:404,headers});
   const decisions=await getDb().select().from(fireflyReviewDecisions).where(eq(fireflyReviewDecisions.packetId,id)).orderBy(desc(fireflyReviewDecisions.createdAt));
   return Response.json({canary:c,decisions},{headers});}

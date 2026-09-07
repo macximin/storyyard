@@ -27,7 +27,7 @@ export function ReviewCollection({ user, entries, mode, archiveCount, canaries =
           {items.map((entry) => <ReviewCard key={entry.packet.packetId} entry={entry} />)}
           {!items.length && !extra.length && <p className="ff-review-column-empty">해당 검토가 없습니다.</p>}
         </section>;
-      })}</div> : <div className="ff-review-archive-list">{visible.map((entry) => <ReviewCard key={entry.packet.packetId} entry={entry} />)}{!visible.length && <p>보관된 검토가 없습니다.</p>}</div>}
+      })}</div> : <div className="ff-review-archive-list">{canaries.map(e=><CanaryCard key={e.canary.id} canary={e.canary} decisions={e.decisions}/>)}{visible.map((entry) => <ReviewCard key={entry.packet.packetId} entry={entry} />)}{!visible.length && !canaries.length && <p>보관된 검토가 없습니다.</p>}</div>}
     </section>
   </main>;
 }
