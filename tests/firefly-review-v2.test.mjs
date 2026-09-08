@@ -155,7 +155,7 @@ test("accepts a strict blind v2 packet without raw source prose", () => {
   assert.equal(JSON.stringify(parsed).includes("원문 압박"), false);
 });
 
-test("accepts Astra/high v2 packets while binding the exact model to packet identity", () => {
+test("accepts Astra high and medium v2 packets while binding the exact runtime to packet identity", () => {
   const astra = packet();
   astra.comparison.runtime.model = "gpt-6-astra";
   assert.throws(() => validateFireflyReviewPacket(astra), /identity or SHA-256 mismatch/u);
@@ -163,12 +163,21 @@ test("accepts Astra/high v2 packets while binding the exact model to packet iden
   assert.equal(parsed.comparison.runtime.model, "gpt-6-astra");
   assert.equal(parsed.comparison.runtime.reasoning, "high");
 
+  const medium = structuredClone(parsed);
+  medium.comparison.runtime.reasoning = "medium";
+  assert.throws(() => validateFireflyReviewPacket(medium), /identity or SHA-256 mismatch/u);
+  assert.equal(validateFireflyReviewPacket(rehash(medium)).comparison.runtime.reasoning, "medium");
+
   const unsupported = packet();
   unsupported.comparison.runtime.model = "gpt-5.6-terra";
-  assert.throws(() => validateFireflyReviewPacket(rehash(unsupported)), /supported Sol\/Astra high/u);
+  assert.throws(() => validateFireflyReviewPacket(rehash(unsupported)), /supported Sol\/high or Astra\/high\/medium/u);
   const wrongReasoning = packet();
   wrongReasoning.comparison.runtime.reasoning = "medium";
-  assert.throws(() => validateFireflyReviewPacket(rehash(wrongReasoning)), /supported Sol\/Astra high/u);
+  assert.throws(() => validateFireflyReviewPacket(rehash(wrongReasoning)), /supported Sol\/high or Astra\/high\/medium/u);
+
+  const unsupportedEffort = structuredClone(astra);
+  unsupportedEffort.comparison.runtime.reasoning = "low";
+  assert.throws(() => validateFireflyReviewPacket(rehash(unsupportedEffort)), /supported Sol\/high or Astra\/high\/medium/u);
 });
 
 test("rejects candidate drift, automatic rewrite, and raw selector fields", () => {

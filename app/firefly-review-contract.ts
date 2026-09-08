@@ -153,7 +153,7 @@ export type FireflyReviewPacketV2 = PacketBase & {
       retrieval: "legacy";
       fts: "off";
       model: "gpt-5.6-sol" | "gpt-6-astra";
-      reasoning: "high";
+      reasoning: "high" | "medium";
     };
   };
   candidates: [FireflyReviewCandidateV2, FireflyReviewCandidateV2];
@@ -615,9 +615,11 @@ function validateV2(packet: Record<string, unknown>): FireflyReviewPacketV2 {
   const comparisonIsolation = validateCanaryIsolation(comparison.canaryIsolation, "comparison canary isolation");
   const runtime = requireRecord(comparison.runtime, "comparison runtime");
   exactKeys(runtime, ["kernel", "piWorker", "retrieval", "fts", "model", "reasoning"]);
+  const supportedComparisonRuntime = (runtime.model === "gpt-5.6-sol" && runtime.reasoning === "high")
+    || (runtime.model === "gpt-6-astra" && (runtime.reasoning === "high" || runtime.reasoning === "medium"));
   if (runtime.kernel !== "enforce" || runtime.piWorker !== "off" || runtime.retrieval !== "legacy" || runtime.fts !== "off"
-    || (runtime.model !== "gpt-5.6-sol" && runtime.model !== "gpt-6-astra") || runtime.reasoning !== "high") {
-    throw new Error("comparison runtime is not a supported Sol/Astra high Phase 7 baseline.");
+    || !supportedComparisonRuntime) {
+    throw new Error("comparison runtime is not a supported Sol/high or Astra/high/medium Phase 7 baseline.");
   }
 
   if (!Array.isArray(packet.candidates) || packet.candidates.length !== 2) throw new Error("v2 blind comparison requires exactly two candidates.");
