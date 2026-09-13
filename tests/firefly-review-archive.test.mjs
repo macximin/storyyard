@@ -70,6 +70,7 @@ test("kanban derives receipt states without turning a human opinion into complet
 
 test("kanban and archive use the same packet identities with exact candidate links", async () => {
   const { ReviewCollection } = await component("../app/review/collection.tsx", {
+    "./bulk-review-actions": {BulkReviewActions: ({children}) => children, BulkReviewCheckbox: () => null},
     "./canary-card": await component("../app/review/canary-card.tsx",{"../firefly-canary-catalog.mjs":canaryCatalog}),
     "../global-sidebar": { GlobalSidebar: () => null }, "../firefly-review-catalog": catalog, "./collection-model.ts": collectionModel,
     "../firefly-review-display.mjs": { fireflyReviewQueueMetadata },
