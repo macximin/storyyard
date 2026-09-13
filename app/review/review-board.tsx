@@ -83,7 +83,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
           <h2>검토 대기 없음</h2>
           <p>원고 적용 또는 평가 수신 영수증까지 확인된 패킷은 활성 큐에서 자동 종료됩니다.</p>
           {completedCount > 0 && <span>종료된 패킷 {completedCount}개</span>}
-          <p><a href="/review/board">검토 칸반</a> · <a href="/review/archive">검토 보관함</a></p>
+          <p><a href="/review/board">검토 목록</a> · <a href="/review/archive">검토 보관함</a></p>
         </section>
       </section>
     </main>;
@@ -185,7 +185,7 @@ export function FireflyReviewBoard({ user, packets, completedCount, initialDecis
         <div><p className="kicker">FIREFLY HUMAN REVIEW</p><h1>{archive ? "보관된 검토" : completed ? "처리 확인된 검토" : "오늘 검토"}</h1><p>{archive || completed ? "이전 내용과 당시 판정 기록입니다." : "재미와 도파민을 먼저 보고, 정합성은 치명적인 모순만 막습니다."}</p></div>
         <div className="review-authority"><LockKey size={18} /><strong>정본은 InkOS</strong><span>Storyyard는 판정만 기록</span></div>
       </header>
-      <nav className="ff-review-view-nav" aria-label="검토 보기"><a href="/review">검토 대기</a><a href="/review/board">검토 칸반</a><a href="/review/archive">검토 보관함</a></nav>
+      <nav className="ff-review-view-nav" aria-label="검토 보기"><a href="/review">검토 대기</a><a href="/review/board">검토 목록</a><a href="/review/archive">검토 보관함</a></nav>
       {archive && <aside className="ff-review-archive-notice"><strong>{archive.invalidated ? "무효 처리된 이전 검토 · 읽기 전용" : "보관된 이전 검토 · 읽기 전용"}</strong><p>{archive.reason}</p><small>보관일 {archive.archivedAt.slice(0, 10)}</small></aside>}
       {completed && !archive && <aside className="ff-review-archive-notice"><strong>처리 확인된 검토 · 읽기 전용</strong><p>기록된 판정과 InkOS 처리 확인을 볼 수 있습니다.</p></aside>}
       <nav className="review-queue" aria-label="검토 패킷">

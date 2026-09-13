@@ -7,6 +7,7 @@ import * as Phosphor from "@phosphor-icons/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 import * as catalog from "../app/firefly-review-catalog.ts";
+import * as collectionModel from "../app/review/collection-model.ts";
 import * as canaryCatalog from "../app/firefly-canary-catalog.mjs";
 import * as queue from "../app/firefly-review-queue.ts";
 import { mergeFireflyReviewPackets, validateFireflyReviewPacketStaticIndex } from "../app/firefly-review-packet-index.mjs";
@@ -70,24 +71,29 @@ test("kanban derives receipt states without turning a human opinion into complet
 test("kanban and archive use the same packet identities with exact candidate links", async () => {
   const { ReviewCollection } = await component("../app/review/collection.tsx", {
     "./canary-card": await component("../app/review/canary-card.tsx",{"../firefly-canary-catalog.mjs":canaryCatalog}),
-    "../global-sidebar": { GlobalSidebar: () => null }, "../firefly-review-catalog": catalog,
+    "../global-sidebar": { GlobalSidebar: () => null }, "../firefly-review-catalog": catalog, "./collection-model.ts": collectionModel,
     "../firefly-review-display.mjs": { fireflyReviewQueueMetadata },
   });
   const entries = packets.map((packet) => ({ packet, decisions: [], archive: archives.get(packet.packetId), invalidationReason: invalidations.find((item) => item.packetId === packet.packetId)?.reason }));
-  const board = renderToStaticMarkup(React.createElement(ReviewCollection, { user, entries, mode: "board", archiveCount: 17 }));
+  const board = renderToStaticMarkup(React.createElement(ReviewCollection, { user, entries, mode: "board", query: {view:"board"}, archiveCount: 17 }));
   assert.equal((board.match(/class="ff-review-card"/gu) ?? []).length, 1);
   for (const candidate of current.candidates) assert.ok(board.includes(catalog.reviewDetailHref(currentId, candidate.id)));
   for (const id of archives.keys()) assert.ok(!board.includes(`id="packet-${id}"`));
-  const history = renderToStaticMarkup(React.createElement(ReviewCollection, { user, entries, mode: "archive", archiveCount: 17 }));
+  const history = renderToStaticMarkup(React.createElement(ReviewCollection, { user, entries, mode: "archive", query: {view:"board"}, archiveCount: 17 }));
   assert.equal((history.match(/class="ff-review-card"/gu) ?? []).length, 17);
-  assert.equal((history.match(/>무효 기록</gu) ?? []).length, 2);
+  assert.equal((history.match(/>무효 기록<\/span>/gu) ?? []).length, 2);
   assert.ok(!history.includes(`id="packet-${currentId}"`));
   for (const packet of packets.filter((p) => archives.has(p.packetId))) for (const candidate of packet.candidates) assert.ok(history.includes(catalog.reviewDetailHref(packet.packetId, candidate.id, true)));
-  assert.doesNotMatch(board + history, /<form|draggable=/);
+  assert.doesNotMatch(board + history, /method="post"|draggable=/);
   const canaries = ['complete','incomplete','failed'].map((state,i)=>({canary:{id:`fcp-${i}`,title:`비교 ${i}`,state,generatedAt:'2026-09-06',author:{route:'웹',model:'관찰 모델',reasoning:'최고'}},decisions:i===1?[{decision:'hold',status:'pending',createdAt:'2026-09-06'}]:[]}));
-  const combined=renderToStaticMarkup(React.createElement(ReviewCollection,{user,entries,mode:'board',archiveCount:17,canaries}));
+  const combined=renderToStaticMarkup(React.createElement(ReviewCollection,{user,entries,mode:'board',query:{view:'board'},archiveCount:17,canaries}));
   assert.equal((combined.match(/class="ff-review-card"/gu)??[]).length,4);
   for(const e of canaries)assert.ok(combined.includes(`/review/canary/${e.canary.id}`));
+  const list = renderToStaticMarkup(React.createElement(ReviewCollection,{user,entries,mode:'board',archiveCount:17,canaries}));
+  assert.match(list, /<table/);
+  assert.equal((list.match(/<tr id=/g) ?? []).length,4);
+  assert.doesNotMatch(list,/실행 영수증|class="ff-review-card"/);
+  for (const candidate of current.candidates) assert.ok(list.includes(catalog.reviewDetailHref(currentId,candidate.id)));
   assert.match(combined,/실행 영수증/);assert.match(combined,/실행 실패/);assert.match(combined,/보류/);
 
 });

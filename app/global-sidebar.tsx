@@ -179,8 +179,8 @@ export function GlobalSidebar({
             <Link className={active === "review" ? "active" : ""} href="/review" aria-label="검토 대기">
               <ClipboardText size={18} /><span>검토 대기</span>
             </Link>
-            <Link className={active === "review-board" ? "active" : ""} href="/review/board" aria-label="검토 칸반">
-              <Kanban size={18} /><span>검토 칸반</span>
+            <Link className={active === "review-board" ? "active" : ""} href="/review/board" aria-label="검토 목록">
+              <Kanban size={18} /><span>검토 목록</span>
             </Link>
             <Link className={active === "review-archive" ? "active" : ""} href="/review/archive" aria-label="검토 보관함">
               <Archive size={18} /><span>검토 보관함</span>

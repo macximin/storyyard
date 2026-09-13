@@ -82,6 +82,10 @@ function parseSurfaceClassifications(value: string): unknown[] {
 
 export async function listDecisionsForPackets(ids:string[]){
  if(!ids.length)return new Map<string,FireflyReviewDecisionRecord[]>();
- const rows=await getDb().select().from(fireflyReviewDecisions).where(inArray(fireflyReviewDecisions.packetId,ids)).orderBy(desc(fireflyReviewDecisions.createdAt));
+ // Lists filter before pagination; keep each D1 query below its bind limit.
+ const rows: FireflyReviewDecisionRecord[] = [];
+ for(let offset=0;offset<ids.length;offset+=80){
+  rows.push(...await getDb().select().from(fireflyReviewDecisions).where(inArray(fireflyReviewDecisions.packetId,ids.slice(offset,offset+80))).orderBy(desc(fireflyReviewDecisions.createdAt)));
+ }
  const grouped=new Map<string,FireflyReviewDecisionRecord[]>();for(const row of rows)grouped.set(row.packetId,[...(grouped.get(row.packetId)||[]),row]);return grouped;
 }

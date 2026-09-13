@@ -1,5 +1,3 @@
-import {pageCanaries} from "@/app/firefly-canary-catalog.mjs";
-import {CanaryPagination} from "../canary-pagination";
 import {listPlanningCanaries} from "@/app/firefly-canaries";
 import { redirect } from "next/navigation";
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
@@ -19,8 +17,7 @@ export default async function ReviewArchivePage({ searchParams }: { searchParams
   if (selected) redirect(reviewDetailHref(selected.packetId, selected.candidates[0].id, true));
   const entries = await Promise.all(packets.map(async (packet) => ({ packet, archive: getFireflyReviewArchive(packet.packetId), invalidationReason: getFireflyReviewInvalidation(packet.packetId)?.reason, decisions: await listFireflyReviewDecisions(packet.packetId) })));
   const all=(await listPlanningCanaries(true)).filter(c=>c.lifecycle?.archived);
-  const filters={date:typeof query.date==='string'?query.date:'',route:typeof query.route==='string'?query.route:'',cursor:typeof query.cursor==='string'?query.cursor:''};
-  const page=pageCanaries(all,filters),decisions=await listDecisionsForPackets(page.items.map((c:{id:string})=>c.id));
-  const canaries=page.items.map((canary:any)=>({canary,decisions:decisions.get(canary.id)||[]}));
-  return <ReviewCollection canaries={canaries} user={user} entries={entries} mode="archive" archiveCount={packets.length+all.length} controls={<CanaryPagination base="/review/archive" {...filters} total={page.total} nextCursor={page.nextCursor}/>}/>;
+  const decisions=await listDecisionsForPackets(all.map(c=>c.id));
+  const canaries=all.map(canary=>({canary,decisions:decisions.get(canary.id)||[]}));
+  return <ReviewCollection canaries={canaries} user={user} entries={entries} mode="archive" archiveCount={packets.length+all.length} query={query}/>;
 }

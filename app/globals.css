@@ -1528,3 +1528,67 @@ a { color: inherit; text-decoration: none; }
 .ff-plan-flow li > span { flex: 0 0 auto; color: #8b7500; font-size: .9375rem; font-weight: 850; }
 .ff-plan-flow li > p { margin: 0; font-size: 1rem; font-weight: 650; line-height: 1.7; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .ff-plan-flow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+
+/* Compact review library: one record per row, optional kanban. */
+.ff-collection-filters { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; padding:16px; border:1px solid #ddd; border-radius:8px; background:#fafaf8; }
+.ff-collection-filters label { display:flex; flex-direction:column; gap:6px; color:#555; font-size:.78rem; font-weight:600; }
+.ff-collection-search { flex:1 1 260px; }
+.ff-collection-filters input, .ff-collection-filters select { min-width:0; height:40px; padding:8px 11px; border:1px solid #ccc; border-radius:5px; color:#222; background:#fff; font:inherit; font-size:.875rem; }
+.ff-collection-filters button { min-height:40px; padding:8px 20px; border:1px solid #d3b746; border-radius:5px; background:var(--yellow); color:#292713; font:inherit; font-size:.875rem; font-weight:700; cursor:pointer; }
+.ff-collection-reset { padding:11px 2px; color:#666; font-size:.8rem; }
+.ff-collection-extra { flex-basis:100%; color:#666; font-size:.8rem; }
+.ff-collection-extra summary { cursor:pointer; width:fit-content; padding:4px 0; }
+.ff-collection-extra > div { display:flex; flex-wrap:wrap; gap:12px; padding-top:10px; }
+.ff-collection-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:18px 0 10px; }
+.ff-collection-toolbar p { color:#777; font-size:.8rem; margin:0; }
+.ff-collection-toolbar strong { color:#333; font-size:.9rem; }
+.ff-collection-view { display:flex; padding:3px; border:1px solid #ddd; border-radius:6px; background:#f5f5f3; }
+.ff-collection-view a { padding:7px 13px; color:#666; text-decoration:none; font-size:.8rem; border:1px solid transparent; border-radius:4px; }
+.ff-collection-view a[aria-current="page"] { color:#222; background:white; border-color:#ddd; font-weight:700; }
+.ff-collection-table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:.875rem; }
+.ff-collection-table th { padding:11px 12px; background:#f6f6f4; color:#666; font-size:.75rem; font-weight:500; text-align:left; border-block:1px solid #ddd; }
+.ff-collection-table th:first-child { width:108px; }
+.ff-collection-table th:nth-child(3) { width:94px; }
+.ff-collection-table th:last-child { width:132px; }
+.ff-collection-table td { height:54px; padding:8px 12px; border-bottom:1px solid #e8e8e5; vertical-align:middle; }
+.ff-collection-table tbody tr:hover, .ff-collection-table tbody tr:focus-within { background:#fffcf0; }
+.ff-collection-title > div { display:flex; align-items:center; gap:8px; min-width:0; }
+.ff-collection-title-link { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#242424; font-weight:550; text-decoration:none; padding:8px 0; }
+.ff-collection-title-link:hover { text-decoration:underline; }
+.ff-collection-kind, .ff-collection-date { color:#777; font-size:.78rem; white-space:nowrap; }
+.ff-status { display:inline-block; padding:4px 7px; border-radius:4px; font-size:.73rem; white-space:nowrap; background:#f3f3f1; color:#666; }
+.ff-status-waiting { background:#fff5ca; color:#766019; }
+.ff-status-recorded { background:#edf1f7; color:#42618a; }
+.ff-status-confirmed { background:#edf5ef; color:#386846; }
+.ff-status[data-status="hold"] { background:#f8f0e4; color:#826029; }
+.ff-status[data-status="reject"], .ff-status[data-status="failed"], .ff-status[data-status="invalid"] { background:#fbeeed; color:#9a4642; }
+.ff-collection-candidates { position:relative; flex-shrink:0; }
+.ff-collection-candidates summary { list-style:none; padding:5px 7px; color:#666; font-size:.7rem; border:1px solid #ddd; border-radius:4px; cursor:pointer; background:#fff; }
+.ff-collection-candidates summary::-webkit-details-marker { display:none; }
+.ff-collection-candidates > div { position:absolute; z-index:5; right:0; top:calc(100% + 5px); width:320px; max-width:70vw; padding:6px; background:#fff; border:1px solid #ddd; border-radius:6px; box-shadow:0 5px 20px #0002; }
+.ff-collection-candidates a { display:block; padding:10px; color:#333; font-size:.8rem; text-decoration:none; overflow-wrap:anywhere; }
+.ff-collection-candidates a:hover { background:#fff5ca; }
+.ff-collection-pagination { display:flex; justify-content:center; align-items:center; gap:20px; margin:24px 0; font-size:.875rem; }
+.ff-collection-pagination a, .ff-collection-empty a { color:#5d5323; padding:10px; }
+.ff-collection-empty { text-align:center; padding:50px 16px; border-block:1px solid #ddd; color:#777; }
+.ff-collection-empty h2 { color:#444; font-size:1rem; }
+.ff-collection-empty p { margin:10px 0 20px; font-size:.875rem; }
+.ff-visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.ff-collection-filters :is(input,select,button,a,summary):focus-visible, .ff-collection-table :is(a,summary):focus-visible, .ff-collection-view a:focus-visible, .ff-collection-pagination a:focus-visible { outline:2px solid #235578; outline-offset:3px; }
+@media (max-width:680px) {
+ .ff-review-collection { padding:20px 14px; }
+ .ff-collection-filters { gap:10px; padding:12px; }
+ .ff-collection-search { flex-basis:100%; }
+ .ff-collection-filters label:not(.ff-collection-search) { flex:1 1 115px; }
+ .ff-collection-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+ .ff-collection-table, .ff-collection-table tbody { display:block; }
+ .ff-collection-table tr { display:grid; grid-template-columns:88px minmax(0,1fr) 108px; align-items:center; border-bottom:1px solid #e8e8e5; padding:8px 0; }
+ .ff-collection-table td { display:block; height:auto; padding:2px 5px; border:0; }
+ .ff-collection-table td:first-child { grid-column:1; grid-row:1 / 3; }
+ .ff-collection-title { grid-column:2 / 4; grid-row:1; }
+ .ff-collection-title-link { padding:5px 0; font-size:.85rem; }
+ .ff-collection-kind { grid-column:2; grid-row:2; }
+ .ff-collection-date { grid-column:3; grid-row:2; text-align:right; }
+ .ff-collection-kind, .ff-collection-date { font-size:.7rem; }
+ .ff-collection-candidates > div { width:260px; max-width:65vw; }
+}
